@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar } from "@/components/avatar";
+import { RankBadge } from "@/components/rank-badge";
 import { formatCents } from "@/lib/format";
 import type { LeaderboardEntry } from "@/types";
 
@@ -120,7 +120,7 @@ export function ClaimSheet({
         <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-5">
           {myEntry ? (
             <div className="card flex items-center gap-3 rounded-[var(--radius-md)] p-3">
-              <Avatar seed={myEntry.id} initials={myEntry.initials} size={40} />
+              <RankBadge rank={myEntry.rank} />
               <div className="min-w-0">
                 <p className="truncate text-[14px] font-medium text-foreground">
                   {myEntry.displayName}

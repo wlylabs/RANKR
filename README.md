@@ -73,7 +73,7 @@ Open http://localhost:3000.
 ```
 src/
   app/                 Routes: home page, /api/leaderboard, /api/claim
-  components/          UI: navbar, hero, podium, leaderboard list, claim sheet
+  components/          UI: navbar, hero, leaderboard list, claim sheet
   components/ui/       Small primitives: button, input, dialog, toast
   hooks/               useLeaderboard (SWR polling), useMyEntrant (local identity)
   lib/                 db, entrants (ranking/claim logic), payments, formatting

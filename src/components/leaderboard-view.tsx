@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { Navbar } from "@/components/navbar";
 import { Hero } from "@/components/hero";
-import { Podium } from "@/components/podium";
 import { LeaderboardList } from "@/components/leaderboard-list";
 import { Footer } from "@/components/footer";
 import { ClaimSheet, type ClaimSubmitInput, type ClaimSubmitResult } from "@/components/claim-sheet";
@@ -36,8 +35,6 @@ export function LeaderboardView({ initialLeaderboard }: { initialLeaderboard: Le
   const [justMovedId, setJustMovedId] = useState<string | null>(null);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const top3 = leaderboard.slice(0, 3);
-  const rest = leaderboard.slice(3);
   const totalPooledCents = leaderboard.reduce((sum, entry) => sum + entry.totalCents, 0);
   const topAmountCents = leaderboard[0]?.totalCents ?? 0;
 
@@ -101,14 +98,7 @@ export function LeaderboardView({ initialLeaderboard }: { initialLeaderboard: Le
             </p>
           </div>
         ) : (
-          <>
-            <Podium entries={top3} justMovedId={justMovedId} />
-            {rest.length > 0 && (
-              <div className="mt-6">
-                <LeaderboardList entries={rest} justMovedId={justMovedId} />
-              </div>
-            )}
-          </>
+          <LeaderboardList entries={leaderboard} justMovedId={justMovedId} />
         )}
       </main>
 

@@ -18,7 +18,6 @@ function openDatabase(): DatabaseSync {
     CREATE TABLE IF NOT EXISTS entrants (
       id TEXT PRIMARY KEY,
       display_name TEXT NOT NULL,
-      initials TEXT NOT NULL,
       total_cents INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL

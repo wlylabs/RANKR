@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Avatar } from "@/components/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { cn } from "@/lib/cn";
 import { formatCents } from "@/lib/format";
@@ -14,6 +13,8 @@ export function LeaderboardRow({
   entry: LeaderboardEntry;
   justMoved: boolean;
 }) {
+  const isTopThree = entry.rank <= 3;
+
   return (
     <motion.div
       layout
@@ -23,16 +24,27 @@ export function LeaderboardRow({
       exit={{ opacity: 0, y: 8 }}
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       className={cn(
-        "flex items-center gap-3 border-b border-border px-4 py-3 last:border-none sm:px-5",
+        "flex items-center gap-3 border-b border-border px-4 py-3.5 last:border-none sm:px-5",
+        isTopThree && "py-4",
         justMoved && "rounded-[var(--radius-sm)] border-transparent bg-accent-soft",
       )}
     >
       <RankBadge rank={entry.rank} />
-      <Avatar seed={entry.id} initials={entry.initials} size={36} />
-      <p className="min-w-0 flex-1 truncate text-[14.5px] font-medium text-foreground">
+      <p
+        className={cn(
+          "min-w-0 flex-1 truncate text-foreground",
+          isTopThree ? "text-[16px] font-semibold" : "text-[14.5px] font-medium",
+        )}
+      >
         {entry.displayName}
       </p>
-      <p className="tabular shrink-0 text-[14.5px] font-semibold text-foreground-muted">
+      <p
+        className={cn(
+          "tabular shrink-0 font-semibold",
+          isTopThree ? "text-[17px] text-foreground" : "text-[14.5px] text-foreground-muted",
+          entry.rank === 1 && "accent-text",
+        )}
+      >
         {formatCents(entry.totalCents)}
       </p>
     </motion.div>
