@@ -16,9 +16,14 @@ export function LeaderboardList({
   return (
     <LayoutGroup id="list">
       <div className="card overflow-hidden rounded-[var(--radius-lg)]">
-        <AnimatePresence initial={false}>
-          {entries.map((entry) => (
-            <LeaderboardRow key={entry.id} entry={entry} justMoved={entry.id === justMovedId} />
+        <AnimatePresence>
+          {entries.map((entry, index) => (
+            <LeaderboardRow
+              key={entry.id}
+              entry={entry}
+              index={index}
+              justMoved={entry.id === justMovedId}
+            />
           ))}
         </AnimatePresence>
       </div>

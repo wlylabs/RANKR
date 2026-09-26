@@ -84,6 +84,7 @@ export function LeaderboardView({ initialLeaderboard }: { initialLeaderboard: Le
         entrantCount={leaderboard.length}
         totalPooledCents={totalPooledCents}
         topAmountCents={topAmountCents}
+        previewEntries={leaderboard.slice(0, 5)}
         onClaim={() => setDialogOpen(true)}
       />
 

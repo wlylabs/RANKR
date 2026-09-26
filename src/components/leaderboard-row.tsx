@@ -2,18 +2,22 @@
 
 import { motion } from "framer-motion";
 import { RankBadge } from "@/components/rank-badge";
+import { useCountUp } from "@/hooks/use-count-up";
 import { cn } from "@/lib/cn";
 import { formatCents } from "@/lib/format";
 import type { LeaderboardEntry } from "@/types";
 
 export function LeaderboardRow({
   entry,
+  index,
   justMoved,
 }: {
   entry: LeaderboardEntry;
+  index: number;
   justMoved: boolean;
 }) {
   const isTopThree = entry.rank <= 3;
+  const animatedCents = useCountUp(entry.totalCents);
 
   return (
     <motion.div
@@ -22,11 +26,16 @@ export function LeaderboardRow({
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
-      transition={{ type: "spring", stiffness: 320, damping: 32 }}
+      transition={{
+        layout: { type: "spring", stiffness: 320, damping: 32 },
+        opacity: { duration: 0.25, delay: Math.min(index * 0.025, 0.3) },
+        y: { duration: 0.25, delay: Math.min(index * 0.025, 0.3) },
+      }}
+      whileHover={{ x: 2 }}
       className={cn(
-        "flex items-center gap-3 border-b border-border px-4 py-3.5 last:border-none sm:px-5",
+        "flex items-center gap-3 border-b border-border px-4 py-3.5 transition-colors last:border-none hover:bg-surface-2 sm:px-5",
         isTopThree && "py-4",
-        justMoved && "rounded-[var(--radius-sm)] border-transparent bg-accent-soft",
+        justMoved && "rounded-[var(--radius-sm)] border-transparent bg-accent-soft hover:bg-accent-soft",
       )}
     >
       <RankBadge rank={entry.rank} />
@@ -45,7 +54,7 @@ export function LeaderboardRow({
           entry.rank === 1 && "accent-text",
         )}
       >
-        {formatCents(entry.totalCents)}
+        {formatCents(Math.round(animatedCents))}
       </p>
     </motion.div>
   );

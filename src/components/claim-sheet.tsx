@@ -165,7 +165,7 @@ export function ClaimSheet({
                   key={preset}
                   type="button"
                   onClick={() => setAmount(String(preset))}
-                  className="rounded-full border border-border px-3 py-1 text-[12.5px] font-medium text-foreground-muted transition-colors hover:border-border-strong hover:text-foreground"
+                  className="rounded-full border border-border px-3 py-1 text-[12.5px] font-medium text-foreground-muted transition-all duration-150 hover:border-border-strong hover:text-foreground active:scale-[0.94]"
                 >
                   ${preset}
                 </button>
@@ -174,7 +174,7 @@ export function ClaimSheet({
                 <button
                   type="button"
                   onClick={() => setAmount((takeFirstCents / 100).toFixed(2))}
-                  className="rounded-full border border-accent/30 bg-accent-soft px-3 py-1 text-[12.5px] font-medium accent-text transition-colors hover:brightness-95"
+                  className="rounded-full border border-accent/30 bg-accent-soft px-3 py-1 text-[12.5px] font-medium accent-text transition-all duration-150 hover:brightness-95 active:scale-[0.94]"
                 >
                   Take #1 — {formatCents(takeFirstCents)}
                 </button>
