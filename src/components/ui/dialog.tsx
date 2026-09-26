@@ -34,7 +34,7 @@ export function DialogContent({
         {children}
         {showClose && (
           <RadixDialog.Close
-            className="absolute right-4 top-4 rounded-full p-1.5 text-foreground-subtle hover:text-foreground hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50"
+            className="absolute right-4 top-4 rounded-full p-1.5 text-foreground-subtle hover:text-foreground hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             aria-label="Close"
           >
             <X size={18} strokeWidth={2} />

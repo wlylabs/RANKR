@@ -22,7 +22,7 @@ function fireConfetti() {
     gravity: 1.1,
     ticks: 160,
     origin: { y: 0.35 },
-    colors: ["#f8e7bd", "#d8b264", "#a87f3c", "#f5f5f7"],
+    colors: ["#0e8f68", "#3ecf98", "#6c63ff", "#101110"],
     scalar: 0.85,
     disableForReducedMotion: true,
   });
@@ -92,7 +92,7 @@ export function LeaderboardView({ initialLeaderboard }: { initialLeaderboard: Le
 
       <main id="leaderboard" className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 sm:px-6">
         {leaderboard.length === 0 ? (
-          <div className="glass-panel rounded-[var(--radius-lg)] px-6 py-16 text-center">
+          <div className="card rounded-[var(--radius-lg)] px-6 py-16 text-center">
             <p className="text-[16px] font-medium text-foreground">
               The leaderboard is empty.
             </p>

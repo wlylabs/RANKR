@@ -63,7 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               exit={{ opacity: 0, y: -12, scale: 0.96 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className={cn(
-                "glass-panel pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--radius-md)] p-4 shadow-2xl",
+                "card-lifted pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--radius-md)] p-4",
               )}
             >
               {toast.variant === "error" ? (

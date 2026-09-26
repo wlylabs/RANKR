@@ -1,13 +1,12 @@
 import { getDb } from "@/lib/db";
 import { generateId } from "@/lib/id";
-import { colorFor, initialsFor } from "@/lib/avatar";
+import { initialsFor } from "@/lib/avatar";
 import type { LeaderboardEntry } from "@/types";
 
 interface EntrantRow {
   id: string;
   display_name: string;
   initials: string;
-  color: string;
   total_cents: number;
   created_at: number;
   updated_at: number;
@@ -18,7 +17,6 @@ function toEntry(row: EntrantRow, rank: number): LeaderboardEntry {
     id: row.id,
     displayName: row.display_name,
     initials: row.initials,
-    color: row.color,
     totalCents: row.total_cents,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -76,13 +74,12 @@ export function recordClaim(input: ClaimInput): ClaimResult {
     } else {
       entrantId = generateId("entrant");
       db.prepare(
-        `INSERT INTO entrants (id, display_name, initials, color, total_cents, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO entrants (id, display_name, initials, total_cents, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       ).run(
         entrantId,
         input.displayName,
         initialsFor(input.displayName),
-        colorFor(input.displayName + entrantId),
         input.amountCents,
         now,
         now,

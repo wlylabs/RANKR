@@ -119,8 +119,8 @@ export function ClaimSheet({
 
         <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-5">
           {myEntry ? (
-            <div className="glass-panel flex items-center gap-3 rounded-[var(--radius-md)] p-3">
-              <Avatar initials={myEntry.initials} color={myEntry.color} size={40} />
+            <div className="card flex items-center gap-3 rounded-[var(--radius-md)] p-3">
+              <Avatar seed={myEntry.id} initials={myEntry.initials} size={40} />
               <div className="min-w-0">
                 <p className="truncate text-[14px] font-medium text-foreground">
                   {myEntry.displayName}
@@ -174,7 +174,7 @@ export function ClaimSheet({
                 <button
                   type="button"
                   onClick={() => setAmount((takeFirstCents / 100).toFixed(2))}
-                  className="rounded-full border border-gold-600/40 bg-gold-500/[0.08] px-3 py-1 text-[12.5px] font-medium text-gold-300 transition-colors hover:bg-gold-500/[0.14]"
+                  className="rounded-full border border-accent/30 bg-accent-soft px-3 py-1 text-[12.5px] font-medium accent-text transition-colors hover:brightness-95"
                 >
                   Take #1 — {formatCents(takeFirstCents)}
                 </button>

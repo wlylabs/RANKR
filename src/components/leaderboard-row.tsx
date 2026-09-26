@@ -24,11 +24,11 @@ export function LeaderboardRow({
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       className={cn(
         "flex items-center gap-3 border-b border-border px-4 py-3 last:border-none sm:px-5",
-        justMoved && "rounded-[var(--radius-sm)] border-transparent bg-gold-500/[0.06]",
+        justMoved && "rounded-[var(--radius-sm)] border-transparent bg-accent-soft",
       )}
     >
       <RankBadge rank={entry.rank} />
-      <Avatar initials={entry.initials} color={entry.color} size={36} />
+      <Avatar seed={entry.id} initials={entry.initials} size={36} />
       <p className="min-w-0 flex-1 truncate text-[14.5px] font-medium text-foreground">
         {entry.displayName}
       </p>

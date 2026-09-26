@@ -28,7 +28,7 @@ export function Hero({ entrantCount, totalPooledCents, topAmountCents, onClaim }
         <h1 className="mt-5 text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] text-foreground sm:text-[56px]">
           Every dollar
           <br />
-          moves you <span className="gold-text">up.</span>
+          moves you <span className="accent-text">up.</span>
         </h1>
         <p className="mt-5 max-w-md text-[16px] leading-relaxed text-foreground-muted">
           Claim your rank with a contribution. Outbid the entrant above you to rise —

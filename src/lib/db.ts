@@ -19,7 +19,6 @@ function openDatabase(): DatabaseSync {
       id TEXT PRIMARY KEY,
       display_name TEXT NOT NULL,
       initials TEXT NOT NULL,
-      color TEXT NOT NULL,
       total_cents INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL

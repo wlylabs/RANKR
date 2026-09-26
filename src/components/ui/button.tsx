@@ -11,11 +11,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-gradient-to-b from-gold-300 to-gold-600 text-accent-foreground font-semibold shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_8px_24px_-8px_rgba(216,178,100,0.55)] hover:brightness-[1.06] active:brightness-95",
+    "bg-accent text-accent-foreground font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.06),0_8px_20px_-8px_rgba(14,143,104,0.45)] hover:bg-accent-strong active:brightness-95",
   secondary:
-    "glass-panel text-foreground hover:border-border-strong hover:bg-white/[0.06]",
+    "card text-foreground hover:border-border-strong hover:bg-surface-2",
   ghost:
-    "text-foreground-muted hover:text-foreground hover:bg-white/[0.04]",
+    "text-foreground-muted hover:text-foreground hover:bg-surface-2",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -31,7 +31,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={cn(
           "inline-flex items-center justify-center whitespace-nowrap font-medium transition-all duration-200 ease-out disabled:opacity-40 disabled:pointer-events-none select-none",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           variantClasses[variant],
           sizeClasses[size],
           className,

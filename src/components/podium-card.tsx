@@ -7,10 +7,13 @@ import { cn } from "@/lib/cn";
 import { formatCents } from "@/lib/format";
 import type { LeaderboardEntry } from "@/types";
 
-const RANK_STYLES: Record<number, { order: string; height: string; ring: string; label: string }> = {
-  1: { order: "sm:order-2", height: "sm:pt-0", ring: "border-rank-gold/40", label: "1st" },
-  2: { order: "sm:order-1", height: "sm:pt-8", ring: "border-rank-silver/30", label: "2nd" },
-  3: { order: "sm:order-3", height: "sm:pt-8", ring: "border-rank-bronze/30", label: "3rd" },
+const RANK_STYLES: Record<
+  number,
+  { order: string; height: string; topBar: string; label: string }
+> = {
+  1: { order: "sm:order-2", height: "sm:pt-0", topBar: "bg-rank-1", label: "1st" },
+  2: { order: "sm:order-1", height: "sm:pt-8", topBar: "bg-rank-2", label: "2nd" },
+  3: { order: "sm:order-3", height: "sm:pt-8", topBar: "bg-rank-3", label: "3rd" },
 };
 
 export function PodiumCard({ entry, justMoved }: { entry: LeaderboardEntry; justMoved: boolean }) {
@@ -33,25 +36,20 @@ export function PodiumCard({ entry, justMoved }: { entry: LeaderboardEntry; just
     >
       <div
         className={cn(
-          "glass-panel relative flex w-full flex-col items-center rounded-[var(--radius-lg)] border px-5 pb-6 pt-8 text-center",
-          style.ring,
-          isFirst && "gold-ring",
-          justMoved && "gold-ring",
+          "card-lifted relative flex w-full flex-col items-center overflow-hidden rounded-[var(--radius-lg)] px-5 pb-6 pt-8 text-center",
+          justMoved && "accent-ring",
         )}
       >
+        <span className={cn("absolute inset-x-0 top-0 h-[3px]", style.topBar)} />
         <span className="absolute left-4 top-4 text-[12px] font-medium text-foreground-subtle">
           {style.label}
         </span>
         {isFirst && (
-          <Crown
-            size={20}
-            strokeWidth={1.75}
-            className="absolute right-4 top-4 text-gold-500"
-          />
+          <Crown size={18} strokeWidth={2} className="absolute right-4 top-4 accent-text" />
         )}
         <Avatar
+          seed={entry.id}
           initials={entry.initials}
-          color={entry.color}
           size={isFirst ? 68 : 56}
           ring={isFirst}
         />
@@ -61,7 +59,7 @@ export function PodiumCard({ entry, justMoved }: { entry: LeaderboardEntry; just
         <p
           className={cn(
             "tabular mt-1 text-[20px] font-bold",
-            isFirst ? "gold-text" : "text-foreground-muted",
+            isFirst ? "accent-text" : "text-foreground-muted",
           )}
         >
           {formatCents(entry.totalCents)}

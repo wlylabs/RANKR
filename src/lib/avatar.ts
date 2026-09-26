@@ -1,14 +1,15 @@
-// A restrained, premium palette — no primary colors, everything sits
-// comfortably next to the gold accent without competing for attention.
-const PALETTE = [
-  "#6B6F76", // slate
-  "#8A7B6C", // taupe
-  "#5E7A73", // deep sage
-  "#7A6A8A", // muted plum
-  "#6E7B8A", // steel blue
-  "#8A6E6E", // dusty rose
-  "#77806B", // olive
-  "#6C7A8A", // slate blue
+// Soft duotone gradients — vivid enough to tell entrants apart at a
+// glance, kept out of the brand's own accent hue so a colored avatar is
+// never mistaken for a rank-1 highlight.
+const PALETTE: Array<[string, string]> = [
+  ["#FF9472", "#E85D75"], // coral → rose
+  ["#6C63FF", "#4C46B6"], // indigo
+  ["#4FACFE", "#2D6CDF"], // sky → blue
+  ["#FFB86B", "#F2823C"], // amber → orange
+  ["#B892FF", "#7C5CD6"], // violet
+  ["#FF7EB3", "#D6336C"], // pink → magenta
+  ["#64748B", "#42536E"], // slate
+  ["#2DD4BF", "#0E9DA6"], // teal
 ];
 
 export function initialsFor(name: string): string {
@@ -18,7 +19,7 @@ export function initialsFor(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function colorFor(seed: string): string {
+export function gradientFor(seed: string): [string, string] {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash << 5) - hash + seed.charCodeAt(i);
