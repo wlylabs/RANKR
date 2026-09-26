@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------
+   RANKR design tokens
+   A dark, premium "black card" surface with a champagne-gold
+   accent reserved for rank, value and primary actions.
+------------------------------------------------------------------ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --background: #08080a;
+  --surface-1: #100f12;
+  --surface-2: #17161a;
+  --surface-3: #201f24;
+  --border: rgba(245, 245, 247, 0.08);
+  --border-strong: rgba(245, 245, 247, 0.14);
+
+  /* Typography */
+  --foreground: #f5f5f7;
+  --foreground-muted: #a7a7b0;
+  --foreground-subtle: #717179;
+
+  /* Brand accent — champagne gold */
+  --gold-100: #f8e7bd;
+  --gold-300: #eccd82;
+  --gold-500: #d8b264;
+  --gold-600: #c79a4b;
+  --gold-700: #a87f3c;
+  --accent: var(--gold-500);
+  --accent-foreground: #14100a;
+
+  /* Rank medal tones */
+  --rank-gold: #d8b264;
+  --rank-silver: #c9ccd1;
+  --rank-bronze: #c98a5b;
+
+  /* Feedback */
+  --positive: #4ade80;
+  --negative: #f87171;
+
+  /* Shape */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-gold-100: var(--gold-100);
+  --color-gold-300: var(--gold-300);
+  --color-gold-500: var(--gold-500);
+  --color-gold-600: var(--gold-600);
+  --color-gold-700: var(--gold-700);
+
+  --color-rank-gold: var(--rank-gold);
+  --color-rank-silver: var(--rank-silver);
+  --color-rank-bronze: var(--rank-bronze);
+
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ambient backdrop: soft gold glow + fine grain, both very subtle. */
+.rankr-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 40% at 50% -10%, rgba(216, 178, 100, 0.14) 0%, rgba(216, 178, 100, 0) 60%),
+    radial-gradient(45% 35% at 90% 15%, rgba(216, 178, 100, 0.06) 0%, rgba(216, 178, 100, 0) 65%),
+    var(--background);
+}
+
+.rankr-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  border: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.gold-text {
+  background: linear-gradient(120deg, var(--gold-100) 0%, var(--gold-500) 45%, var(--gold-700) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.gold-ring {
+  box-shadow: 0 0 0 1px rgba(216, 178, 100, 0.35), 0 0 24px rgba(216, 178, 100, 0.16);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: rgba(216, 178, 100, 0.3);
+  color: var(--foreground);
+}
+
+/* ---------------- Dialog (Radix) ---------------- */
+@keyframes rankr-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rankr-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes rankr-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes rankr-sheet-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@keyframes rankr-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes rankr-modal-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+
+.dialog-overlay[data-state="open"] { animation: rankr-fade-in 200ms ease-out both; }
+.dialog-overlay[data-state="closed"] { animation: rankr-fade-out 150ms ease-in both; }
+
+.dialog-content[data-state="open"] { animation: rankr-modal-in 260ms var(--ease-spring) both; }
+.dialog-content[data-state="closed"] { animation: rankr-modal-out 150ms ease-in both; }
+
+@media (max-width: 640px) {
+  .dialog-content[data-state="open"] { animation: rankr-sheet-in 320ms var(--ease-spring) both; }
+  .dialog-content[data-state="closed"] { animation: rankr-sheet-out 200ms ease-in both; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
