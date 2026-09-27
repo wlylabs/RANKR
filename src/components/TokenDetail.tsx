@@ -5,7 +5,7 @@ import { Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lu
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { chainMeta } from "@/lib/chains";
 import {
@@ -302,17 +302,71 @@ function Milestones({ token: t }: { token: TokenView }) {
   );
 }
 
+/** Chart timeframes: the label, and DexScreener's `interval` value (minutes, or "1D"). */
+const CHART_INTERVALS = [
+  { label: "1m", value: "1" },
+  { label: "15m", value: "15" },
+  { label: "4h", value: "240" },
+  { label: "1D", value: "1D" },
+] as const;
+type ChartInterval = (typeof CHART_INTERVALS)[number]["value"];
+const INTERVAL_KEY = "rankr:chart:interval";
+
+/**
+ * DexScreener's chart, embedded: market cap on the Y axis, Heikin Ashi candles (TradingView chart style 8),
+ * no trades, info or drawing toolbar. The timeframe picked here is remembered on this device.
+ */
 function Chart({ market, className }: { market: MarketSnapshot; className?: string }) {
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === "light" ? "light" : "dark";
   const demo = market.pairAddress.startsWith("mockpair");
+  const [interval, setIntervalValue] = useState<ChartInterval>("15");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(INTERVAL_KEY);
+      const hit = CHART_INTERVALS.find((i) => i.value === saved);
+      if (hit) setIntervalValue(hit.value);
+    } catch {
+      /* storage blocked: keep the default */
+    }
+  }, []);
+
+  function pick(value: ChartInterval) {
+    setIntervalValue(value);
+    try {
+      localStorage.setItem(INTERVAL_KEY, value);
+    } catch {
+      /* storage blocked: the pick lasts for this page */
+    }
+  }
+
   const src =
     `https://dexscreener.com/${market.chainId}/${market.pairAddress}?embed=1&loadChartSettings=0&trades=0&tabs=0` +
-    `&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=${theme}&theme=${theme}&chartStyle=1&chartType=marketCap&interval=15`;
+    `&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=${theme}&theme=${theme}&chartStyle=8&chartType=marketCap` +
+    `&interval=${interval}`;
   return (
     <section className={clsx("overflow-hidden rounded-lg border border-border", className)}>
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <h2 className="text-sm font-medium">Chart</h2>
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-medium">Chart</h2>
+          <div className="flex h-7 items-center rounded-md border border-border p-0.5" role="group" aria-label="Timeframe">
+            {CHART_INTERVALS.map((i) => (
+              <button
+                key={i.value}
+                type="button"
+                onClick={() => pick(i.value)}
+                aria-pressed={interval === i.value}
+                className={clsx(
+                  "h-full rounded px-2 font-mono text-[11px] transition-colors",
+                  interval === i.value ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
+                )}
+              >
+                {i.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <a
           href={market.url}
           target="_blank"
@@ -326,7 +380,7 @@ function Chart({ market, className }: { market: MarketSnapshot; className?: stri
         <div className="grid h-[360px] place-items-center font-mono text-xs text-subtle">chart unavailable in demo mode</div>
       ) : (
         <iframe
-          key={theme}
+          key={`${theme}:${interval}`}
           src={src}
           title={`${market.symbol} chart`}
           loading="lazy"
