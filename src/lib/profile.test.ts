@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkProfile, cleanBio, parsePostId, parseTelegram, parseX, xCode, xPostText } from "./profile";
+import { checkProfile, cleanBio, parsePostId, parseTelegram, parseWebsite, parseX, websiteLabel, xCode, xPostText } from "./profile";
 
 describe("profile fields", () => {
   it("collapses the bio to one trimmed line", () => {
@@ -26,12 +26,33 @@ describe("profile fields", () => {
     expect(parseTelegram("")).toBeNull();
   });
 
+  it("takes a website with or without https://, as a full http(s) link", () => {
+    expect(parseWebsite("example.com")).toBe("https://example.com");
+    expect(parseWebsite(" https://Example.com/ ")).toBe("https://example.com");
+    expect(parseWebsite("http://blog.example.co.uk/calls?x=1")).toBe("http://blog.example.co.uk/calls?x=1");
+    expect(parseWebsite("münchen.de")).toBe("https://xn--mnchen-3ya.de");
+    expect(parseWebsite("")).toBeNull();
+    for (const bad of ["javascript:alert(1)", "ftp://example.com", "localhost", "https://127.0.0.1", "https://user:pw@example.com", "exa mple.com", "https://", `example.com/${"a".repeat(200)}`]) {
+      expect(parseWebsite(bad), bad).toBeUndefined();
+    }
+  });
+
+  it("shows a website without the scheme, www. or trailing slash", () => {
+    expect(websiteLabel("https://www.example.com")).toBe("example.com");
+    expect(websiteLabel("http://example.com/calls/")).toBe("example.com/calls");
+  });
+
   it("checks the whole profile and says which field is wrong", () => {
-    expect(checkProfile({ bio: " gm ", x: "@a_b", telegram: "" })).toEqual({ ok: true, profile: { bio: "gm", x: "a_b", telegram: null } });
-    expect(checkProfile({ bio: "é".repeat(160), x: "", telegram: "" }).ok).toBe(true);
-    expect(checkProfile({ bio: "é".repeat(161), x: "", telegram: "" })).toMatchObject({ ok: false, field: "bio" });
-    expect(checkProfile({ bio: "", x: "no spaces here", telegram: "" })).toMatchObject({ ok: false, field: "x" });
-    expect(checkProfile({ bio: "", x: "", telegram: "abc" })).toMatchObject({ ok: false, field: "telegram" });
+    const empty = { bio: "", x: "", telegram: "", website: "" };
+    expect(checkProfile({ bio: " gm ", x: "@a_b", telegram: "", website: "a.io" })).toEqual({
+      ok: true,
+      profile: { bio: "gm", x: "a_b", telegram: null, website: "https://a.io" },
+    });
+    expect(checkProfile({ ...empty, bio: "é".repeat(160) }).ok).toBe(true);
+    expect(checkProfile({ ...empty, bio: "é".repeat(161) })).toMatchObject({ ok: false, field: "bio" });
+    expect(checkProfile({ ...empty, x: "no spaces here" })).toMatchObject({ ok: false, field: "x" });
+    expect(checkProfile({ ...empty, telegram: "abc" })).toMatchObject({ ok: false, field: "telegram" });
+    expect(checkProfile({ ...empty, website: "javascript:alert(1)" })).toMatchObject({ ok: false, field: "website" });
   });
 });
 

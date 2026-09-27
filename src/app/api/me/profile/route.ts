@@ -6,7 +6,7 @@ import type { MeResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-/** POST /api/me/profile {bio, x, telegram} saves your bio and links ("" clears one). */
+/** POST /api/me/profile {bio, x, telegram, website} saves your bio and links ("" clears one). */
 export async function POST(req: Request) {
   const account = await requireAccount(req);
   if (account instanceof NextResponse) return account;
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     /* handled below */
   }
   const text = (v: unknown) => (typeof v === "string" ? v.slice(0, 1_000) : "");
-  const checked = checkProfile({ bio: text(body.bio), x: text(body.x), telegram: text(body.telegram) });
+  const checked = checkProfile({ bio: text(body.bio), x: text(body.x), telegram: text(body.telegram), website: text(body.website) });
   if (!checked.ok) return NextResponse.json({ error: checked.error, field: checked.field }, { status: 400 });
   try {
     const about = await setProfile(account, checked.profile);

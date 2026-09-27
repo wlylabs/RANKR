@@ -27,11 +27,18 @@ type ProfileRow = {
   x_handle?: string | null;
   x_verified_at?: string | null;
   telegram?: string | null;
+  website?: string | null;
 };
 
 // Columns are read with select=*, so profiles work (without bio and links) before …_rankr_profile.sql has run.
 function aboutOf(row: Partial<ProfileRow> | undefined): CallerAbout {
-  return { bio: row?.bio ?? null, x: row?.x_handle ?? null, xVerified: !!row?.x_verified_at, telegram: row?.telegram ?? null };
+  return {
+    bio: row?.bio ?? null,
+    x: row?.x_handle ?? null,
+    xVerified: !!row?.x_verified_at,
+    telegram: row?.telegram ?? null,
+    website: row?.website ?? null,
+  };
 }
 
 export class AuthError extends Error {}
@@ -119,17 +126,36 @@ export async function setUsername(
   return { ok: true, username: out.username ?? name };
 }
 
-/** Saves the bio, X account and Telegram username (checked with checkProfile). A different X account starts unverified. */
+/**
+ * Saves the bio, X account, Telegram username and website (checked with checkProfile). A different X account
+ * starts unverified.
+ */
 export async function setProfile(account: Account, profile: ProfileFields): Promise<CallerAbout | null> {
   const api = rest();
   if (!api) return null;
-  const out = await api.rpc<{ ok: boolean; bio?: string | null; x?: string | null; x_verified?: boolean; telegram?: string | null }>(
-    "rankr_set_profile",
-    { p_user: account.id, p_bio: profile.bio, p_x: profile.x, p_telegram: profile.telegram },
-  );
+  const out = await api.rpc<{
+    ok: boolean;
+    bio?: string | null;
+    x?: string | null;
+    x_verified?: boolean;
+    telegram?: string | null;
+    website?: string | null;
+  }>("rankr_set_profile", {
+    p_user: account.id,
+    p_bio: profile.bio,
+    p_x: profile.x,
+    p_telegram: profile.telegram,
+    p_website: profile.website,
+  });
   if (!out.ok) return null;
   forget(account.id);
-  return { bio: out.bio ?? null, x: out.x ?? null, xVerified: !!out.x_verified, telegram: out.telegram ?? null };
+  return {
+    bio: out.bio ?? null,
+    x: out.x ?? null,
+    xVerified: !!out.x_verified,
+    telegram: out.telegram ?? null,
+    website: out.website ?? null,
+  };
 }
 
 /**

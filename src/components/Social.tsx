@@ -1,5 +1,6 @@
 import clsx from "clsx";
-import { Check, Send } from "lucide-react";
+import { Check, Globe, Send } from "lucide-react";
+import { websiteLabel } from "@/lib/profile";
 import type { CallerAbout } from "@/lib/types";
 
 /** The X logo, in the text color. */
@@ -16,10 +17,12 @@ export function XLogo({ className }: { className?: string }) {
 
 const LINK = "inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-fg";
 
-/** A caller's X account (verified ones only, see src/lib/profile.ts) and Telegram, as links. */
+/** A caller's X account (verified ones only, see src/lib/profile.ts), Telegram and website, as links. */
 export function SocialLinks({ about, className }: { about: CallerAbout; className?: string }) {
   const x = about.xVerified ? about.x : null;
-  if (!x && !about.telegram) return null;
+  // Checked when saved too; an href is never anything but http(s).
+  const website = about.website && /^https?:\/\//i.test(about.website) ? about.website : null;
+  if (!x && !about.telegram && !website) return null;
   return (
     <div className={clsx("flex flex-wrap items-center gap-x-4 gap-y-1.5", className)}>
       {x && (
@@ -41,6 +44,12 @@ export function SocialLinks({ about, className }: { about: CallerAbout; classNam
           <Send className="size-3.5 shrink-0" aria-hidden />
           <span className="truncate">@{about.telegram}</span>
           <span className="sr-only">(Telegram)</span>
+        </a>
+      )}
+      {website && (
+        <a href={website} target="_blank" rel="noopener noreferrer nofollow ugc" className={LINK}>
+          <Globe className="size-3.5 shrink-0" aria-hidden />
+          <span className="max-w-60 truncate">{websiteLabel(website)}</span>
         </a>
       )}
     </div>

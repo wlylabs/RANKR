@@ -22,8 +22,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Each
   caller has a public profile at `/u/<username>` with their numbers and every call.
 - **Caller profiles**: an avatar drawn from the account (a mirrored 5x5 matrix from `sha256(user id)`, in the style
-  of the logo, nothing to upload), a short bio, a Telegram link and an **X account, shown only once verified**:
-  the caller posts a code from that X account and pastes the link (next sections). Edited on `/account`.
+  of the logo, nothing to upload), a short bio, Telegram and website links, and an **X account, shown only once
+  verified**: the caller posts a code from that X account and pastes the link (next sections). Edited on
+  `/account`.
 - **Feed** (`/feed`, and a live ticker under the header): every call as it lands ("@userx called $SHIB at
   $1.2B mc") and every call that reaches a milestone ("$PEPE hit 10x from @userx's call"), each from the caller's
   own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone or top callers (the top 25 of
@@ -244,6 +245,8 @@ On `/account` a caller can add (rules in `src/lib/profile.ts`, the same in SQL):
 
 - a **bio**: up to 160 characters, one line;
 - a **Telegram** username (5-32 letters, numbers or underscores), shown as a `t.me` link;
+- a **website**: any http(s) link to a real domain, up to 200 characters (`example.com` becomes
+  `https://example.com`), shown without the `https://`;
 - an **X** username (up to 15 letters, numbers or underscores), shown on the profile **only once verified**, so
   nobody can pass for someone else's X account. To verify, the caller posts a short text from that X account
   with a code (`rankr-` and 10 hex digits of `sha256(user id + X username)`, so a post proves the X account for
@@ -271,7 +274,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
 | `GET /api/callers/:username` | a caller's profile: board numbers, bio and links, and calls |
 | `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET/DELETE /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
-| `POST /api/me/profile` `{bio, x, telegram}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
+| `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
 | `GET /api/feed?scope=all\|top&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first |
 
@@ -307,7 +310,7 @@ src/lib/store/               storage: file (local) and Supabase adapters, shared
 src/lib/accounts.ts          accounts (Supabase Auth: guests, keys), names and calls, server side
 src/lib/key.ts               sign-in keys: generate, parse, the key's email, the dot pattern
 src/lib/username.ts          username rules (reserved names, look-alikes), same as the SQL
-src/lib/profile.ts           bio, X and Telegram rules, the X verification code, same as the SQL
+src/lib/profile.ts           bio, X, Telegram and website rules, the X verification code, same as the SQL
 src/lib/x-post.ts            reads a public post on X (embed endpoint, or the X API), to verify an X account
 src/lib/avatar.ts            a caller's avatar: a mirrored 5x5 matrix from sha256 of the user id
 src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and server)

@@ -101,7 +101,14 @@ export type CallersResponse = { enabled: boolean; total: number; callers: Caller
  * What a caller says about themselves (see src/lib/profile.ts). On a public profile `x` is there only once
  * verified; the account's own view has it either way.
  */
-export type CallerAbout = { bio: string | null; x: string | null; xVerified: boolean; telegram: string | null };
+export type CallerAbout = {
+  bio: string | null;
+  x: string | null;
+  xVerified: boolean;
+  telegram: string | null;
+  /** A full http(s) link. */
+  website: string | null;
+};
 
 /** A caller's public profile: board numbers, bio and links, and calls, newest first. */
 export type CallerProfileResponse = { caller: CallerView; about: CallerAbout; calls: CallView[]; updatedAt: number };

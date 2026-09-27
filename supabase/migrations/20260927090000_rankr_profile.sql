@@ -1,5 +1,5 @@
--- Caller profiles beyond the name: a short bio, an X account and a Telegram username (same rules as
--- src/lib/profile.ts). The X account shows on the public profile only once verified: the server has read
+-- Caller profiles beyond the name: a short bio, an X account, a Telegram username and a website (same rules
+-- as src/lib/profile.ts; for the website the app checks the domain, SQL the scheme and length). The X account shows on the public profile only once verified: the server has read
 -- a public post from that X account carrying the code for this Rankr account (rankr_verify_x).
 -- One Rankr account per verified X account; the newest verification wins.
 
@@ -14,6 +14,7 @@ alter table public.profiles add column if not exists bio text;
 alter table public.profiles add column if not exists x_handle text;
 alter table public.profiles add column if not exists x_verified_at timestamptz;
 alter table public.profiles add column if not exists telegram text;
+alter table public.profiles add column if not exists website text;
 
 do $$
 begin
@@ -26,6 +27,10 @@ begin
   if not exists (select 1 from pg_constraint where conname = 'profiles_telegram_format') then
     alter table public.profiles add constraint profiles_telegram_format check (telegram ~ '^[A-Za-z][A-Za-z0-9_]{4,31}$');
   end if;
+  if not exists (select 1 from pg_constraint where conname = 'profiles_website_format') then
+    alter table public.profiles add constraint profiles_website_format
+      check (website ~ '^https?://[^[:space:]]+$' and char_length(website) <= 200);
+  end if;
   if not exists (select 1 from pg_constraint where conname = 'profiles_x_verified_has_handle') then
     alter table public.profiles add constraint profiles_x_verified_has_handle check (x_verified_at is null or x_handle is not null);
   end if;
@@ -33,10 +38,13 @@ end $$;
 
 create unique index if not exists profiles_x_verified_key on public.profiles (lower(x_handle)) where x_verified_at is not null;
 
--- Sets the bio, X account and Telegram username (null or '' clears one). A different X account starts
--- unverified; the same one in another case stays verified.
--- Returns {ok, bio, x, x_verified, telegram} or {ok: false, error: not_found | invalid}.
-create or replace function public.rankr_set_profile(p_user uuid, p_bio text, p_x text, p_telegram text) returns jsonb
+-- Sets the bio, X account, Telegram username and website (null or '' clears one). A different X account
+-- starts unverified; the same one in another case stays verified.
+-- Returns {ok, bio, x, x_verified, telegram, website} or {ok: false, error: not_found | invalid}.
+drop function if exists public.rankr_set_profile(uuid, text, text, text);
+create or replace function public.rankr_set_profile(
+  p_user uuid, p_bio text, p_x text, p_telegram text, p_website text default null
+) returns jsonb
 language plpgsql as $$
 declare
   v public.profiles;
@@ -45,14 +53,15 @@ begin
      set bio = nullif(btrim(p_bio), ''),
          x_verified_at = case when lower(x_handle) = lower(nullif(p_x, '')) then x_verified_at end,
          x_handle = nullif(p_x, ''),
-         telegram = nullif(p_telegram, '')
+         telegram = nullif(p_telegram, ''),
+         website = nullif(p_website, '')
    where user_id = p_user
   returning * into v;
   if not found then
     return jsonb_build_object('ok', false, 'error', 'not_found');
   end if;
   return jsonb_build_object('ok', true, 'bio', v.bio, 'x', v.x_handle, 'x_verified', v.x_verified_at is not null,
-                            'telegram', v.telegram);
+                            'telegram', v.telegram, 'website', v.website);
 exception when check_violation then
   return jsonb_build_object('ok', false, 'error', 'invalid');
 end $$;
@@ -72,16 +81,16 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
-revoke all on function public.rankr_set_profile(uuid, text, text, text) from public;
+revoke all on function public.rankr_set_profile(uuid, text, text, text, text) from public;
 revoke all on function public.rankr_verify_x(uuid, text) from public;
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
-    revoke all on function public.rankr_set_profile(uuid, text, text, text) from anon, authenticated;
+    revoke all on function public.rankr_set_profile(uuid, text, text, text, text) from anon, authenticated;
     revoke all on function public.rankr_verify_x(uuid, text) from anon, authenticated;
   end if;
   if exists (select 1 from pg_roles where rolname = 'service_role') then
-    grant execute on function public.rankr_set_profile(uuid, text, text, text) to service_role;
+    grant execute on function public.rankr_set_profile(uuid, text, text, text, text) to service_role;
     grant execute on function public.rankr_verify_x(uuid, text) to service_role;
   end if;
 end $$;

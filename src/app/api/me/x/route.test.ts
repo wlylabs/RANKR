@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PostError } from "@/lib/x-post";
 
-const about = { bio: null, x: "alpha_x", xVerified: false, telegram: null };
+const about = { bio: null, x: "alpha_x", xVerified: false, telegram: null, website: null };
 const account = { id: "u1", username: "nonce_7f3a", hasKey: false, official: false, about };
 let over = false;
 let outcome: () => Promise<unknown>;

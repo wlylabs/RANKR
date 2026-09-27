@@ -4,7 +4,7 @@ const USER = { id: "00000000-0000-4000-8000-00000000000a", email: "0123456789abc
 const GUEST = { id: "00000000-0000-4000-8000-00000000000b", email: "", is_anonymous: true };
 // Signed up by email before keys: keyless, and the address never leaves the server.
 const OLD_EMAIL = { id: "00000000-0000-4000-8000-00000000000c", email: "caller@example.com" };
-const NO_ABOUT = { bio: null, x: null, xVerified: false, telegram: null };
+const NO_ABOUT = { bio: null, x: null, xVerified: false, telegram: null, website: null };
 
 type ProfileRow = {
   username: string;
@@ -13,6 +13,7 @@ type ProfileRow = {
   x_handle?: string | null;
   x_verified_at?: string | null;
   telegram?: string | null;
+  website?: string | null;
 };
 
 describe("accounts", () => {
@@ -81,10 +82,12 @@ describe("accounts", () => {
         return new Response(JSON.stringify({ ok: true, username: p_username }));
       }
       if (url.endsWith("/rest/v1/rpc/rankr_set_profile")) {
-        const { p_bio, p_x, p_telegram } = JSON.parse(String(init?.body));
+        const { p_bio, p_x, p_telegram, p_website } = JSON.parse(String(init?.body));
         const kept = profile[0].x_handle?.toLowerCase() === p_x?.toLowerCase() ? profile[0].x_verified_at : null;
-        profile = [{ ...profile[0], bio: p_bio, x_handle: p_x, x_verified_at: kept, telegram: p_telegram }];
-        return new Response(JSON.stringify({ ok: true, bio: p_bio, x: p_x, x_verified: !!kept, telegram: p_telegram }));
+        profile = [{ ...profile[0], bio: p_bio, x_handle: p_x, x_verified_at: kept, telegram: p_telegram, website: p_website }];
+        return new Response(
+          JSON.stringify({ ok: true, bio: p_bio, x: p_x, x_verified: !!kept, telegram: p_telegram, website: p_website }),
+        );
       }
       if (url.endsWith("/rest/v1/rpc/rankr_verify_x")) {
         if (verifyOk) profile = [{ ...profile[0], x_verified_at: "2026-09-27T12:00:00Z" }];
@@ -183,21 +186,23 @@ describe("accounts", () => {
     profile = [{ username: "alpha_caller", bio: "gm", x_handle: "Alpha_X", x_verified_at: "2026-09-27T12:00:00Z", telegram: null }];
     const { accountFromRequest, setProfile } = await import("./accounts");
     const account = (await accountFromRequest(req("good-token")))!;
-    expect(account.about).toEqual({ bio: "gm", x: "Alpha_X", xVerified: true, telegram: null });
+    expect(account.about).toEqual({ bio: "gm", x: "Alpha_X", xVerified: true, telegram: null, website: null });
     expect(urls().find((u) => u.includes("/rest/v1/profiles?"))).toContain("select=*");
 
     // Same X account in another case: still verified.
-    expect(await setProfile(account, { bio: "Early on cats.", x: "alpha_x", telegram: "alpha_tg" })).toEqual({
-      bio: "Early on cats.",
-      x: "alpha_x",
-      xVerified: true,
-      telegram: "alpha_tg",
-    });
+    const saved = { bio: "Early on cats.", x: "alpha_x", telegram: "alpha_tg", website: "https://alpha.example" };
+    expect(await setProfile(account, saved)).toEqual({ ...saved, xVerified: true });
     const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("rankr_set_profile"))!;
-    expect(JSON.parse(String(call[1]?.body))).toEqual({ p_user: USER.id, p_bio: "Early on cats.", p_x: "alpha_x", p_telegram: "alpha_tg" });
+    expect(JSON.parse(String(call[1]?.body))).toEqual({
+      p_user: USER.id,
+      p_bio: "Early on cats.",
+      p_x: "alpha_x",
+      p_telegram: "alpha_tg",
+      p_website: "https://alpha.example",
+    });
     // Another one starts over.
-    expect((await setProfile(account, { bio: null, x: "bravo_x", telegram: null }))?.xVerified).toBe(false);
-    expect((await accountFromRequest(req("good-token")))?.about).toEqual({ bio: null, x: "bravo_x", xVerified: false, telegram: null });
+    expect((await setProfile(account, { bio: null, x: "bravo_x", telegram: null, website: null }))?.xVerified).toBe(false);
+    expect((await accountFromRequest(req("good-token")))?.about).toEqual({ ...NO_ABOUT, x: "bravo_x" });
   });
 
   it("verifies the X account from a public post by that account with the account's code", async () => {
@@ -222,7 +227,7 @@ describe("accounts", () => {
 
     expect(await verifyX(account, link, post("alpha_x", `gm\n${code.toUpperCase()}`))).toEqual({
       ok: true,
-      about: { bio: null, x: "Alpha_X", xVerified: true, telegram: null },
+      about: { ...NO_ABOUT, x: "Alpha_X", xVerified: true },
     });
     const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("rankr_verify_x"))!;
     expect(JSON.parse(String(call[1]?.body))).toEqual({ p_user: USER.id, p_x: "Alpha_X" });
@@ -326,10 +331,13 @@ describe("callerProfile", () => {
 
   it("shows the bio and Telegram, and the X account only once verified", async () => {
     const { callerProfile } = await import("./accounts");
-    rows = [{ user_id: "u1", username: "nonce_7f3a", bio: "gm", x_handle: "someone_famous", x_verified_at: null, telegram: "nonce_tg" }];
-    expect((await callerProfile("nonce_7f3a"))?.about).toEqual({ bio: "gm", x: null, xVerified: false, telegram: "nonce_tg" });
+    rows = [
+      { user_id: "u1", username: "nonce_7f3a", bio: "gm", x_handle: "someone_famous", x_verified_at: null, telegram: "nonce_tg", website: "https://nonce.example" },
+    ];
+    const about = { bio: "gm", telegram: "nonce_tg", website: "https://nonce.example" };
+    expect((await callerProfile("nonce_7f3a"))?.about).toEqual({ ...about, x: null, xVerified: false });
     rows[0].x_verified_at = "2026-09-27T12:00:00Z";
-    expect((await callerProfile("nonce_7f3a"))?.about).toEqual({ bio: "gm", x: "someone_famous", xVerified: true, telegram: "nonce_tg" });
+    expect((await callerProfile("nonce_7f3a"))?.about).toEqual({ ...about, x: "someone_famous", xVerified: true });
   });
 
   it("returns null for unknown or impossible names", async () => {

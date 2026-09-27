@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, Copy, LoaderCircle, Send } from "lucide-react";
+import { Check, Copy, Globe, LoaderCircle, Send } from "lucide-react";
 import { useState } from "react";
 import { callerHref } from "@/lib/format";
 import {
@@ -9,8 +9,11 @@ import {
   checkProfile,
   cleanBio,
   parseTelegram,
+  parseWebsite,
   parseX,
   TELEGRAM_HELP,
+  WEBSITE_HELP,
+  WEBSITE_MAX,
   X_HELP,
   xCode,
   xPostText,
@@ -36,8 +39,8 @@ function Hint({ id, error, children }: { id: string; error?: string | null; chil
   );
 }
 
-/** One "@name" input, for X or Telegram. */
-function HandleField({
+/** One link input: an "@name" for X or Telegram (`handle`), or a website. */
+function LinkField({
   id,
   label,
   icon,
@@ -46,6 +49,7 @@ function HandleField({
   placeholder,
   help,
   error,
+  handle = false,
 }: {
   id: string;
   label: string;
@@ -55,6 +59,7 @@ function HandleField({
   placeholder: string;
   help: string;
   error: string | null;
+  handle?: boolean;
 }) {
   return (
     <div>
@@ -62,13 +67,15 @@ function HandleField({
         {icon} {label}
       </label>
       <div className={clsx(FIELD, "mt-2 flex h-11 items-center")}>
-        <span className="font-mono text-subtle">@</span>
+        {handle && <span className="font-mono text-subtle">@</span>}
         <input
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={!!error}
           aria-describedby={`${id}-hint`}
+          inputMode={handle ? "text" : "url"}
+          maxLength={handle ? 64 : WEBSITE_MAX + 20}
           autoCapitalize="off"
           autoComplete="off"
           spellCheck={false}
@@ -83,10 +90,15 @@ function HandleField({
   );
 }
 
-/** Bio, X and Telegram. The X account shows on the profile once verified (XVerify). */
+/** Bio, X, Telegram and website. The X account shows on the profile once verified (XVerify). */
 export function ProfileSection({ about }: { about: CallerAbout }) {
   const { saveProfile } = useAuth();
-  const [form, setForm] = useState<ProfileInput>({ bio: about.bio ?? "", x: about.x ?? "", telegram: about.telegram ?? "" });
+  const [form, setForm] = useState<ProfileInput>({
+    bio: about.bio ?? "",
+    x: about.x ?? "",
+    telegram: about.telegram ?? "",
+    website: about.website ?? "",
+  });
   const [problem, setProblem] = useState<ProfileProblem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -94,7 +106,10 @@ export function ProfileSection({ about }: { about: CallerAbout }) {
 
   const bioLength = [...(cleanBio(form.bio) ?? "")].length;
   const unchanged =
-    cleanBio(form.bio) === about.bio && parseX(form.x) === about.x && parseTelegram(form.telegram) === about.telegram;
+    cleanBio(form.bio) === about.bio &&
+    parseX(form.x) === about.x &&
+    parseTelegram(form.telegram) === about.telegram &&
+    parseWebsite(form.website) === about.website;
 
   function set(field: keyof ProfileInput, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -111,8 +126,8 @@ export function ProfileSection({ about }: { about: CallerAbout }) {
     setSaving(true);
     try {
       await saveProfile(form);
-      const { bio, x, telegram } = checked.profile;
-      setForm({ bio: bio ?? "", x: x ?? "", telegram: telegram ?? "" });
+      const { bio, x, telegram, website } = checked.profile;
+      setForm({ bio: bio ?? "", x: x ?? "", telegram: telegram ?? "", website: website ?? "" });
       setSaved(true);
     } catch (err) {
       setError((err as Error).message);
@@ -150,7 +165,8 @@ export function ProfileSection({ about }: { about: CallerAbout }) {
             </span>
           </Hint>
         </div>
-        <HandleField
+        <LinkField
+          handle
           id="x"
           label="X"
           icon={<XLogo className="size-3" />}
@@ -160,7 +176,8 @@ export function ProfileSection({ about }: { about: CallerAbout }) {
           help={`${X_HELP} Shows on your profile once verified.`}
           error={errorOf("x")}
         />
-        <HandleField
+        <LinkField
+          handle
           id="telegram"
           label="Telegram"
           icon={<Send className="size-3" aria-hidden />}
@@ -169,6 +186,16 @@ export function ProfileSection({ about }: { about: CallerAbout }) {
           placeholder="your_telegram"
           help={TELEGRAM_HELP}
           error={errorOf("telegram")}
+        />
+        <LinkField
+          id="website"
+          label="Website"
+          icon={<Globe className="size-3" aria-hidden />}
+          value={form.website}
+          onChange={(v) => set("website", v)}
+          placeholder="example.com"
+          help={WEBSITE_HELP}
+          error={errorOf("website")}
         />
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving || unchanged} className={PRIMARY}>
