@@ -47,10 +47,10 @@ export default function LandingPage() {
         <p className="mt-6 max-w-sm text-[15px] text-pretty text-muted sm:max-w-md sm:text-base">
           Every call is sealed the second it&apos;s pasted, then ranked live.
         </p>
-        {/* One quiet next step: plain text, no button, no arrow. */}
+        {/* The one next step, styled like the app's own primary buttons (Track, Paste a CA). */}
         <Link
           href={APP_HOME}
-          className="mt-8 text-sm font-medium text-fg underline decoration-border-strong underline-offset-[6px] transition-colors hover:decoration-fg"
+          className="mt-8 inline-flex h-10 items-center rounded-md bg-fg px-5 text-sm font-medium text-bg transition-opacity hover:opacity-85"
         >
           Start tracking
         </Link>

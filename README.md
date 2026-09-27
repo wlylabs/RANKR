@@ -28,7 +28,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
-- **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" link, three steps and a
+- **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, three steps and a
   four-question FAQ. English only: Rankr is for DEX traders everywhere.
   The app itself (paste box + live board) is at **`/app`**.
 - **Settings menu** (the gear in the header): theme, and the app: open it, install it, copy its link. It is the
