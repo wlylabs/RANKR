@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { APP_HOME } from "@/lib/login";
 import { isStandalone } from "@/lib/pwa";
+import { Reveal } from "./Cinema";
 
 /** The installed app opens on /app; if it ever lands on the landing page (e.g. added from /), go there. */
 export function StandaloneRedirect() {
@@ -62,8 +63,10 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 export function Faq({ items }: { items: { q: string; a: string }[] }) {
   return (
     <div className="border-b border-border">
-      {items.map((item) => (
-        <FaqItem key={item.q} {...item} />
+      {items.map((item, i) => (
+        <Reveal key={item.q} delay={i * 90}>
+          <FaqItem {...item} />
+        </Reveal>
       ))}
     </div>
   );

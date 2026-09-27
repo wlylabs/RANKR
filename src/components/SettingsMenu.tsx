@@ -14,11 +14,12 @@ import { CopyButton } from "./CopyButton";
 const ITEM = "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
 
 /**
- * Switches the theme with a short cross-fade of the whole page (View Transitions), where the browser has
- * them and motion is welcome; otherwise instantly. The class is set here, inside the transition, because
+ * Switches the theme cinematically: the new theme opens as a circle from the toggle and washes over the
+ * page (View Transitions + a clip-path on the new snapshot; Material 3 emphasized decelerate, 700ms).
+ * Instant without View Transitions or with reduced motion. The class is set inside the transition because
  * next-themes only applies it in an effect, after the new frame would already be captured.
  */
-function switchTheme(next: "dark" | "light", setTheme: (theme: string) => void) {
+function switchTheme(next: "dark" | "light", setTheme: (theme: string) => void, from: DOMRect) {
   const apply = () => {
     const root = document.documentElement;
     root.classList.remove("dark", "light");
@@ -27,7 +28,21 @@ function switchTheme(next: "dark" | "light", setTheme: (theme: string) => void) 
     setTheme(next);
   };
   if (!document.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
-  document.startViewTransition(apply);
+
+  const x = from.left + from.width / 2;
+  const y = from.top + from.height / 2;
+  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+  const transition = document.startViewTransition(apply);
+  transition.ready
+    .then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 700, easing: "cubic-bezier(0.05, 0.7, 0.1, 1)", pseudoElement: "::view-transition-new(root)" },
+      );
+    })
+    .catch(() => {
+      /* skipped (e.g. another transition started); the theme is applied either way */
+    });
 }
 
 /** The app's full link on this site, e.g. https://rankr.example/app (just the path while server rendering). */
@@ -109,7 +124,7 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
                 <button
                   key={t}
                   type="button"
-                  onClick={() => resolvedTheme !== t && switchTheme(t, setTheme)}
+                  onClick={(e) => resolvedTheme !== t && switchTheme(t, setTheme, e.currentTarget.getBoundingClientRect())}
                   aria-pressed={resolvedTheme === t}
                   className={clsx(
                     "relative inline-flex h-6 items-center justify-center gap-1.5 rounded px-2 text-xs capitalize transition-colors duration-300",

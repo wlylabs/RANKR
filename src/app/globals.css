@@ -55,8 +55,10 @@
   --color-down-soft: var(--down-soft);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  /* Material 3 "emphasized" easing: quick start, long gentle settle. Used for expand / collapse. */
+  /* Material 3 motion. "emphasized": quick start, long gentle settle (expand / collapse, the theme slide).
+     "enter" (emphasized decelerate): things arriving on screen, fast then soft. */
   --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 
 html {
@@ -137,11 +139,105 @@ body {
   animation: fade-in 0.18s ease-out;
 }
 
-/* Theme switch: the whole page cross-fades (see switchTheme in SettingsMenu). */
+/*
+ * Theme switch: the new theme opens as a circle from the toggle over the old one (switchTheme in
+ * SettingsMenu drives the clip-path), instead of the default cross-fade.
+ */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.35s;
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* ---- Cinematic motion (Material 3 durations: long 500-800ms for entrances) ---- */
+
+/* Arrival: out of a soft blur, rising a little. `--d` staggers a sequence. Fill is `backwards` only, so
+   nothing (filter, transform) is left on the element afterwards. */
+@keyframes cine-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(10px);
+  }
+}
+.cine-in {
+  animation: cine-in 0.9s var(--ease-enter) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Below the fold: hidden until scrolled into view (Reveal), then the same arrival. */
+.reveal-hidden {
+  opacity: 0;
+}
+.reveal-in {
+  animation: cine-in 0.8s var(--ease-enter) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* A page of the app settling in after navigation. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(6px);
+  }
+}
+.animate-page-in {
+  animation: page-in 0.5s var(--ease-enter) backwards;
+}
+
+/* The hash field behind the hero: lit cells breathe in and out, each on its own clock. */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.twinkle {
+  animation: twinkle var(--t, 5s) ease-in-out infinite;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes field-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+.field-in {
+  animation: field-in 1.6s var(--ease-enter) backwards;
+}
+
+/* Scrolling away from the hero, it drifts up and dims, like a camera pulling off (Chromium's
+   scroll-driven animations; elsewhere it simply stays put). */
+@keyframes hero-exit {
+  to {
+    opacity: 0.2;
+    transform: translateY(-6vh) scale(0.97);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .hero-exit {
+    animation: hero-exit linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 65vh;
+  }
+}
+
+/* Film grain over the landing page: static, very faint, never in the way of clicks. */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+:root:not(.dark) .grain::after {
+  opacity: 0.035;
 }
 
 /* Live ticks: a number that just moved gets a short wash in its direction's color. */
@@ -173,7 +269,13 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+  .hero-exit,
+  .twinkle {
+    animation: none !important;
   }
 }
