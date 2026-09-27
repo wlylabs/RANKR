@@ -14,9 +14,12 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Live multiple**: current price / entry price, shown as `3.42x` for gains and `-37.2%` for losses.
   Peak and lowest point since the paste are recorded too.
 - **Leaderboard**: top gainers, peak x, biggest dumps, newest, most pasted. Filter by 24h / 7d / 30d, chain, and search.
-- **My calls**: every token you pasted, measured from *your* paste. Saved in the browser, or synced to your
-  wallet when connected.
-- **Caller leaderboard**: connected wallets ranked by their calls (2x hits, average x, best call).
+- **Accounts**: pasting needs an account, so every call on Rankr has a name behind it. Continue as a
+  **guest** in one click, or sign in with an **email link** (or the code in it), no password. Every account
+  starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`, and can rename itself. Guests can add
+  an email later to keep their account. Emails are never shown.
+- **My calls**: every token you pasted, measured from *your* paste.
+- **Caller leaderboard**: callers ranked by their calls (2x hits, average x, best call), by username.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme, installable as a PWA.
@@ -59,49 +62,75 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
 - **"no backdating" is enforced by the database**: a trigger rejects any change to a token's entry;
 - a paste is one atomic SQL call, so simultaneous pastes never lose a count;
 - browsers can only read (RLS); every write goes through the server with the secret key;
-- wallet accounts (Supabase Auth, Sign in with Web3) sync "My calls" and power the caller leaderboard.
+- Supabase Auth handles accounts (anonymous guests, email magic link), and each caller's calls are rows tied
+  to their account.
 
 ### Setup
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run the files in `supabase/migrations/` in order
-   (`…_rankr_tokens.sql`, then `…_rankr_callers.sql`). With the Supabase CLI: `supabase link`, `supabase db push`.
+2. Open **SQL Editor**, paste the whole of **`supabase/setup.sql`** and run it. It contains every migration in
+   the right order and is safe to run again. (With the Supabase CLI instead: `supabase link`, `supabase db push`.)
+   Running `…_rankr_callers.sql` on its own before `…_rankr_tokens.sql` fails with
+   `relation "public.tokens" does not exist`; nothing is changed in that case, just run `setup.sql`.
 3. Set the env vars on your host (Vercel etc.):
    ```
    SUPABASE_URL=https://YOUR-PROJECT.supabase.co
    SUPABASE_SECRET_KEY=sb_secret_...        # Settings -> API Keys. Server-side only.
    CRON_SECRET=some-long-random-string
    NEXT_PUBLIC_SITE_URL=https://your-domain
+   NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # Settings -> API Keys, public
    ```
-4. Optional, for peaks/lows while nobody is browsing: run `supabase/cron.sql` (pg_cron + pg_net call
+4. Set up email sign-in (next section).
+5. Optional, for peaks/lows while nobody is browsing: run `supabase/cron.sql` (pg_cron + pg_net call
    `/api/cron/refresh` every minute).
 
-### Wallet accounts (optional)
+### Accounts (guest or email)
 
-Connect a Solana (Phantom, Solflare, Backpack) or Ethereum (MetaMask, Rabby…) wallet to sync "My calls" across
-devices and appear on the **caller leaderboard** (Leaderboard → Callers).
+Pasting needs an account. Someone signed out who pastes a CA goes to `/login` and picks one:
 
-1. Supabase dashboard → **Authentication → Sign In / Providers → Web3 Wallet**: enable Solana and/or Ethereum.
-2. **Authentication → URL Configuration**: set the Site URL to your domain and add `http://localhost:3000` to the
-   redirect URLs for local dev (the signed message names the page's domain).
-3. Add the public keys to the app env:
+- **Continue as guest**: one click, no email. A Supabase anonymous account that lives in that browser.
+- **Email**: a sign-in link **and** a code in one email (the code is for when the email is opened on
+  another device). The same link creates the account the first time.
+
+Either way they land back on the home page and the CA they pasted is tracked. Browsing needs no account.
+
+In the Supabase dashboard:
+
+1. **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins** (guests) and keep **Email**
+   enabled with "Allow new users to sign up" on.
+2. **Authentication → URL Configuration**: Site URL = `https://your-domain`. Add `http://localhost:3000/**`
+   to Redirect URLs for local dev.
+3. **Custom SMTP (needed for email sign-in)**: Supabase's built-in mailer only delivers to members of your
+   Supabase team and only a couple of emails per hour. Add any SMTP provider (Resend, Postmark, SES, ...) under
+   **Authentication → Emails → SMTP Settings**, then raise the email limit under **Authentication → Rate Limits**.
+   Guests work without it.
+4. **Authentication → Emails → Templates**: add the code to **Magic Link**, **Confirm signup** (first sign-in)
+   and **Change Email Address** (a guest adding an email):
+   ```html
+   <p><a href="{{ .ConfirmationURL }}">Continue</a></p>
+   <p>Or enter this code: <strong>{{ .Token }}</strong></p>
    ```
-   NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # Settings -> API Keys
-   ```
+5. Optional, against guest spam: **Authentication → Attack Protection → CAPTCHA** (Supabase caps anonymous
+   sign-ins at 30 per hour per IP by default, adjustable under Rate Limits).
 
-How calls work:
+How it works:
 
-- Signing in only signs a message. No transaction, no fees.
-- A **call** is the price at the moment *you* paste a token while connected, taken from the server's market
-  data. The first call per token counts; calls can be deleted but never edited (enforced by the database).
-- Calls saved on a device before connecting stay on that device (marked "device") and are **not** uploaded,
-  because their entry came from the browser and could be faked. Only server-recorded calls count on the board.
-- The caller board ranks wallets by 2x hits, average x (3+ calls), best call and number of calls, each call
-  measured from the caller's own entry.
-
-Without `SUPABASE_URL` / `SUPABASE_SECRET_KEY` Rankr uses `./data/rankr.json`. `RANKR_MOCK=1` always uses the
-file store, so demo data never reaches a real database.
+- A **call** is the price at the moment *you* paste a token, taken from the server's market data. The first
+  call per token counts; calls can be deleted but never edited (enforced by the database).
+- **Names**: every new account gets a default name from `sha256(user id)`: the first hex digit picks a
+  word (`nonce`, `cipher`, `merkle`, `ledger`, `satoshi`, ...), the next 4 digits follow it (`@nonce_7f3a`;
+  more digits if that one is taken). Renaming on `/account`: 3-20 letters, numbers or underscores, unique
+  ignoring case, a few names reserved. Calls follow the account, not the name. Profiles hold only the name:
+  no email, no wallet.
+- **Guests** exist only in the browser that created them; clearing site data loses access (their calls
+  stay on the board). Adding an email on `/account` turns the guest into a normal account with the same id,
+  name and calls. Signing out a guest asks for confirmation first.
+- `/api/track` checks the access token with Supabase Auth and refuses pastes without an account (401); the UI
+  sends people to `/login` and back with their CA.
+- The caller board ranks callers by 2x hits, average x (3+ calls), best call and number of calls.
+- Without the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` vars (local dev), there are no accounts: pasting works
+  for everyone and "My calls" is kept in the browser.
 
 `supabase/smoke-test.sql` checks the schema (sealed entry, atomic pastes, sorting, stats, privileges) and
 rolls everything back. Run it against a local or throwaway database:
@@ -111,13 +140,14 @@ rolls everything back. Run it against a local or throwaway database:
 
 | Route | What |
 | --- | --- |
-| `POST /api/track` `{input}` | paste a CA / link |
+| `POST /api/track` `{input}` | paste a CA / link (needs an account when accounts are on) |
 | `GET /api/tokens?sort=top\|peak\|losers\|new\|hot&range=24h\|7d\|30d\|all&chain=&q=&ids=&limit=&offset=` | leaderboard page |
 | `GET /api/tokens/:chain/:address` | one token (or a preview if untracked) |
 | `GET /api/stats` | totals for the home page |
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
 | `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
-| `GET /api/me`, `GET/DELETE /api/me/calls` | the signed-in wallet and its calls (`Authorization: Bearer <access token>`) |
+| `GET /api/me`, `POST /api/me/username` `{username}`, `GET/DELETE /api/me/calls` | your account, username and calls (`Authorization: Bearer <access token>`) |
+| `GET /api/username?name=` | is a username free |
 
 ## How the numbers work
 
@@ -139,13 +169,14 @@ src/app/                     pages, API routes, icons, social cards
   api/tokens                 GET a leaderboard page (sort, filter, paging)
   api/stats                  GET home page totals
   api/cron/refresh           background price refresh
-  api/callers, api/me/*      caller board, signed-in wallet and its calls
+  api/callers, api/me/*      caller board, your account, username and calls
+  login, account             guest / email sign-in, rename, keep a guest account
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
-src/lib/accounts.ts          wallet sessions (Supabase Auth) and calls, server side
-supabase/                    migration, smoke test, optional cron job
+src/lib/accounts.ts          accounts (Supabase Auth: guests, email), names and calls, server side
+supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```
 
 Not financial advice. Memecoins can and do go to zero.

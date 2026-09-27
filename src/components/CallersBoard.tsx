@@ -2,12 +2,10 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import { chainMeta } from "@/lib/chains";
 import { formatMultiple, tokenHref } from "@/lib/format";
 import { useCallerPages } from "@/lib/hooks";
 import { MIN_CALLS_FOR_AVG, type CallerSort } from "@/lib/params";
 import type { CallerView } from "@/lib/types";
-import { shortWallet } from "@/lib/wallet";
 import { useAuth } from "./AuthProvider";
 import { MultipleBadge } from "./MultipleBadge";
 import { ListSkeleton } from "./TokenList";
@@ -28,10 +26,7 @@ function winRate(c: CallerView) {
 function Caller({ c, me }: { c: CallerView; me: boolean }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <span className="truncate font-mono text-[13px]" title={c.wallet}>
-        {shortWallet(c.wallet)}
-      </span>
-      <span className="font-mono text-[11px] text-subtle uppercase">{chainMeta(c.chain).short}</span>
+      <span className="truncate font-mono text-[13px]">@{c.username}</span>
       {me && <span className="rounded border border-border px-1 font-mono text-[10px] text-muted">you</span>}
     </span>
   );
@@ -64,7 +59,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
         <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
           <p className="font-medium">No callers yet</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-            Connect a wallet and paste a CA. Every paste while connected is your call, measured from your entry.
+            Sign in, paste a CA and you&apos;re on it. Every paste is your call, measured from your own entry.
           </p>
         </div>
       ) : (

@@ -92,7 +92,7 @@ export function Leaderboard() {
           <p className="mt-1.5 text-sm text-muted">
             {view === "tokens"
               ? "Every token ranked by how it moved since its first paste on Rankr."
-              : "Wallets ranked by their calls, each measured from the caller's own entry."}
+              : "Callers ranked by their calls, each measured from the caller's own entry."}
           </p>
         </div>
         <div className="flex items-center gap-3">

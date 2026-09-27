@@ -1,12 +1,18 @@
-// Wallet accounts (Supabase Auth, Sign in with Web3) and per-user calls. Server only.
+// Accounts (Supabase Auth: one-click guests or email magic link) with a public username, and per-user
+// calls. Server only.
 import { MIN_CALLS_FOR_AVG, type CallerSort } from "./params";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
 import type { CallView, CallerView, TokenView } from "./types";
-import { walletOf, type AuthUserLike, type Wallet } from "./wallet";
+import { checkUsername, type UsernameProblem } from "./username";
 
-export type Account = { id: string; wallet: Wallet };
+/**
+ * A signed-in user. New accounts get a default name (e.g. nonce_7f3a) they can change. `guest` accounts
+ * (anonymous sign-in) have no email and live in one browser until an email is added. The email is never
+ * shown publicly.
+ */
+export type Account = { id: string; email: string | null; username: string | null; guest: boolean };
 
 export class AuthError extends Error {}
 
@@ -25,11 +31,14 @@ export function accountsEnabled(): boolean {
 
 // Verified tokens for a minute, so every request doesn't round-trip to Supabase Auth.
 const verified = new Map<string, { account: Account; until: number }>();
-const profiled = new Set<string>();
+
+function forget(userId: string) {
+  for (const [token, hit] of verified) if (hit.account.id === userId) verified.delete(token);
+}
 
 /**
- * The signed-in wallet behind `Authorization: Bearer <supabase access token>`, or null when the
- * request has no token. Throws AuthError when a token is sent but isn't valid.
+ * The user behind `Authorization: Bearer <supabase access token>`, or null when the request has
+ * no token. Throws AuthError when a token is sent but isn't valid.
  */
 export async function accountFromRequest(req: Request): Promise<Account | null> {
   const api = rest();
@@ -39,18 +48,45 @@ export async function accountFromRequest(req: Request): Promise<Account | null> 
   const hit = verified.get(token);
   if (hit && hit.until > Date.now()) return hit.account;
 
-  const user = await api.user<AuthUserLike>(token);
-  const wallet = walletOf(user);
-  if (!user || !wallet) throw new AuthError("Sign in again with your wallet.");
-  const account = { id: user.id, wallet };
+  const user = await api.user<{ id: string; email?: string | null; is_anonymous?: boolean }>(token);
+  if (!user?.id) throw new AuthError("Your session expired. Sign in again.");
 
-  if (!profiled.has(account.id)) {
-    await api.rpc("rankr_upsert_profile", { p_user: account.id, p_chain: wallet.chain, p_wallet: wallet.address });
-    profiled.add(account.id);
-  }
+  const rows = await api.select<{ username: string }[]>(
+    `profiles?select=username&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
+  );
+  // First sight of this account: give it its default name.
+  const username = rows[0]?.username ?? (await api.rpc<string>("rankr_ensure_profile", { p_user: user.id }));
+  const account: Account = { id: user.id, email: user.email || null, username, guest: !!user.is_anonymous };
   if (verified.size > 5_000) verified.clear();
   verified.set(token, { account, until: Date.now() + 60_000 });
   return account;
+}
+
+/** Sets or changes the account's public username. */
+export async function setUsername(
+  account: Account,
+  name: string,
+): Promise<{ ok: true; username: string } | { ok: false; error: UsernameProblem }> {
+  const api = rest();
+  if (!api) return { ok: false, error: "invalid" };
+  const problem = checkUsername(name);
+  if (problem) return { ok: false, error: problem };
+  const out = await api.rpc<{ ok: boolean; username?: string; error?: UsernameProblem }>("rankr_set_username", {
+    p_user: account.id,
+    p_username: name,
+  });
+  if (!out.ok) return { ok: false, error: out.error ?? "invalid" };
+  forget(account.id);
+  return { ok: true, username: out.username ?? name };
+}
+
+/** Why `name` can't be used (by `userId`, whose own current name is fine), or null if it can. */
+export async function usernameProblem(name: string, userId?: string): Promise<UsernameProblem | null> {
+  const local = checkUsername(name);
+  if (local) return local;
+  const api = rest();
+  if (!api) return null;
+  return api.rpc<UsernameProblem | null>("rankr_username_problem", { p_username: name, p_user: userId ?? null });
 }
 
 type CallRow = {
@@ -107,8 +143,7 @@ export async function deleteCall(account: Account, tokenId: string): Promise<boo
 
 type CallerRow = {
   user_id: string;
-  chain: string;
-  wallet: string;
+  username: string;
   calls: number;
   hits: number;
   wins: number;
@@ -130,8 +165,7 @@ export async function callers(sort: CallerSort, limit: number, offset: number): 
     total: out.total,
     callers: out.callers.map((c) => ({
       userId: c.user_id,
-      chain: c.chain,
-      wallet: c.wallet,
+      username: c.username,
       calls: c.calls,
       hits: c.hits,
       wins: c.wins,

@@ -1,207 +1,207 @@
 "use client";
 
-import clsx from "clsx";
-import { ExternalLink, LoaderCircle, LogOut, UserRound, Wallet as WalletIcon, X } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { shortWallet } from "@/lib/wallet";
-import { INSTALL_URL, ethereumWallet, isMobile, openInWalletUrl, solanaWallet } from "@/lib/wallets";
-import { useAuth, type Chain } from "./AuthProvider";
+import { LoaderCircle, LogOut, Mail } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { loginHref } from "@/lib/login";
+import { useAuth } from "./AuthProvider";
+import { UsernameForm } from "./UsernameForm";
 
-const OPTIONS: { chain: Chain; title: string; wallets: string }[] = [
-  { chain: "solana", title: "Solana", wallets: "Phantom, Solflare, Backpack" },
-  { chain: "ethereum", title: "Ethereum", wallets: "MetaMask, Rabby, Coinbase Wallet" },
-];
+const INPUT =
+  "h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none transition-colors placeholder:text-subtle/60 focus:border-border-strong";
+const PRIMARY =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-fg px-4 text-sm font-medium text-bg transition-opacity hover:opacity-85 disabled:opacity-50";
 
-/** Header control: "Connect" when signed out, the wallet with a small menu when signed in. */
-export function AccountButton() {
-  const { available, ready, wallet } = useAuth();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const [open, setOpen] = useState(false);
+/** Change the name, keep a guest account by adding an email, sign out. */
+export function Account() {
+  const router = useRouter();
+  const { available, ready, userId, email, username, guest, signOut } = useAuth();
+  const [saved, setSaved] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
 
-  if (!available) return null;
-  if (!ready) return <span className="h-8 w-20 animate-pulse rounded-md bg-surface-2" aria-hidden />;
-  if (wallet) return <AccountMenu />;
+  useEffect(() => {
+    if (!available || (ready && (!userId || !username))) router.replace(available ? loginHref("/account") : "/");
+  }, [available, ready, userId, username, router]);
+
+  if (!ready || !userId || !username) {
+    return (
+      <div className="pt-14">
+        <LoaderCircle className="size-5 animate-spin text-subtle" />
+      </div>
+    );
+  }
+
+  async function out() {
+    await signOut();
+    router.replace("/");
+  }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          dialogRef.current?.showModal();
-        }}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-      >
-        <WalletIcon className="size-3.5" />
-        <span className="hidden sm:inline">Connect</span>
-      </button>
-      <dialog
-        ref={dialogRef}
-        onClose={() => setOpen(false)}
-        onClick={(e) => e.target === e.currentTarget && dialogRef.current?.close()}
-        className="m-0 mt-auto w-full max-w-none rounded-t-xl border border-border bg-bg p-0 text-fg backdrop:bg-black/50 sm:m-auto sm:max-w-md sm:rounded-xl"
-        aria-label="Connect a wallet"
-      >
-        {open && <ConnectPanel onDone={() => dialogRef.current?.close()} />}
-      </dialog>
-    </>
+    <div className="mx-auto max-w-lg pt-10 sm:pt-14">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Account</h1>
+      <p className="mt-1.5 text-sm text-muted">
+        You are <span className="font-mono text-fg">@{username}</span> on the caller board
+        {guest ? ", as a guest." : "."}
+      </p>
+
+      {guest && <KeepAccount />}
+
+      <section className="mt-6 rounded-lg border border-border p-5">
+        <h2 className="text-sm font-medium">Change username</h2>
+        <p className="mt-1 mb-5 text-sm text-muted">Your calls move with you. The old name becomes free for others.</p>
+        <UsernameForm key={username} initial={username} current={username} submitLabel="Save username" onSaved={() => setSaved(true)} />
+        {saved && <p className="mt-3 text-xs text-up">Saved.</p>}
+      </section>
+
+      {!guest && (
+        <section className="mt-6 rounded-lg border border-border p-5">
+          <h2 className="text-sm font-medium">Email</h2>
+          <p className="mt-1 font-mono text-sm break-all text-muted">{email}</p>
+          <p className="mt-2 text-xs text-subtle">Private. Only used to send your sign-in links.</p>
+        </section>
+      )}
+
+      {guest && confirmOut ? (
+        <div className="mt-6 rounded-lg border border-down/40 p-4">
+          <p className="text-sm">
+            Guest accounts can&apos;t sign back in. After signing out, <span className="font-mono">@{username}</span> and its
+            calls stay on the board but you lose access. Add an email first to keep it.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={out}
+              className="h-8 rounded-md border border-border px-3 text-sm text-down transition-colors hover:bg-surface-2"
+            >
+              Sign out anyway
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmOut(false)}
+              className="h-8 rounded-md px-3 text-sm text-muted hover:text-fg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => (guest ? setConfirmOut(true) : void out())}
+          className="mt-6 inline-flex h-9 items-center gap-2 rounded-md border border-border px-3.5 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        >
+          <LogOut className="size-3.5" /> Sign out
+        </button>
+      )}
+    </div>
   );
 }
 
-function ConnectPanel({ onDone }: { onDone: () => void }) {
-  const { connect } = useAuth();
-  const [busy, setBusy] = useState<Chain | null>(null);
+/** Guest -> email account. Same user, so the name and calls stay. */
+function KeepAccount() {
+  const { addEmail, verifyEmailCode } = useAuth();
+  const [email, setEmail] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detected, setDetected] = useState<Record<Chain, boolean>>({ solana: false, ethereum: false });
-  const [mobile, setMobile] = useState(false);
 
-  useEffect(() => {
-    setDetected({ solana: !!solanaWallet(), ethereum: !!ethereumWallet() });
-    setMobile(isMobile());
-  }, []);
-
-  async function choose(chain: Chain) {
-    setBusy(chain);
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
     setError(null);
     try {
-      await connect(chain);
-      onDone();
+      await fn();
     } catch (err) {
-      const message = (err as Error).message ?? String(err);
-      setError(/reject|denied|cancel/i.test(message) ? "Signature request was cancelled." : message);
+      setError((err as Error).message);
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
   return (
-    <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-semibold tracking-tight">Connect a wallet</h2>
-          <p className="mt-0.5 text-sm text-muted">Sync your calls across devices and join the caller board.</p>
-        </div>
-        <button
-          type="button"
-          onClick={onDone}
-          className="grid size-8 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
-          aria-label="Close"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
-
-      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-        {OPTIONS.map(({ chain, title, wallets }) =>
-          detected[chain] ? (
-            <button
-              key={chain}
-              type="button"
-              disabled={busy !== null}
-              onClick={() => choose(chain)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-2 disabled:opacity-60"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="font-medium">{title}</div>
-                <div className="truncate text-xs text-muted">{wallets}</div>
-              </div>
-              {busy === chain ? (
-                <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-muted">
-                  <LoaderCircle className="size-3.5 animate-spin" /> check your wallet
-                </span>
-              ) : (
-                <span className="font-mono text-[11px] text-up">detected</span>
-              )}
-            </button>
-          ) : (
-            <a
-              key={chain}
-              href={mobile ? openInWalletUrl(chain) : INSTALL_URL[chain]}
-              target={mobile ? undefined : "_blank"}
-              rel="noreferrer"
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-2"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-muted">{title}</div>
-                <div className="truncate text-xs text-subtle">{wallets}</div>
-              </div>
-              <span className="inline-flex items-center gap-1 font-mono text-[11px] text-subtle">
-                {mobile ? `open in ${chain === "solana" ? "Phantom" : "MetaMask"}` : "install"}
-                <ExternalLink className="size-3" />
-              </span>
-            </a>
-          ),
-        )}
-      </div>
-
-      {error && <p className="mt-3 text-sm text-down">{error}</p>}
-      <p className="mt-4 font-mono text-[11px] leading-relaxed text-subtle">
-        You sign a message to prove you own the wallet. No transaction, no fees, no access to funds.
+    <section className="mt-8 rounded-lg border border-border-strong bg-surface p-5">
+      <h2 className="text-sm font-medium">Keep this account</h2>
+      <p className="mt-1 text-sm text-muted">
+        A guest account lives in this browser only. Clear your browser data or switch devices and it&apos;s gone. Add an
+        email to sign in anywhere; your name and calls stay the same.
       </p>
-    </div>
-  );
-}
-
-function AccountMenu() {
-  const { wallet, disconnect } = useAuth();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
-
-  if (!wallet) return null;
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className={clsx(
-          "inline-flex h-8 items-center gap-2 rounded-md border border-border px-2.5 font-mono text-xs transition-colors hover:bg-surface-2",
-          open && "bg-surface-2",
-        )}
-      >
-        <span className="size-1.5 rounded-full bg-up" />
-        {shortWallet(wallet.address)}
-      </button>
-      {open && (
-        <div className="animate-fade-in absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-bg shadow-lg">
-          <div className="border-b border-border px-3 py-2.5">
-            <div className="font-mono text-[11px] text-subtle uppercase">{wallet.chain}</div>
-            <div className="truncate font-mono text-xs" title={wallet.address}>
-              {wallet.address}
-            </div>
+      {!sentTo ? (
+        <form
+          className="mt-5 flex flex-col gap-2 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const to = email.trim();
+            if (to) void run(async () => {
+              await addEmail(to);
+              setSentTo(to);
+            });
+          }}
+        >
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError(null);
+            }}
+            autoComplete="email"
+            placeholder="you@example.com"
+            aria-label="Email"
+            className={INPUT}
+          />
+          <button type="submit" disabled={!email.trim() || busy} className={`${PRIMARY} h-11 shrink-0`}>
+            {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Mail className="size-4" />}
+            Add email
+          </button>
+        </form>
+      ) : (
+        <form
+          className="mt-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (code.length >= 6) void run(() => verifyEmailCode(sentTo, code));
+          }}
+        >
+          <p className="text-sm text-muted">
+            We sent a link to <span className="text-fg">{sentTo}</span>. Open it on this device, or enter the code:
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 10));
+                setError(null);
+              }}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              aria-label="Code from the email"
+              className={`${INPUT} text-center font-mono tracking-[0.4em]`}
+            />
+            <button type="submit" disabled={code.length < 6 || busy} className={`${PRIMARY} h-11 shrink-0`}>
+              {busy && <LoaderCircle className="size-4 animate-spin" />}
+              Confirm
+            </button>
           </div>
-          <Link
-            href="/me"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-fg"
-          >
-            <UserRound className="size-3.5" /> My calls
-          </Link>
           <button
             type="button"
             onClick={() => {
-              setOpen(false);
-              void disconnect();
+              setSentTo(null);
+              setCode("");
+              setError(null);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg"
+            className="mt-3 text-xs text-muted underline-offset-4 hover:text-fg hover:underline"
           >
-            <LogOut className="size-3.5" /> Disconnect
+            Use a different email
           </button>
-        </div>
+        </form>
       )}
-    </div>
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-down">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }

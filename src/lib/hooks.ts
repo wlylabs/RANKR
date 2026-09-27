@@ -4,7 +4,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import type { CallerSort, RangeKey, SortKey } from "./params";
-import type { CallersResponse, StatsResponse, TokenView, TokensResponse } from "./types";
+import { authedFetcher } from "./supabase-browser";
+import type { CallersResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -97,6 +98,12 @@ export function useStats() {
   return { stats: data ?? null, error, isLoading };
 }
 
+/** The signed-in account's calls (none when `userId` is null). */
+export function useAccountCalls(userId: string | null) {
+  // No keepPreviousData: after switching accounts, never show the last one's calls.
+  return useSWR<MyCallsResponse>(userId ? `/api/me/calls?u=${userId}` : null, authedFetcher, { refreshInterval: 20_000 });
+}
+
 /** Revalidates every board and stat on the page, e.g. after a paste. */
 export function refreshBoards() {
   // `includes` also matches the "$inf$..." keys of paged boards.
@@ -115,7 +122,8 @@ export function useNow(ms = 30_000): number {
   return now;
 }
 
-// ---- "My calls": the tokens this browser pasted, with the entry at the moment of *your* paste.
+// ---- Device calls: without accounts (local dev), "My calls" are the tokens this browser pasted,
+// with the entry at the moment of *your* paste.
 
 export type MyCall = {
   id: string;

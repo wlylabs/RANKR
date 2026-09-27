@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/** Wallet sign-in is offered only when the public Supabase URL and key are configured. */
+/** Accounts are on only when the public Supabase URL and key are configured. */
 export const accountsAvailable = Boolean(URL && KEY);
 
 let client: SupabaseClient | null = null;
@@ -14,7 +14,14 @@ let client: SupabaseClient | null = null;
 export function browserSupabase(): SupabaseClient | null {
   if (!accountsAvailable) return null;
   client ??= createClient(URL!, KEY!, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      // The magic link lands on /login with the session in the URL fragment. Implicit flow (not PKCE)
+      // so the link also works when it's opened in a different browser than the one that asked for it.
+      detectSessionInUrl: true,
+      flowType: "implicit",
+    },
   });
   return client;
 }
@@ -26,7 +33,7 @@ export async function accessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-/** fetch() that carries the signed-in wallet's session to our API. */
+/** fetch() that carries the caller's session (if any) to our API. */
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const token = await accessToken();
   const headers = new Headers(init.headers);

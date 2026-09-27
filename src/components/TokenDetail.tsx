@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ArrowLeft, Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { chainMeta } from "@/lib/chains";
@@ -16,10 +17,12 @@ import {
   formatUsd,
   shortAddress,
 } from "@/lib/format";
-import { fetcher, useMyCalls } from "@/lib/hooks";
+import { fetcher, useAccountCalls, useMyCalls } from "@/lib/hooks";
 import { MILESTONES, ratio } from "@/lib/metrics";
-import { trackPaste } from "@/lib/track";
+import { loginHref } from "@/lib/login";
+import { PasteError, trackPaste } from "@/lib/track";
 import type { Link as TokenLink, MarketSnapshot, TokenResponse, TokenView } from "@/lib/types";
+import { useAuth } from "./AuthProvider";
 import { CopyButton } from "./CopyButton";
 import { DecryptText } from "./DecryptText";
 import { ChangeText, MultipleBadge } from "./MultipleBadge";
@@ -129,8 +132,17 @@ function tone(multiple: number) {
   return multiple > 1.005 ? "text-up" : multiple < 0.995 ? "text-down" : "text-fg";
 }
 
+/** Your own entry on the token: from your account, or from this device when accounts are off. */
+function useYourCall(tokenId: string) {
+  const { available, userId } = useAuth();
+  const account = useAccountCalls(available ? userId : null).data?.calls.find((c) => c.tokenId === tokenId);
+  const device = useMyCalls().find((c) => c.id === tokenId);
+  if (available) return account && { entryPriceUsd: account.entryPriceUsd, entryMarketCap: account.entryMarketCap, at: account.calledAt };
+  return device && { entryPriceUsd: device.entryPriceUsd, entryMarketCap: device.entryMarketCap, at: device.pastedAt };
+}
+
 function Tracked({ token: t }: { token: TokenView }) {
-  const myCall = useMyCalls().find((c) => c.id === t.id);
+  const myCall = useYourCall(t.id);
   const m = t.market;
 
   return (
@@ -192,7 +204,7 @@ function Tracked({ token: t }: { token: TokenView }) {
             <Section title="Your call">
               <div className="flex items-center justify-between gap-3">
                 <div className="tabular font-mono text-xs text-muted">
-                  entry {formatUsd(myCall.entryMarketCap)} · <TimeAgo at={myCall.pastedAt} />
+                  entry {formatUsd(myCall.entryMarketCap)} · <TimeAgo at={myCall.at} />
                 </div>
                 <MultipleBadge multiple={ratio(m?.priceUsd ?? t.entryPriceUsd, myCall.entryPriceUsd)} />
               </div>
@@ -376,17 +388,22 @@ function ShareButton({ token: t }: { token: TokenView }) {
 }
 
 function Untracked({ preview: p, onTracked }: { preview: MarketSnapshot; onTracked: () => void }) {
+  const router = useRouter();
+  const { available, ready, userId, username } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mc = p.marketCap ?? p.fdv;
+  const signIn = () => router.push(loginHref(window.location.pathname));
 
   async function track() {
+    if (available && ready && (!userId || !username)) return signIn();
     setLoading(true);
     setError(null);
     try {
       await trackPaste(p.address, p.chainId);
       onTracked();
     } catch (err) {
+      if (err instanceof PasteError && err.code) return signIn();
       setError((err as Error).message);
       setLoading(false);
     }

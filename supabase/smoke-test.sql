@@ -119,17 +119,31 @@ begin
   raise notice 'rankr smoke test: tokens ok';
 end $$;
 
--- Callers (needs the 20260927010000_rankr_callers migration).
+-- Accounts and callers (needs all migrations).
 do $$
 declare
   a uuid := '00000000-0000-4000-8000-00000000000a';
   b uuid := '00000000-0000-4000-8000-00000000000b';
+  c uuid := '00000000-0000-4000-8000-00000000000c';
+  d uuid := '00000000-0000-4000-8000-00000000000d';
   r jsonb;
+  v text;
   failed boolean;
 begin
   insert into auth.users (id) values (a), (b);
-  perform public.rankr_upsert_profile(a, 'solana', 'WalletA111');
-  perform public.rankr_upsert_profile(b, 'ethereum', '0xwalletb');
+
+  -- Usernames: format, reserved words, case-insensitive uniqueness.
+  assert public.rankr_set_username(a, 'x') = '{"ok": false, "error": "invalid"}'::jsonb;
+  assert public.rankr_set_username(a, 'Admin')->>'error' = 'reserved';
+  assert (public.rankr_set_username(a, 'Alpha_Caller')->>'ok')::boolean;
+  assert public.rankr_set_username(b, 'alpha_caller')->>'error' = 'taken', 'case-insensitive';
+  assert (public.rankr_set_username(a, 'alpha_caller')->>'ok')::boolean, 'own name, new case';
+  assert (public.rankr_set_username(b, 'bravo')->>'ok')::boolean;
+  assert public.rankr_username_problem('bravo') = 'taken';
+  assert public.rankr_username_problem('charlie') is null;
+  assert not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'profiles' and column_name in ('wallet', 'chain', 'handle')),
+         'no wallet columns';
 
   -- AAA's price is now 0.000006, BRAVO 11, CHAR 0.2 (from the block above).
   r := public.rankr_record_call(a, 'base:0xbbb', 1, 1000000, now());
@@ -152,7 +166,7 @@ begin
 
   r := public.rankr_callers('avg');
   assert (r->>'total')::int = 2;
-  assert r->'callers'->0->>'wallet' = 'WalletA111', 'A leads on avg: ' || r::text;
+  assert r->'callers'->0->>'username' = 'alpha_caller', 'A leads on avg: ' || r::text;
   assert (r->'callers'->0->>'calls')::int = 2 and (r->'callers'->0->>'hits')::int = 2;
   assert r->'callers'->0->'best_token'->>'symbol' = 'BRAVO';
   assert (r->'callers'->0->>'best_multiple')::float8 = 11;
@@ -160,18 +174,30 @@ begin
   r := public.rankr_callers('calls', p_min_calls => 3);
   assert (r->>'total')::int = 0, 'min calls filter';
   r := public.rankr_callers('avg', p_limit => 1, p_offset => 1);
-  assert r->'callers'->0->>'wallet' = '0xwalletb';
+  assert r->'callers'->0->>'username' = 'bravo';
 
   assert public.rankr_delete_call(b, 'solana:AAA');
   assert not public.rankr_delete_call(b, 'solana:AAA');
 
+  -- Default names: a crypto word + hex from sha256(user id). Stable, valid, and unique.
+  v := public.rankr_default_username(c);
+  assert v ~ '^(nonce|cipher|hash|salt|merkle|ledger|block|shard|vault|epoch|proof|oracle|genesis|keccak|satoshi|entropy)_[0-9a-f]{4}$', v;
+  assert public.rankr_username_problem(v) is null and public.rankr_username_problem(public.rankr_default_username(c, 12)) is null;
+  insert into auth.users (id) values (c), (d);
+  assert (public.rankr_set_username(d, v)->>'ok')::boolean;                -- somebody took c's default name
+  assert public.rankr_ensure_profile(c) = public.rankr_default_username(c, 6), 'taken default gets more hex';
+  assert public.rankr_ensure_profile(c) = public.rankr_default_username(c, 6), 'idempotent';
+  assert public.rankr_ensure_profile(a) = 'alpha_caller', 'existing name kept';
+
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_set_username(uuid,text)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_ensure_profile(uuid)', 'execute');
     assert has_function_privilege('anon', 'public.rankr_callers(text,integer,integer,integer)', 'execute');
   end if;
 
-  raise notice 'rankr smoke test: callers ok';
+  raise notice 'rankr smoke test: accounts ok';
 end $$;
 
 rollback;

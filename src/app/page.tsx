@@ -34,7 +34,7 @@ export default function HomePage() {
             there.
           </p>
           <div className="mt-8" id="paste">
-            <PasteBox />
+            <PasteBox resumeFromUrl />
           </div>
           <p className="mt-4 flex flex-col items-center justify-center gap-1 font-mono text-[11px] text-subtle sm:flex-row sm:gap-3">
             <span className="inline-flex items-center gap-1.5">

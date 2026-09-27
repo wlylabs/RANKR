@@ -4,6 +4,14 @@
 -- in. Calls are written by the server only, from server-side market data, so nobody can
 -- backdate or invent an entry. They are what the caller leaderboard ranks.
 
+-- This builds on public.tokens: fail with a clear message if the first migration hasn't run.
+do $$
+begin
+  if to_regclass('public.tokens') is null then
+    raise exception 'rankr: run 20260927000000_rankr_tokens.sql first (or use supabase/setup.sql, which runs everything in order)';
+  end if;
+end $$;
+
 create table if not exists public.profiles (
   user_id    uuid primary key references auth.users (id) on delete cascade,
   chain      text not null,            -- 'solana' | 'ethereum'

@@ -63,11 +63,11 @@ export type TokenView = TokenRecord & {
 export type TrackResponse = {
   status: "created" | "existing";
   token: TokenView;
-  /** Present when the paste came from a signed-in wallet: that user's call on the token. */
+  /** The signed-in caller's call on the token (their own entry). */
   call?: { created: boolean; entryPriceUsd: number; calledAt: number } | null;
 };
 
-/** A signed-in user's call: their own entry on a token. */
+/** A caller's call: their own entry on a token. */
 export type CallView = {
   tokenId: string;
   entryPriceUsd: number;
@@ -82,8 +82,7 @@ export type MyCallsResponse = { calls: CallView[] };
 
 export type CallerView = {
   userId: string;
-  chain: string;
-  wallet: string;
+  username: string;
   calls: number;
   /** Calls at 2x or more right now. */
   hits: number;
@@ -118,3 +117,5 @@ export type TokenResponse = {
   /** Live data for a token Rankr has not recorded yet. */
   preview: MarketSnapshot | null;
 };
+
+export type MeResponse = { account: { id: string; email: string | null; username: string | null; guest: boolean } };

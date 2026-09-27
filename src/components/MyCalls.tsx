@@ -1,17 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { ClipboardPaste, Trash2 } from "lucide-react";
+import { ClipboardPaste, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import useSWR from "swr";
 import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
-import { removeMyCall, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
+import { refreshBoards, removeMyCall, useAccountCalls, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
+import { loginHref } from "@/lib/login";
 import { MAX_LIMIT } from "@/lib/params";
 import { ratio, tierOf } from "@/lib/metrics";
-import { apiFetch, authedFetcher } from "@/lib/supabase-browser";
-import type { CallView, MyCallsResponse, TokenView } from "@/lib/types";
-import { shortWallet } from "@/lib/wallet";
+import { apiFetch } from "@/lib/supabase-browser";
+import type { CallView, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
@@ -29,8 +28,6 @@ type Row = {
   multiple: number;
   marketCap: number | null;
   token: TokenView | undefined;
-  /** "account": verified and synced; "device": this browser only. */
-  source: "account" | "device";
 };
 
 const SORTS = {
@@ -52,7 +49,6 @@ function deviceRow(call: MyCall, token: TokenView | undefined): Row {
     multiple: price ? ratio(price, call.entryPriceUsd) : 1,
     marketCap: token?.marketCap ?? null,
     token,
-    source: "device",
   };
 }
 
@@ -69,61 +65,118 @@ function accountRow(c: CallView): Row {
     multiple: c.multiple,
     marketCap: t.marketCap,
     token: t,
-    source: "account",
   };
 }
 
 export function MyCalls() {
-  const { userId, wallet, available } = useAuth();
-  const deviceCalls = useMyCalls();
-  // Live data for the calls on this device (the newest MAX_LIMIT of them).
-  const { tokens, isLoading } = useTokens({ ids: deviceCalls.slice(0, MAX_LIMIT).map((c) => c.id), limit: MAX_LIMIT });
-  const account = useSWR<MyCallsResponse>(userId ? `/api/me/calls?u=${userId}` : null, authedFetcher, {
-    refreshInterval: 20_000,
-    keepPreviousData: true,
-  });
-  const [sort, setSort] = useState<keyof typeof SORTS>("new");
+  const { available, ready, userId, username, guest } = useAuth();
+  if (!available) return <DeviceCalls />;
+  if (!ready) return <Page intro={null} rows={[]} loading />;
+  if (!userId || !username) {
+    return (
+      <Page intro={null} rows={[]}>
+        <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
+          <UserRound className="mx-auto size-5 text-subtle" />
+          <p className="mt-3 font-medium">{userId ? "Pick a name" : "Sign in to see your calls"}</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
+            {userId
+              ? "Your calls show up on the caller board under it."
+              : "Every CA you paste is your call, tracked from your own entry and ranked on the caller board. Continue as a guest in one click, or use your email."}
+          </p>
+          <Link
+            href={loginHref("/me")}
+            className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
+          >
+            {userId ? "Pick a name" : "Sign in"}
+          </Link>
+        </div>
+      </Page>
+    );
+  }
+  return <AccountCalls userId={userId} username={username} guest={guest} />;
+}
 
-  const rows = useMemo(() => {
-    const synced = (account.data?.calls ?? []).map(accountRow);
-    const syncedIds = new Set(synced.map((r) => r.id));
-    const byId = new Map(tokens.map((t) => [t.id, t]));
-    const local = deviceCalls.filter((c) => !syncedIds.has(c.id)).map((c) => deviceRow(c, byId.get(c.id)));
-    return [...synced, ...local].sort(SORTS[sort]);
-  }, [account.data, deviceCalls, tokens, sort]);
+function AccountCalls({ userId, username, guest }: { userId: string; username: string; guest: boolean }) {
+  const { data, isLoading, mutate } = useAccountCalls(userId);
+  const rows = useMemo(() => (data?.calls ?? []).map(accountRow), [data]);
 
   async function remove(row: Row) {
-    removeMyCall(row.id);
-    if (row.source === "account") {
-      await apiFetch(`/api/me/calls?token=${encodeURIComponent(row.id)}`, { method: "DELETE" });
-      void account.mutate();
-    }
+    await mutate((cur) => cur && { calls: cur.calls.filter((c) => c.tokenId !== row.id) }, { revalidate: false });
+    await apiFetch(`/api/me/calls?token=${encodeURIComponent(row.id)}`, { method: "DELETE" });
+    void refreshBoards();
   }
 
+  return (
+    <Page
+      intro={
+        <>
+          Recorded as <span className="font-mono text-fg">@{username}</span> and ranked on the caller board.
+          {guest && (
+            <>
+              {" "}
+              Guest account, this browser only:{" "}
+              <Link href="/account" className="text-fg underline-offset-4 hover:underline">
+                add an email to keep it
+              </Link>
+              .
+            </>
+          )}
+        </>
+      }
+      rows={rows}
+      loading={isLoading}
+      onRemove={remove}
+    />
+  );
+}
+
+/** Without accounts (local dev): the calls pasted from this browser. */
+function DeviceCalls() {
+  const calls = useMyCalls();
+  // Live data for the calls on this device (the newest MAX_LIMIT of them).
+  const { tokens, isLoading } = useTokens({ ids: calls.slice(0, MAX_LIMIT).map((c) => c.id), limit: MAX_LIMIT });
+  const rows = useMemo(() => {
+    const byId = new Map(tokens.map((t) => [t.id, t]));
+    return calls.map((c) => deviceRow(c, byId.get(c.id)));
+  }, [calls, tokens]);
+  return (
+    <Page
+      intro="Saved on this device."
+      rows={rows}
+      loading={isLoading && calls.length > 0}
+      onRemove={(row) => removeMyCall(row.id)}
+    />
+  );
+}
+
+function Page({
+  intro,
+  rows: unsorted,
+  loading = false,
+  onRemove,
+  children,
+}: {
+  intro: React.ReactNode;
+  rows: Row[];
+  loading?: boolean;
+  onRemove?: (row: Row) => void;
+  children?: React.ReactNode;
+}) {
+  const [sort, setSort] = useState<keyof typeof SORTS>("new");
+  const rows = useMemo(() => [...unsorted].sort(SORTS[sort]), [unsorted, sort]);
   const withData = rows.filter((r) => r.token);
   const inProfit = withData.filter((r) => ["up", "pump", "moon"].includes(tierOf(r.multiple))).length;
   const doubled = withData.filter((r) => r.multiple >= 2).length;
   const best = withData.reduce<Row | null>((acc, r) => (!acc || r.multiple > acc.multiple ? r : acc), null);
-  const loading = (isLoading && deviceCalls.length > 0) || (!!userId && account.isLoading);
 
   return (
     <div className="pt-10 sm:pt-14">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My calls</h1>
       <p className="mt-1.5 text-sm text-muted">
-        Measured from the moment <em>you</em> pasted.{" "}
-        {wallet ? (
-          <span className="text-subtle">
-            Synced to <span className="font-mono">{shortWallet(wallet.address)}</span>. Calls made while connected count on the
-            caller board.
-          </span>
-        ) : available ? (
-          <span className="text-subtle">Saved on this device. Connect a wallet to sync them and join the caller board.</span>
-        ) : (
-          <span className="text-subtle">Saved on this device.</span>
-        )}
+        Measured from the moment <em>you</em> pasted. {intro && <span className="text-subtle">{intro}</span>}
       </p>
 
-      {!rows.length ? (
+      {children ?? (!rows.length ? (
         loading ? (
           <div className="mt-8 rounded-lg border border-border">
             <ListSkeleton rows={4} />
@@ -183,17 +236,7 @@ export function MyCalls() {
               <li key={row.id} className="group flex items-center gap-2 pr-2 transition-colors hover:bg-surface-2">
                 <Link href={tokenHref(row)} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
                   <div className="min-w-0 flex-1">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <TokenName symbol={row.symbol} name={row.name} className="min-w-0" />
-                      {wallet && row.source === "device" && (
-                        <span
-                          className="shrink-0 rounded border border-border px-1 font-mono text-[10px] text-subtle"
-                          title="Pasted before connecting. Kept on this device, not on the caller board."
-                        >
-                          device
-                        </span>
-                      )}
-                    </span>
+                    <TokenName symbol={row.symbol} name={row.name} className="min-w-0" />
                     <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
                       <ChainTag chainId={row.chainId} /> · you {formatUsd(row.entryMarketCap)} → {formatUsd(row.marketCap)} ·{" "}
                       <TimeAgo at={row.calledAt} />
@@ -212,20 +255,22 @@ export function MyCalls() {
                     )}
                   </div>
                 </Link>
+                {onRemove && (
                 <button
                   type="button"
-                  onClick={() => void remove(row)}
+                  onClick={() => onRemove(row)}
                   className="grid size-8 shrink-0 place-items-center rounded-md text-subtle transition hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   aria-label={`Remove $${row.symbol} from my calls`}
                   title="Remove from my calls"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
+                )}
               </li>
             ))}
           </ul>
         </>
-      )}
+      ))}
     </div>
   );
 }
