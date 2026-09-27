@@ -9,6 +9,7 @@ describe("accounts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let profile: { username: string; official?: boolean }[];
   let feedArgs: Record<string, unknown> | null;
+  let profileArgs: Record<string, unknown> | null;
 
   beforeEach(() => {
     vi.resetModules();
@@ -16,6 +17,7 @@ describe("accounts", () => {
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
     profile = [{ username: "alpha_caller" }];
     feedArgs = null;
+    profileArgs = null;
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const auth = new Headers(init?.headers).get("authorization");
       if (url.endsWith("/auth/v1/user")) {
@@ -61,6 +63,10 @@ describe("accounts", () => {
               caller_calls: 8, caller_hits: 5, token },
           ]),
         );
+      }
+      if (url.endsWith("/rest/v1/rpc/rankr_set_profile")) {
+        profileArgs = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ ok: true, bio: profileArgs!.p_bio, links: profileArgs!.p_links }));
       }
       if (url.endsWith("/rest/v1/rpc/rankr_set_username")) {
         const { p_username } = JSON.parse(String(init?.body));
@@ -166,6 +172,35 @@ describe("accounts", () => {
     ]);
   });
 
+  it("sets the bio and links cleaned, refusing bad ones before the database", async () => {
+    const { accountFromRequest, setProfile } = await import("./accounts");
+    const account = (await accountFromRequest(req("good-token")))!;
+
+    expect(await setProfile(account, { bio: "hi", links: [{ label: "", url: "javascript:alert(1)" }] })).toEqual({
+      ok: false,
+      error: "bad_url",
+      index: 0,
+    });
+    expect(profileArgs).toBeNull();
+
+    const out = await setProfile(account, { bio: " Low caps\n only ", links: [{ label: " X ", url: "x.com/alpha" }, { label: "", url: "" }] });
+    const profile = { bio: "Low caps only", links: [{ label: "X", url: "https://x.com/alpha" }] };
+    expect(out).toEqual({ ok: true, profile });
+    expect(profileArgs).toEqual({ p_user: USER.id, p_bio: profile.bio, p_links: profile.links });
+  });
+
+  it("reads your own bio and links, empty before the profile migration", async () => {
+    const { accountFromRequest, myProfile } = await import("./accounts");
+    const account = (await accountFromRequest(req("good-token")))!;
+    expect(await myProfile(account)).toEqual({ bio: "", links: [] });
+    // jsonb keeps keys in its own order; they come back as {label, url}.
+    profile = [{ username: "alpha_caller", bio: "gm", links: [{ url: "https://t.me/alpha", label: "" }] } as never];
+    const read = await myProfile(account);
+    expect(read).toEqual({ bio: "gm", links: [{ label: "", url: "https://t.me/alpha" }] });
+    expect(Object.keys(read.links[0])).toEqual(["label", "url"]);
+    expect(urls().at(-1)).toContain(`profiles?select=*&user_id=eq.${USER.id}`);
+  });
+
   it("is null without a token and rejects bad tokens", async () => {
     const { AuthError, accountFromRequest } = await import("./accounts");
     expect(await accountFromRequest(req())).toBeNull();
@@ -238,6 +273,13 @@ describe("callerProfile", () => {
     const out = await callerProfile("NONCE_7F3A");
     expect(out?.caller).toMatchObject({ userId: "u1", username: "nonce_7f3a", calls: 0, bestToken: null });
     expect(urls[0]).toContain("username=ilike.NONCE%5C_7F3A");
+  });
+
+  it("carries the caller's bio and links", async () => {
+    const { callerProfile } = await import("./accounts");
+    expect((await callerProfile("nonce_7f3a"))?.profile).toEqual({ bio: "", links: [] });
+    rows = [{ user_id: "u1", username: "nonce_7f3a", bio: "gm", links: [{ label: "X", url: "https://x.com/n" }] } as never];
+    expect((await callerProfile("nonce_7f3a"))?.profile).toEqual({ bio: "gm", links: [{ label: "X", url: "https://x.com/n" }] });
   });
 
   it("returns null for unknown or impossible names", async () => {

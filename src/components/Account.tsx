@@ -7,13 +7,14 @@ import { APP_HOME, LANDING, loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeyReveal, KeySignInForm } from "./Key";
 import { OfficialBadge } from "./OfficialBadge";
+import { ProfileSection } from "./ProfileForm";
 import { UsernameForm } from "./UsernameForm";
 
 const PRIMARY =
   "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-fg px-4 text-sm font-medium text-bg transition-opacity hover:opacity-85 disabled:opacity-50";
 const LINK = "text-muted underline-offset-4 hover:text-fg hover:underline";
 
-/** Save a sign-in key (or make a new one), change the name, sign out. */
+/** Save a sign-in key (or make a new one), change the name, bio and links, sign out. */
 export function Account() {
   const router = useRouter();
   const { available, ready, userId, username, hasKey, official, signOut } = useAuth();
@@ -73,6 +74,8 @@ export function Account() {
           {saved && <p className="mt-3 text-xs text-up">Saved.</p>}
         </section>
       )}
+
+      <ProfileSection userId={userId} username={username} />
 
       {confirmOut ? (
         <div className="mt-6 rounded-lg border border-down/40 p-4">

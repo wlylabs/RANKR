@@ -5,7 +5,16 @@ import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import type { CallerSort, FeedKind, FeedScope, RangeKey, SortKey } from "./params";
 import { authedFetcher } from "./supabase-browser";
-import type { CallerProfileResponse, CallersResponse, FeedResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
+import type {
+  CallerProfileResponse,
+  CallersResponse,
+  FeedResponse,
+  MyCallsResponse,
+  ProfileResponse,
+  StatsResponse,
+  TokenView,
+  TokensResponse,
+} from "./types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -162,6 +171,11 @@ export function useStats() {
 export function useAccountCalls(userId: string | null) {
   // No keepPreviousData: after switching accounts, never show the last one's calls.
   return useSWR<MyCallsResponse>(userId ? `/api/me/calls?u=${userId}` : null, authedFetcher, { refreshInterval: 20_000 });
+}
+
+/** The signed-in account's bio and links, for editing (none when `userId` is null). */
+export function useMyProfile(userId: string | null) {
+  return useSWR<ProfileResponse>(userId ? `/api/me/profile?u=${userId}` : null, authedFetcher, { revalidateOnFocus: false });
 }
 
 /** Revalidates every board and stat on the page, e.g. after a paste. */

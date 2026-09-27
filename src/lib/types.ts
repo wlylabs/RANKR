@@ -1,3 +1,5 @@
+import type { Profile } from "./profile";
+
 export type Link = { label: string; url: string };
 
 /** Live market data for a token, taken from its most liquid DEX pair. */
@@ -97,8 +99,8 @@ export type CallerView = {
 
 export type CallersResponse = { enabled: boolean; total: number; callers: CallerView[]; updatedAt: number };
 
-/** A caller's public profile: board numbers and calls, newest first. */
-export type CallerProfileResponse = { caller: CallerView; calls: CallView[]; updatedAt: number };
+/** A caller's public profile: board numbers, bio and links, and calls, newest first. */
+export type CallerProfileResponse = { caller: CallerView; profile: Profile; calls: CallView[]; updatedAt: number };
 
 /**
  * One entry of the feed: a new call ("@userx called $SHIB at $1.2B mc") or a call reaching a milestone
@@ -150,6 +152,9 @@ export type TokenResponse = {
 };
 
 export type MeResponse = { account: { id: string; username: string | null; hasKey: boolean; official: boolean } };
+
+/** The signed-in account's bio and links. */
+export type ProfileResponse = { profile: Profile };
 
 /** A new sign-in key, returned once. */
 export type KeyResponse = MeResponse & { key: string };

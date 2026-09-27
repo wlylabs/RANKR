@@ -21,6 +21,10 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **My calls**: every token you pasted, measured from *your* paste.
 - **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Each
   caller has a public profile at `/u/<username>` with their numbers and every call.
+- **Profile bio and links**: on `/account`, a one-line bio (160 characters) and up to 8 links (X, Telegram, a site,
+  a trading bot referral...), each with an optional name. They show on the caller's public page, every link ready
+  to copy with one tap (or all of them at once, one per line), next to a "Copy profile link" button. Links are
+  http(s) only; `x.com/you` gets `https://` added, and the real host always shows under the name.
 - **Feed** (`/feed`, and a live ticker under the header): every call as it lands ("@userx called $SHIB at
   $1.2B mc") and every call that reaches a milestone ("$PEPE hit 10x from @userx's call"), each from the caller's
   own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone, top callers (the top 25 of
@@ -193,8 +197,15 @@ How it works:
   word (`nonce`, `cipher`, `merkle`, `ledger`, `satoshi`, ...), the next 4 digits follow it (`@nonce_7f3a`;
   more digits if that one is taken). Renaming on `/account`: 3-20 letters, numbers or underscores, unique
   ignoring case, a few names reserved (and look-alikes: anything starting with `rankr` or containing
-  `official`). Calls follow the account, not the name. Profiles hold only the name and the official flag:
-  no email, no wallet.
+  `official`). Calls follow the account, not the name. Profiles hold only the name, the official flag, and the
+  bio and links the account chose to show: no email, no wallet.
+- **Bio and links** (`src/lib/profile.ts`, the same rules as `rankr_profile_problem` in SQL): the bio is one line
+  of up to 160 characters; up to 8 links, a name of up to 32 characters (optional) and an http(s) link of up to
+  200 with no `user@` part. The server cleans them (whitespace, hidden and bidi characters, `https://` added, host
+  lowercased and international hosts in punycode, so a look-alike domain shows as `xn--…`) and saves them with
+  `rankr_set_profile`; a table constraint refuses anything else. On the page, links open in a new tab with
+  `rel="nofollow ugc noopener noreferrer"`. Before the migration has run, profiles still load (with no bio or
+  links); saving needs it (re-run `supabase/setup.sql`).
 - **Guests** exist only in the browser that created them; clearing site data loses access (their calls
   stay on the board). Signing out without a key asks for confirmation first.
 - **Keys** (`src/lib/key.ts`): `rk-` and 20 Crockford base32 characters, 100 random bits, forgiving about
@@ -250,8 +261,9 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/stats` | totals for the home page |
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
 | `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
-| `GET /api/callers/:username` | a caller's profile: board numbers and calls |
+| `GET /api/callers/:username` | a caller's profile: board numbers, bio and links, and calls |
 | `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET/DELETE /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
+| `GET /api/me/profile`, `POST /api/me/profile` `{bio, links: [{label, url}]}` | your bio and links (the caller profile carries them as `profile`) |
 | `GET /api/username?name=` | is a username free |
 | `GET /api/feed?scope=all\|top\|following&callers=&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`callers`: followed user ids, for `following`) |
 
@@ -287,6 +299,7 @@ src/lib/store/               storage: file (local) and Supabase adapters, shared
 src/lib/accounts.ts          accounts (Supabase Auth: guests, keys), names and calls, server side
 src/lib/key.ts               sign-in keys: generate, parse, the key's email, the dot pattern
 src/lib/username.ts          username rules (reserved names, look-alikes), same as the SQL
+src/lib/profile.ts           bio and link rules (cleaning, allowed links), same as the SQL
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (starred tokens, kept in the browser)
 src/lib/following.ts         followed callers and the feed filter (kept in the browser)

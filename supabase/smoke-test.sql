@@ -290,4 +290,52 @@ begin
   raise notice 'rankr smoke test: limits ok';
 end $$;
 
+-- Profile bio and links (needs all migrations).
+do $$
+declare
+  a uuid := '00000000-0000-4000-8000-00000000000a';
+  nobody uuid := '00000000-0000-4000-8000-0000000000ff';
+  v_links jsonb := '[{"label": "X", "url": "https://x.com/alpha"}, {"label": "", "url": "https://medium.com/@alpha"}]';
+  r jsonb;
+  failed boolean;
+begin
+  assert (select p.bio = '' and p.links = '[]'::jsonb from public.profiles p where p.user_id = a), 'empty by default';
+
+  r := public.rankr_set_profile(a, 'Low caps only. 🐸', v_links);
+  assert (r->>'ok')::boolean and r->'links' = v_links, r::text;
+  assert (select p.bio = 'Low caps only. 🐸' and p.links = v_links from public.profiles p where p.user_id = a);
+  assert (public.rankr_set_profile(a, '', '[]')->>'ok')::boolean, 'cleared';
+
+  assert public.rankr_set_profile(a, repeat('🐸', 160), '[]')->>'ok' = 'true', '160 characters, not bytes';
+  assert public.rankr_set_profile(a, repeat('a', 161), '[]')->>'error' = 'bio_long';
+  assert public.rankr_set_profile(a, '', '{}')->>'error' = 'invalid';
+  assert public.rankr_set_profile(a, '', (select jsonb_agg(jsonb_build_object('label', '', 'url', 'https://x.com/' || i))
+                                           from generate_series(1, 9) i))->>'error' = 'too_many';
+  assert public.rankr_set_profile(a, '', jsonb_build_array(jsonb_build_object('label', repeat('a', 33), 'url', 'https://x.com')))->>'error' = 'label_long';
+  assert public.rankr_set_profile(a, '', '[{"label": "", "url": "javascript:alert(1)"}]')->>'error' = 'bad_url';
+  assert public.rankr_set_profile(a, '', '[{"label": "", "url": "https://me@evil.com"}]')->>'error' = 'bad_url', 'no user@ part';
+  assert public.rankr_set_profile(a, '', '[{"label": "", "url": "https://x.com/a b"}]')->>'error' = 'bad_url';
+  assert public.rankr_set_profile(a, '', jsonb_build_array(jsonb_build_object('label', '', 'url', 'https://x.com/' || repeat('a', 190))))->>'error' = 'bad_url';
+  assert public.rankr_set_profile(a, '', '[{"url": "https://x.com"}]')->>'error' = 'invalid', 'label required (may be empty)';
+  assert public.rankr_set_profile(a, '', '[{"label": "", "url": "https://x.com", "extra": 1}]')->>'error' = 'invalid';
+  assert public.rankr_set_profile(a, '', '["https://x.com"]')->>'error' = 'invalid';
+  assert public.rankr_set_profile(nobody, '', '[]')->>'error' = 'not_found';
+
+  -- The same rules hold for a direct write.
+  failed := false;
+  begin
+    update public.profiles set links = '[{"label": "", "url": "javascript:alert(1)"}]' where user_id = a;
+  exception when check_violation then failed := true;
+  end;
+  assert failed, 'bad link rejected by the table';
+
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    assert not has_function_privilege('anon', 'public.rankr_set_profile(uuid,text,jsonb)', 'execute');
+    assert not has_function_privilege('authenticated', 'public.rankr_set_profile(uuid,text,jsonb)', 'execute');
+    assert has_function_privilege('service_role', 'public.rankr_set_profile(uuid,text,jsonb)', 'execute');
+  end if;
+
+  raise notice 'rankr smoke test: profiles ok';
+end $$;
+
 rollback;

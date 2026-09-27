@@ -4,6 +4,21 @@ import clsx from "clsx";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
+/** Copies to the clipboard; `copied` stays true for `ms` after a copy. */
+export function useCopy(ms = 1500) {
+  const [copied, setCopied] = useState(false);
+  async function copy(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), ms);
+    } catch {
+      /* clipboard blocked */
+    }
+  }
+  return { copied, copy };
+}
+
 /** `what` names the value for screen readers when there is no visible label ("Copy link"). */
 export function CopyButton({
   value,
@@ -16,20 +31,14 @@ export function CopyButton({
   what?: string;
   className?: string;
 }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopy();
   return (
     <button
       type="button"
-      onClick={async (e) => {
+      onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          /* clipboard blocked */
-        }
+        void copy(value);
       }}
       className={clsx(
         "inline-flex items-center gap-1.5 rounded-lg text-muted transition hover:text-fg",

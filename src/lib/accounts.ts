@@ -3,6 +3,7 @@
 import { callerStats } from "./caller-stats";
 import { generateKey, isKeyEmail, keyEmail } from "./key";
 import { MIN_CALLS_RANKED, type CallerSort } from "./params";
+import { checkProfile, type Profile, type ProfileProblem } from "./profile";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
@@ -272,21 +273,60 @@ export async function callers(sort: CallerSort, limit: number, offset: number): 
   };
 }
 
+type ProfileRow = { user_id: string; username: string; official?: boolean; bio?: string; links?: Profile["links"] };
+
 /**
- * A caller's public profile by username (any case): their board numbers and their calls. Null when no
- * account has that name. Usernames are letters, numbers and "_" (a LIKE wildcard, so it is escaped).
+ * A profile's bio and links, as {label, url} in that order (jsonb keeps keys in its own order). Read with
+ * select=*, so pages keep working (empty) before that migration has run.
  */
-export async function callerProfile(name: string): Promise<{ caller: CallerView; calls: CallView[] } | null> {
+function profileOf(row: ProfileRow): Profile {
+  const links = Array.isArray(row.links) ? row.links : [];
+  return { bio: row.bio ?? "", links: links.map((l) => ({ label: l.label ?? "", url: l.url })) };
+}
+
+/**
+ * A caller's public profile by username (any case): their board numbers, bio and links, and their calls.
+ * Null when no account has that name. Usernames are letters, numbers and "_" (a LIKE wildcard, so it is escaped).
+ */
+export async function callerProfile(
+  name: string,
+): Promise<{ caller: CallerView; profile: Profile; calls: CallView[] } | null> {
   const api = rest();
   if (!api || !/^\w{1,32}$/.test(name)) return null;
-  const rows = await api.select<{ user_id: string; username: string; official?: boolean }[]>(
-    `profiles?select=user_id,username,official&username=ilike.${encodeURIComponent(name.replace(/_/g, "\\_"))}&limit=2`,
+  const rows = await api.select<ProfileRow[]>(
+    `profiles?select=*&username=ilike.${encodeURIComponent(name.replace(/_/g, "\\_"))}&limit=2`,
   );
   const row = rows.find((r) => r.username.toLowerCase() === name.toLowerCase());
   if (!row) return null;
   const calls = await callsOf(row.user_id);
   return {
     caller: { userId: row.user_id, username: row.username, official: !!row.official, ...callerStats(calls) },
+    profile: profileOf(row),
     calls,
   };
+}
+
+/** The account's own bio and links, for editing. */
+export async function myProfile(account: Account): Promise<Profile> {
+  const api = rest();
+  if (!api) return { bio: "", links: [] };
+  const rows = await api.select<ProfileRow[]>(`profiles?select=*&user_id=eq.${encodeURIComponent(account.id)}&limit=1`);
+  return rows[0] ? profileOf(rows[0]) : { bio: "", links: [] };
+}
+
+/** Sets the account's bio and links (as sent from the browser; cleaned here). Official accounts can too. */
+export async function setProfile(
+  account: Account,
+  input: unknown,
+): Promise<{ ok: true; profile: Profile } | { ok: false; error: ProfileProblem | "not_found"; index?: number }> {
+  const api = rest();
+  if (!api) return { ok: false, error: "not_found" };
+  const check = checkProfile(input);
+  if (!check.ok) return check;
+  const out = await api.rpc<{ ok: boolean; bio?: string; links?: Profile["links"]; error?: ProfileProblem | "not_found" }>(
+    "rankr_set_profile",
+    { p_user: account.id, p_bio: check.profile.bio, p_links: check.profile.links },
+  );
+  if (!out.ok) return { ok: false, error: out.error ?? "invalid" };
+  return { ok: true, profile: check.profile };
 }
