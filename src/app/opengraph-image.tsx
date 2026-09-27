@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { OG_SIZE, OgLogo, ogFonts } from "@/lib/og";
+import { OG, OG_SIZE, OgLogo, ogBackground, ogFonts } from "@/lib/og";
 
 export const alt = "Rankr: paste a CA, watch it rank";
 export const size = OG_SIZE;
@@ -10,24 +10,26 @@ export default async function Image() {
     (
       <div
         style={{
+          ...ogBackground,
           width: "100%",
           height: "100%",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           padding: 72,
-          background: "radial-gradient(circle at 50% -10%, #1d3a12 0%, #07090b 60%)",
-          color: "#eef3f0",
+          color: OG.fg,
+          fontFamily: "Geist",
         }}
       >
-        <OgLogo size={64} />
+        <OgLogo size={60} />
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 96, fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1 }}>Paste a CA.</div>
-          <div style={{ fontSize: 96, fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.1, color: "#d4ff3a" }}>
-            Watch it rank.
+          <div style={{ fontFamily: "Pixel", fontSize: 104, lineHeight: 1.05 }}>Paste a CA.</div>
+          <div style={{ display: "flex", alignItems: "flex-end", fontFamily: "Pixel", fontSize: 104, lineHeight: 1.05 }}>
+            Watch it rank
+            <div style={{ width: 52, height: 84, marginLeft: 10, marginBottom: 14, background: OG.orange }} />
           </div>
-          <div style={{ marginTop: 28, fontSize: 32, color: "#93a09a" }}>
-            Entry locked at the first paste. Every 2x, 10x, 100x (or the dump) tracked live.
+          <div style={{ marginTop: 30, fontSize: 30, color: OG.muted }}>
+            Entry locked at the first paste. Every 2x, 10x, 100x tracked live.
           </div>
         </div>
       </div>

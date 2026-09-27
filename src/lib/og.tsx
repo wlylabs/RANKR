@@ -1,23 +1,38 @@
 // Shared pieces for the generated social cards (rendered by next/og, so inline styles only).
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { BRAND } from "@/components/Logo";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
-type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" };
+export const OG = {
+  bg: "#0A0A0A",
+  fg: "#EDEDED",
+  muted: "#8A8A8A",
+  border: "#242424",
+  up: "#3DDC84",
+  down: "#FF4D6A",
+  orange: BRAND.orange,
+};
 
-/** Geist from the installed font package; falls back to the built-in font if it can't be read. */
+type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 500 | 700; style: "normal" };
+
+const buf = (b: Buffer) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+
+/** Geist + Geist Mono + Geist Pixel; falls back to the built-in font if the files can't be read. */
 export async function ogFonts(): Promise<OgFont[] | undefined> {
-  const dir = path.join(process.cwd(), "node_modules/geist/dist/fonts/geist-sans");
+  const root = /*turbopackIgnore: true*/ process.cwd();
+  const geist = path.join(root, "node_modules/geist/dist/fonts");
   try {
-    const [regular, bold] = await Promise.all([
-      readFile(path.join(dir, "Geist-Regular.ttf")),
-      readFile(path.join(dir, "Geist-Bold.ttf")),
+    const [sans, mono, pixel] = await Promise.all([
+      readFile(path.join(geist, "geist-sans/Geist-Regular.ttf")),
+      readFile(path.join(geist, "geist-mono/GeistMono-Medium.ttf")),
+      readFile(path.join(root, "src/assets/fonts/GeistPixel-Square.ttf")),
     ]);
-    const buf = (b: Buffer) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
     return [
-      { name: "Geist", data: buf(regular), weight: 400, style: "normal" },
-      { name: "Geist", data: buf(bold), weight: 700, style: "normal" },
+      { name: "Geist", data: buf(sans), weight: 400, style: "normal" },
+      { name: "Geist Mono", data: buf(mono), weight: 500, style: "normal" },
+      { name: "Pixel", data: buf(pixel), weight: 400, style: "normal" },
     ];
   } catch {
     return undefined;
@@ -25,23 +40,23 @@ export async function ogFonts(): Promise<OgFont[] | undefined> {
 }
 
 export function OgLogo({ size = 56 }: { size?: number }) {
+  const wordHeight = size * 0.62;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: size * 0.3 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: size * 0.36 }}>
       <svg width={size} height={size} viewBox="0 0 64 64">
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#E4FF3F" />
-            <stop offset="1" stopColor="#19D98C" />
-          </linearGradient>
-        </defs>
-        <rect width="64" height="64" rx="18" fill="url(#g)" />
-        <g fill="none" stroke="#06130B" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19 48V25" />
-          <path d="M19 36c0-8 5-12 12-12 3 0 5-1 7-3l7-7" />
-          <path d="M36 14h9v9" />
-        </g>
+        <rect width="64" height="64" rx="12" fill={BRAND.orange} />
+        <path d={BRAND.markPath} fill={BRAND.ink} />
       </svg>
-      <div style={{ fontSize: size * 0.8, fontWeight: 700, letterSpacing: "-0.05em", color: "#eef3f0" }}>rankr</div>
+      <svg height={wordHeight} width={(wordHeight * 247) / 72.2} viewBox={BRAND.wordmarkViewBox}>
+        <path d={BRAND.wordmarkPath} fill={OG.fg} />
+      </svg>
     </div>
   );
 }
+
+/** Dot-matrix backdrop matching the site hero. */
+export const ogBackground = {
+  backgroundColor: OG.bg,
+  backgroundImage: "radial-gradient(circle, rgba(237,237,237,0.07) 1.5px, transparent 1.5px)",
+  backgroundSize: "24px 24px",
+};

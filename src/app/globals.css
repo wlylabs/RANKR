@@ -2,43 +2,42 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Rankr "Terminal" palette: carbon neutrals, one signal-orange accent, green/red reserved for P&L. */
 :root {
-  --bg: #f4f6f5;
+  --bg: #f4f4f1;
   --surface: #ffffff;
-  --surface-2: #eef2f0;
-  --border: #e0e6e3;
-  --fg: #0a0f0d;
-  --muted: #5a6560;
-  --subtle: #8a948f;
-  --brand: #0a0f0d;
-  --brand-fg: #d9ff4a;
-  --ring: #19d98c;
-  --up: #0a9a55;
-  --up-soft: rgb(10 154 85 / 0.1);
-  --down: #d92d4a;
-  --down-soft: rgb(217 45 74 / 0.1);
-  --gold: #b7791f;
-  --gold-soft: rgb(234 170 38 / 0.14);
+  --surface-2: #ececE8;
+  --border: #dcdcd6;
+  --fg: #0a0a0a;
+  --muted: #5d5d58;
+  --subtle: #8e8e88;
+  --brand: #ff5b14;
+  --brand-fg: #0a0a0a;
+  --brand-ink: #d9480a;
+  --up: #0a9950;
+  --up-soft: rgb(10 153 80 / 0.1);
+  --down: #e0294f;
+  --down-soft: rgb(224 41 79 / 0.1);
+  --dot: rgb(10 10 10 / 0.09);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #07090b;
-  --surface: #0e1215;
-  --surface-2: #151b1f;
-  --border: #1e262b;
-  --fg: #eef3f0;
-  --muted: #93a09a;
-  --subtle: #5f6b66;
-  --brand: #d4ff3a;
-  --brand-fg: #07110a;
-  --ring: #d4ff3a;
-  --up: #2be48a;
-  --up-soft: rgb(43 228 138 / 0.12);
-  --down: #ff5470;
-  --down-soft: rgb(255 84 112 / 0.12);
-  --gold: #ffc53d;
-  --gold-soft: rgb(255 197 61 / 0.13);
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface-2: #1a1a1a;
+  --border: #242424;
+  --fg: #ededed;
+  --muted: #8a8a8a;
+  --subtle: #5c5c5c;
+  --brand: #ff5b14;
+  --brand-fg: #0a0a0a;
+  --brand-ink: #ff7033;
+  --up: #3ddc84;
+  --up-soft: rgb(61 220 132 / 0.12);
+  --down: #ff4d6a;
+  --down-soft: rgb(255 77 106 / 0.12);
+  --dot: rgb(237 237 237 / 0.07);
   color-scheme: dark;
 }
 
@@ -52,15 +51,14 @@
   --color-subtle: var(--subtle);
   --color-brand: var(--brand);
   --color-brand-fg: var(--brand-fg);
-  --color-ring: var(--ring);
+  --color-brand-ink: var(--brand-ink);
   --color-up: var(--up);
   --color-up-soft: var(--up-soft);
   --color-down: var(--down);
   --color-down-soft: var(--down-soft);
-  --color-gold: var(--gold);
-  --color-gold-soft: var(--gold-soft);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-pixel: var(--font-rankr-pixel), var(--font-geist-mono), ui-monospace, monospace;
 }
 
 html {
@@ -71,33 +69,31 @@ html {
 body {
   background: var(--bg);
   color: var(--fg);
-  font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--brand);
+  color: var(--brand-fg);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
-/* Soft brand glow behind the hero */
-.hero-glow {
-  background:
-    radial-gradient(60% 55% at 50% 0%, rgb(212 255 58 / 0.14), transparent 70%),
-    radial-gradient(40% 40% at 80% 10%, rgb(25 217 140 / 0.1), transparent 70%);
+/* Small uppercase mono label: the "terminal" voice for section headers and captions. */
+.label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-:root:not(.dark) .hero-glow {
-  background:
-    radial-gradient(60% 55% at 50% 0%, rgb(25 217 140 / 0.16), transparent 70%),
-    radial-gradient(40% 40% at 80% 10%, rgb(212 255 58 / 0.25), transparent 70%);
-}
-
-.grid-lines {
-  background-image:
-    linear-gradient(to right, var(--border) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(70% 60% at 50% 0%, black, transparent 75%);
+/* Faint dot matrix behind the hero */
+.dot-grid {
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.2px);
+  background-size: 16px 16px;
+  mask-image: radial-gradient(70% 70% at 50% 30%, black, transparent 80%);
 }
 
 .scrollbar-none {
@@ -107,10 +103,25 @@ body {
   display: none;
 }
 
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: blink 1.1s steps(1) infinite;
+}
+
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.98);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -119,7 +130,7 @@ body {
 }
 
 .animate-pop-in {
-  animation: pop-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: pop-in 0.2s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -127,6 +138,7 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }

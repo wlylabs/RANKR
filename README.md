@@ -19,6 +19,16 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   share to X / native share, and a generated social card per token.
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme, installable as a PWA.
 
+## Design
+
+"Terminal" identity: carbon neutrals, one signal-orange accent (`#FF5B14`), green/red kept strictly for P&L.
+
+- **Logo**: a bold pixel "r" with a single pixel breaking out above it (the pump). Wordmark set in
+  Geist Pixel Square and outlined to SVG paths (`src/components/Logo.tsx`), so it never depends on font loading.
+- **Type**: Geist Pixel for headlines and big numbers, Geist Mono for data, Geist Sans for body text.
+- Favicon, PWA icons, apple-touch icon and social cards all use the same mark.
+- Colors live as CSS variables in `src/app/globals.css` (dark and light).
+
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · SWR. Market data from the public
@@ -63,6 +73,7 @@ src/app/                     pages, API routes, icons, social cards
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
 src/lib/                     address parsing, DexScreener client, store, metrics, formatting
+src/assets/fonts/            Geist Pixel TTF for social cards (OFL)
 ```
 
 Not financial advice. Memecoins can and do go to zero.

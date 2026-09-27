@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ClipboardPaste, LoaderCircle, Lock, Search, TriangleAlert, X } from "lucide-react";
+import { ArrowRight, ClipboardPaste, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { parseInput } from "@/lib/address";
@@ -70,11 +70,12 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
           void submit(value);
         }}
         className={clsx(
-          "group flex items-center gap-2 rounded-2xl border border-border bg-surface p-1.5 shadow-[0_1px_0_rgb(0_0_0/0.02),0_12px_40px_-12px_rgb(0_0_0/0.25)] transition focus-within:border-ring/70 focus-within:ring-4 focus-within:ring-ring/15",
-          lg && "sm:p-2",
+          "group flex items-center gap-2 rounded-xl border border-border bg-surface p-1.5 transition-colors focus-within:border-brand",
         )}
       >
-        <Search className={clsx("ml-2 shrink-0 text-subtle", lg ? "size-5" : "size-4")} aria-hidden />
+        <span className={clsx("ml-2.5 shrink-0 font-mono font-semibold text-brand-ink", lg ? "text-lg" : "text-base")} aria-hidden>
+          &gt;
+        </span>
         <input
           ref={inputRef}
           value={value}
@@ -91,14 +92,14 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
               void submit(text);
             }
           }}
-          placeholder="Paste a token CA or link"
+          placeholder="paste token CA or link"
           aria-label="Token contract address"
           spellCheck={false}
           autoComplete="off"
           autoCapitalize="off"
           className={clsx(
-            "min-w-0 flex-1 bg-transparent font-mono tracking-tight outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-subtle",
-            lg ? "h-11 text-[15px] sm:h-12 sm:text-base" : "h-10 text-sm",
+            "min-w-0 flex-1 bg-transparent font-mono tracking-tight caret-brand outline-none placeholder:text-subtle",
+            lg ? "h-11 text-[15px] sm:h-12" : "h-10 text-sm",
           )}
         />
         {value && !loading && (
@@ -109,7 +110,7 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
               setError(null);
               inputRef.current?.focus();
             }}
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-subtle hover:bg-surface-2 hover:text-fg"
+            className="grid size-8 shrink-0 place-items-center rounded-md text-subtle hover:bg-surface-2 hover:text-fg"
             aria-label="Clear"
           >
             <X className="size-4" />
@@ -119,7 +120,7 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
           <button
             type="button"
             onClick={pasteFromClipboard}
-            className="hidden h-9 shrink-0 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-fg sm:inline-flex"
+            className="hidden h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 font-mono text-xs text-muted uppercase transition-colors hover:bg-surface-2 hover:text-fg sm:inline-flex"
           >
             <ClipboardPaste className="size-4" />
             Paste
@@ -130,7 +131,7 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
           onClick={value ? undefined : pasteMode ? pasteFromClipboard : () => inputRef.current?.focus()}
           disabled={loading}
           className={clsx(
-            "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand font-semibold text-brand-fg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-70",
+            "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand font-semibold text-brand-fg transition hover:brightness-110 active:translate-y-px disabled:opacity-70",
             lg ? "h-11 px-4 sm:h-12 sm:px-5" : "h-10 px-3.5 text-sm",
           )}
         >
@@ -155,7 +156,7 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
       </form>
 
       {error && (
-        <p role="alert" className="animate-pop-in mt-3 flex items-start gap-2 rounded-xl bg-down-soft px-3 py-2.5 text-sm text-down">
+        <p role="alert" className="animate-pop-in mt-3 flex items-start gap-2 rounded-lg border border-down/30 bg-down-soft px-3 py-2.5 text-left text-sm text-down">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           {error}
         </p>
@@ -172,12 +173,12 @@ function TrackResult({ result, onClose }: { result: Result; onClose: () => void 
   return (
     <div
       role="status"
-      className="animate-pop-in mt-3 overflow-hidden rounded-2xl border border-border bg-surface text-left"
+      className="animate-pop-in mt-3 overflow-hidden rounded-xl border border-border bg-surface text-left"
     >
       <div
         className={clsx(
-          "flex items-center gap-2 px-4 py-2 text-xs font-semibold",
-          created ? "bg-up-soft text-up" : "bg-surface-2 text-muted",
+          "flex items-center gap-2 border-b border-border px-4 py-2 font-mono text-[11px]",
+          created ? "text-brand-ink" : "text-muted",
         )}
       >
         <Lock className="size-3.5" />
@@ -198,14 +199,14 @@ function TrackResult({ result, onClose }: { result: Result; onClose: () => void 
           <X className="size-3.5" />
         </button>
       </div>
-      <Link href={tokenHref(t)} className="flex items-center gap-3 p-4 transition hover:bg-surface-2/60">
-        <TokenAvatar symbol={t.symbol} imageUrl={t.imageUrl} chainId={t.chainId} seed={t.id} size={44} />
+      <Link href={tokenHref(t)} className="flex items-center gap-3 p-4 transition-colors hover:bg-surface-2">
+        <TokenAvatar symbol={t.symbol} imageUrl={t.imageUrl} chainId={t.chainId} size={44} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-bold">${t.symbol}</span>
             <ChainBadge chainId={t.chainId} />
           </div>
-          <div className="tabular mt-0.5 truncate text-sm text-muted">
+          <div className="tabular mt-0.5 truncate font-mono text-xs text-muted">
             Entry {formatUsd(t.entryMarketCap)} <span className="text-subtle">→</span> now {formatUsd(t.marketCap)}
           </div>
         </div>

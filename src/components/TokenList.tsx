@@ -1,5 +1,4 @@
 import clsx from "clsx";
-import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
 import type { TokenView } from "@/lib/types";
@@ -11,14 +10,11 @@ function RankNumber({ rank }: { rank: number }) {
   return (
     <span
       className={clsx(
-        "tabular grid size-7 shrink-0 place-items-center rounded-lg text-xs font-bold",
-        rank === 1 && "bg-gold-soft text-gold",
-        rank === 2 && "bg-surface-2 text-fg",
-        rank === 3 && "bg-surface-2 text-fg",
-        rank > 3 && "text-subtle",
+        "tabular w-6 shrink-0 text-center font-mono text-xs",
+        rank === 1 ? "font-semibold text-brand-ink" : rank <= 3 ? "text-fg" : "text-subtle",
       )}
     >
-      {rank}
+      {String(rank).padStart(2, "0")}
     </span>
   );
 }
@@ -28,16 +24,16 @@ export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView
   return (
     <Link
       href={tokenHref(t)}
-      className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition hover:bg-surface-2/70 sm:px-3"
+      className="flex items-center gap-3 rounded-lg px-2.5 py-2.5 transition-colors hover:bg-surface-2"
     >
       {rank !== undefined && <RankNumber rank={rank} />}
-      <TokenAvatar symbol={t.symbol} imageUrl={t.imageUrl} chainId={t.chainId} seed={t.id} size={38} />
+      <TokenAvatar symbol={t.symbol} imageUrl={t.imageUrl} chainId={t.chainId} size={36} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="truncate font-semibold">${t.symbol}</span>
           <ChainBadge chainId={t.chainId} className="hidden min-[380px]:inline-flex" />
         </div>
-        <div className="tabular mt-0.5 truncate text-xs text-muted">
+        <div className="tabular mt-0.5 truncate font-mono text-[11px] text-muted">
           {formatUsd(t.entryMarketCap)} → {formatUsd(t.marketCap)}
           <span className="text-subtle">
             {" · "}
@@ -53,29 +49,29 @@ export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView
 /** Full table for md+ screens. */
 export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; startRank?: number }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+    <div className="overflow-hidden rounded-xl border border-border bg-surface">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border text-left text-xs text-subtle">
-            <th className="w-12 py-3 pl-4 font-medium">#</th>
-            <th className="py-3 font-medium">Token</th>
-            <th className="py-3 text-right font-medium">Entry MC</th>
-            <th className="py-3 text-right font-medium">MC now</th>
-            <th className="hidden py-3 text-right font-medium lg:table-cell">Peak</th>
-            <th className="hidden py-3 text-right font-medium lg:table-cell">Liquidity</th>
-            <th className="py-3 text-right font-medium">First pasted</th>
-            <th className="py-3 pr-4 text-right font-medium">Since paste</th>
+          <tr className="label border-b border-border text-left text-subtle">
+            <th className="w-14 py-3 pl-4 font-normal">#</th>
+            <th className="py-3 font-normal">Token</th>
+            <th className="py-3 text-right font-normal">Entry MC</th>
+            <th className="py-3 text-right font-normal">MC now</th>
+            <th className="hidden py-3 text-right font-normal lg:table-cell">Peak</th>
+            <th className="hidden py-3 text-right font-normal lg:table-cell">Liquidity</th>
+            <th className="py-3 text-right font-normal">Pasted</th>
+            <th className="py-3 pr-4 text-right font-normal">Since paste</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="font-mono text-[13px]">
           {tokens.map((t, i) => (
-            <tr key={t.id} className="group relative border-b border-border/60 last:border-0 hover:bg-surface-2/60">
+            <tr key={t.id} className="relative border-b border-border/70 transition-colors last:border-0 hover:bg-surface-2">
               <td className="py-3 pl-4">
                 <RankNumber rank={startRank + i} />
               </td>
-              <td className="py-3">
+              <td className="py-3 font-sans">
                 <Link href={tokenHref(t)} className="flex items-center gap-3 after:absolute after:inset-0">
-                  <TokenAvatar symbol={t.symbol} imageUrl={t.imageUrl} chainId={t.chainId} seed={t.id} size={34} />
+                  <TokenAvatar symbol={t.symbol} imageUrl={t.imageUrl} chainId={t.chainId} size={32} />
                   <span className="min-w-0">
                     <span className="flex items-center gap-1.5">
                       <span className="max-w-[10rem] truncate font-semibold">${t.symbol}</span>
@@ -86,23 +82,16 @@ export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; sta
                 </Link>
               </td>
               <td className="tabular py-3 text-right text-muted">{formatUsd(t.entryMarketCap)}</td>
-              <td className="tabular py-3 text-right font-medium">{formatUsd(t.marketCap)}</td>
+              <td className="tabular py-3 text-right">{formatUsd(t.marketCap)}</td>
               <td className="tabular hidden py-3 text-right lg:table-cell">
-                <span className={t.peakMultiple >= 2 ? "font-semibold text-up" : "text-muted"}>
-                  {formatMultiple(t.peakMultiple)}
-                </span>
+                <span className={t.peakMultiple >= 2 ? "text-up" : "text-muted"}>{formatMultiple(t.peakMultiple)}</span>
               </td>
-              <td className="tabular hidden py-3 text-right text-muted lg:table-cell">
-                {formatUsd(t.market?.liquidityUsd)}
-              </td>
+              <td className="tabular hidden py-3 text-right text-muted lg:table-cell">{formatUsd(t.market?.liquidityUsd)}</td>
               <td className="py-3 text-right text-muted">
                 <TimeAgo at={t.firstPastedAt} />
               </td>
               <td className="py-3 pr-4 text-right">
-                <span className="inline-flex items-center gap-1">
-                  <MultipleBadge multiple={t.multiple} />
-                  <ChevronRight className="size-4 text-subtle opacity-0 transition group-hover:opacity-100" />
-                </span>
+                <MultipleBadge multiple={t.multiple} />
               </td>
             </tr>
           ))}
@@ -114,15 +103,15 @@ export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; sta
 
 export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="space-y-1" aria-hidden>
+    <div aria-hidden>
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex animate-pulse items-center gap-3 px-2 py-2.5 sm:px-3">
-          <div className="size-[38px] rounded-full bg-surface-2" />
+        <div key={i} className="flex animate-pulse items-center gap-3 px-2.5 py-2.5">
+          <div className="size-9 rounded-lg bg-surface-2" />
           <div className="flex-1 space-y-2">
             <div className="h-3 w-24 rounded bg-surface-2" />
             <div className="h-2.5 w-36 rounded bg-surface-2" />
           </div>
-          <div className="h-7 w-16 rounded-lg bg-surface-2" />
+          <div className="h-7 w-16 rounded-md bg-surface-2" />
         </div>
       ))}
     </div>

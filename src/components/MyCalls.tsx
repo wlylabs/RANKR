@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ClipboardPaste, Smartphone, Trash2, UserRound } from "lucide-react";
+import { ClipboardPaste, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
@@ -44,19 +44,14 @@ export function MyCalls() {
 
   return (
     <div className="pt-6 sm:pt-10">
-      <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
-        <UserRound className="size-6 sm:size-7" /> My calls
-      </h1>
-      <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
-        Measured from the moment <em>you</em> pasted.
-        <span className="inline-flex items-center gap-1 text-subtle">
-          <Smartphone className="size-3.5" /> Saved on this device.
-        </span>
+      <h1 className="font-pixel text-4xl sm:text-5xl">My calls</h1>
+      <p className="mt-2 text-sm text-muted">
+        Measured from the moment <em>you</em> pasted. <span className="text-subtle">Saved on this device.</span>
       </p>
 
       {!calls.length ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-surface-2">
+        <div className="mt-6 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+          <span className="mx-auto grid size-12 place-items-center rounded-lg border border-border bg-surface-2">
             <ClipboardPaste className="size-5" />
           </span>
           <p className="mt-4 font-semibold">No calls yet</p>
@@ -65,14 +60,14 @@ export function MyCalls() {
           </p>
           <Link
             href="/#paste"
-            className="mt-5 inline-flex h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-brand-fg hover:opacity-90"
+            className="mt-5 inline-flex h-10 items-center rounded-lg bg-brand px-4 text-sm font-semibold text-brand-fg hover:brightness-110"
           >
             Paste a CA
           </Link>
         </div>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
             <Tile label="Calls" value={calls.length} />
             <Tile
               label="In profit"
@@ -88,8 +83,8 @@ export function MyCalls() {
           </div>
 
           <div className="mt-6 flex items-center justify-between">
-            <h2 className="font-semibold">{calls.length} tokens</h2>
-            <div className="flex rounded-xl border border-border bg-surface p-1">
+            <h2 className="label text-muted">{calls.length} tokens</h2>
+            <div className="flex rounded-lg border border-border bg-surface p-1">
               {(Object.keys(SORTS) as (keyof typeof SORTS)[]).map((key) => (
                 <button
                   key={key}
@@ -97,7 +92,7 @@ export function MyCalls() {
                   onClick={() => setSort(key)}
                   aria-pressed={sort === key}
                   className={clsx(
-                    "h-7 rounded-lg px-2.5 text-xs font-semibold capitalize transition",
+                    "h-7 rounded-md px-2.5 font-mono text-[11px] uppercase transition-colors",
                     sort === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
                   )}
                 >
@@ -107,7 +102,7 @@ export function MyCalls() {
             </div>
           </div>
 
-          <ul className="mt-3 divide-y divide-border/60 rounded-2xl border border-border bg-surface">
+          <ul className="mt-3 divide-y divide-border/70 rounded-xl border border-border bg-surface">
             {rows.map(({ call, token, multiple, marketCap }) => (
               <li key={call.id} className="group flex items-center gap-3 px-3 py-3 sm:px-4">
                 <Link href={tokenHref(call)} className="flex min-w-0 flex-1 items-center gap-3">
@@ -115,15 +110,14 @@ export function MyCalls() {
                     symbol={call.symbol}
                     imageUrl={token?.imageUrl ?? call.imageUrl}
                     chainId={call.chainId}
-                    seed={call.id}
-                    size={40}
+                    size={36}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="truncate font-semibold">${call.symbol}</span>
                       <ChainBadge chainId={call.chainId} />
                     </div>
-                    <div className="tabular mt-0.5 truncate text-xs text-muted">
+                    <div className="tabular mt-0.5 truncate font-mono text-[11px] text-muted">
                       You: {formatUsd(call.entryMarketCap)} → {formatUsd(marketCap)}
                       <span className="text-subtle">
                         {" · "}
@@ -138,7 +132,7 @@ export function MyCalls() {
                       <span className="text-xs text-subtle">{isLoading ? "…" : "no data"}</span>
                     )}
                     {token && token.firstPastedAt < call.pastedAt - 60_000 && (
-                      <span className="tabular hidden text-[11px] text-subtle sm:block">
+                      <span className="tabular hidden font-mono text-[11px] text-subtle sm:block">
                         Rankr: {formatMultiple(token.multiple)}
                       </span>
                     )}
@@ -147,7 +141,7 @@ export function MyCalls() {
                 <button
                   type="button"
                   onClick={() => removeMyCall(call.id)}
-                  className="grid size-8 shrink-0 place-items-center rounded-lg text-subtle transition hover:bg-down-soft hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                  className="grid size-8 shrink-0 place-items-center rounded-md text-subtle transition hover:bg-down-soft hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   aria-label={`Remove $${call.symbol} from my calls`}
                   title="Remove from my calls"
                 >
@@ -164,10 +158,10 @@ export function MyCalls() {
 
 function Tile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <div className="text-xs font-medium text-subtle">{label}</div>
-      <div className="tabular mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">{value}</div>
-      {hint && <div className="mt-0.5 truncate text-xs text-muted">{hint}</div>}
+    <div className="bg-surface p-4 sm:p-5">
+      <div className="label text-subtle">{label}</div>
+      <div className="tabular mt-2 font-pixel text-3xl leading-none sm:text-4xl">{value}</div>
+      {hint && <div className="mt-2 truncate text-xs text-muted">{hint}</div>}
     </div>
   );
 }

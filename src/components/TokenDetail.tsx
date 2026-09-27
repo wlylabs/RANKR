@@ -12,7 +12,6 @@ import {
   Lock,
   Send,
   Share2,
-  UserRound,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -56,7 +55,7 @@ export function TokenDetail({ chain, address, initial }: { chain: string; addres
       ) : preview ? (
         <Untracked preview={preview} onTracked={() => mutate()} />
       ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-border px-6 py-16 text-center">
+        <div className="mt-6 rounded-xl border border-dashed border-border px-6 py-16 text-center">
           <CircleAlert className="mx-auto size-8 text-subtle" />
           <p className="mt-3 font-semibold">Token not found</p>
           <p className="mt-1 text-sm text-muted">
@@ -100,15 +99,14 @@ function Header({ market, fallback }: { market: MarketSnapshot | null; fallback:
           symbol={src.symbol}
           imageUrl={src.imageUrl}
           chainId={src.chainId}
-          seed={"id" in fallback ? fallback.id : src.address}
-          size={56}
+          size={52}
         />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-extrabold tracking-tight sm:text-3xl">${src.symbol}</h1>
+            <h1 className="truncate font-pixel text-3xl sm:text-4xl">${src.symbol}</h1>
             <ChainBadge chainId={src.chainId} />
             {market?.dexId && (
-              <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-muted uppercase">
+              <span className="rounded border border-border px-1 py-px font-mono text-[10px] leading-4 text-muted uppercase">
                 {market.dexId}
               </span>
             )}
@@ -126,7 +124,7 @@ function Header({ market, fallback }: { market: MarketSnapshot | null; fallback:
             href={market.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-fg"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 font-mono text-[11px] text-muted uppercase transition-colors hover:bg-surface-2 hover:text-fg"
           >
             <ChartCandlestick className="size-3.5" /> DexScreener
           </a>
@@ -136,7 +134,7 @@ function Header({ market, fallback }: { market: MarketSnapshot | null; fallback:
               href={l.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-fg"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 font-mono text-[11px] text-muted uppercase transition-colors hover:bg-surface-2 hover:text-fg"
             >
               {linkIcon(l.label)} {linkLabel(l)}
             </a>
@@ -149,8 +147,8 @@ function Header({ market, fallback }: { market: MarketSnapshot | null; fallback:
 
 function Card({ title, children, className }: { title?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={clsx("rounded-2xl border border-border bg-surface p-4 sm:p-5", className)}>
-      {title && <h2 className="mb-3 text-sm font-semibold">{title}</h2>}
+    <section className={clsx("rounded-xl border border-border bg-surface p-4 sm:p-5", className)}>
+      {title && <h2 className="label mb-3 text-muted">{title}</h2>}
       {children}
     </section>
   );
@@ -160,16 +158,16 @@ function StatRow({ label, value, sub }: { label: string; value: ReactNode; sub?:
   return (
     <div className="flex items-baseline justify-between gap-3 py-2">
       <dt className="text-sm text-muted">{label}</dt>
-      <dd className="tabular text-right text-sm font-semibold">
+      <dd className="tabular text-right font-mono text-[13px]">
         {value}
-        {sub && <div className="text-xs font-normal text-subtle">{sub}</div>}
+        {sub && <div className="text-[11px] text-subtle">{sub}</div>}
       </dd>
     </div>
   );
 }
 
 const BIG_COLOR = {
-  moon: "text-gold",
+  moon: "text-up",
   pump: "text-up",
   up: "text-up",
   flat: "text-fg",
@@ -189,27 +187,16 @@ function Tracked({ token: t }: { token: TokenView }) {
       <div className="mt-6 grid gap-4 lg:grid-cols-3 lg:grid-rows-[auto_1fr] lg:items-start">
         {/* Hero multiple */}
         <Card className="relative overflow-hidden lg:col-span-2">
-          <div
-            className={clsx(
-              "pointer-events-none absolute -top-24 -right-24 size-72 rounded-full opacity-30 blur-3xl",
-              tier === "moon" ? "bg-gold" : t.multiple >= 1 ? "bg-up" : "bg-down",
-            )}
-            aria-hidden
-          />
+          <div className="dot-grid pointer-events-none absolute inset-0 opacity-70" aria-hidden />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-subtle">
-                <Lock className="size-3.5" /> Since first paste on Rankr
+              <div className="label flex items-center gap-1.5 text-subtle">
+                <Lock className="size-3" /> Since first paste on Rankr
               </div>
-              <div
-                className={clsx(
-                  "tabular mt-2 text-6xl leading-none font-extrabold tracking-[-0.05em] sm:text-7xl",
-                  BIG_COLOR[tier],
-                )}
-              >
+              <div className={clsx("tabular mt-3 font-pixel text-7xl leading-none sm:text-8xl", BIG_COLOR[tier])}>
                 {formatMultiple(t.multiple)}
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px]">
                 <ChangeText multiple={t.multiple} />
                 <span className="tabular text-muted">
                   {formatUsd(t.entryMarketCap)} <span className="text-subtle">→</span>{" "}
@@ -219,7 +206,7 @@ function Tracked({ token: t }: { token: TokenView }) {
             </div>
             <ShareButton token={t} />
           </div>
-          <div className="relative mt-5 flex flex-wrap gap-x-5 gap-y-1 border-t border-border pt-4 text-xs text-muted">
+          <div className="relative mt-5 flex flex-wrap gap-x-5 gap-y-1 border-t border-border pt-4 font-mono text-[11px] text-muted">
             <span>
               First pasted <span className="text-fg" suppressHydrationWarning>
                 {formatDate(t.firstPastedAt)}
@@ -230,7 +217,7 @@ function Tracked({ token: t }: { token: TokenView }) {
               {t.pasteCount === 1 ? "time" : "times"}
             </span>
             {t.stale && (
-              <span className="text-gold">
+              <span className="text-brand-ink">
                 Live data delayed, last update <TimeAgo at={t.lastCheckedAt} />
               </span>
             )}
@@ -241,14 +228,10 @@ function Tracked({ token: t }: { token: TokenView }) {
         <div className="space-y-4 lg:row-span-2">
           {myCall && (
             <Card
-              title={
-                <span className="flex items-center gap-1.5">
-                  <UserRound className="size-4" /> Your call
-                </span>
-              }
+              title="Your call"
             >
               <div className="flex items-center justify-between gap-3">
-                <div className="tabular text-sm text-muted">
+                <div className="tabular font-mono text-xs text-muted">
                   Entry {formatUsd(myCall.entryMarketCap)} · <TimeAgo at={myCall.pastedAt} />
                 </div>
                 <MultipleBadge multiple={ratio(m?.priceUsd ?? t.entryPriceUsd, myCall.entryPriceUsd)} />
@@ -257,7 +240,7 @@ function Tracked({ token: t }: { token: TokenView }) {
           )}
           <Milestones token={t} />
           <Card title="Stats">
-            <dl className="divide-y divide-border/60">
+            <dl className="divide-y divide-border/70">
               <StatRow label="Price" value={formatPrice(m?.priceUsd)} sub={`entry ${formatPrice(t.entryPriceUsd)}`} />
               <StatRow
                 label="Peak since paste"
@@ -286,7 +269,7 @@ function Tracked({ token: t }: { token: TokenView }) {
               />
               {m?.pairCreatedAt && <StatRow label="Pair created" value={<TimeAgo at={m.pairCreatedAt} />} />}
             </dl>
-            <p className="mt-2 text-[11px] text-subtle">Peak and low are sampled whenever Rankr refreshes the token.</p>
+            <p className="mt-2 font-mono text-[10px] text-subtle">Peak and low are sampled whenever Rankr refreshes the token.</p>
           </Card>
         </div>
 
@@ -309,19 +292,17 @@ function Milestones({ token: t }: { token: TokenView }) {
             <li
               key={x}
               className={clsx(
-                "relative rounded-xl border px-2 py-2 text-center",
+                "relative rounded-md border px-2 py-2 text-center font-mono",
                 live
-                  ? x >= 10
-                    ? "border-gold/40 bg-gold-soft text-gold"
-                    : "border-up/40 bg-up-soft text-up"
+                  ? "border-up bg-up text-bg"
                   : hit
-                    ? "border-border bg-surface-2 text-fg"
+                    ? "border-up/40 bg-up-soft text-up"
                     : "border-dashed border-border text-subtle",
               )}
               title={hit ? `Reached ${x}x` : `Not reached yet`}
             >
               {hit && <Check className="absolute top-1 right-1 size-3" strokeWidth={3} />}
-              <div className="tabular text-sm font-bold">{x}x</div>
+              <div className="tabular text-sm font-semibold">{x}x</div>
               <div className="tabular truncate text-[10px] opacity-80">
                 {t.entryMarketCap !== null ? formatUsd(t.entryMarketCap * x) : "—"}
               </div>
@@ -329,7 +310,7 @@ function Milestones({ token: t }: { token: TokenView }) {
           );
         })}
       </ol>
-      <p className="mt-3 text-xs text-muted">
+      <p className="mt-3 font-mono text-[11px] text-muted">
         {t.multiple < 1 ? (
           <>
             Needs <span className="font-semibold text-fg">{formatChange(1 / t.multiple)}</span> to get back to entry.
@@ -356,15 +337,15 @@ function Chart({ market, className }: { market: MarketSnapshot; className?: stri
     `https://dexscreener.com/${market.chainId}/${market.pairAddress}?embed=1&loadChartSettings=0&trades=0&tabs=0` +
     `&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=${theme}&theme=${theme}&chartStyle=1&chartType=marketCap&interval=15`;
   return (
-    <section className={clsx("overflow-hidden rounded-2xl border border-border bg-surface", className)}>
+    <section className={clsx("overflow-hidden rounded-xl border border-border bg-surface", className)}>
       <div className="flex items-center justify-between px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold">Chart</h2>
-        <a href={market.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">
+        <h2 className="label text-muted">Chart</h2>
+        <a href={market.url} target="_blank" rel="noreferrer" className="label inline-flex items-center gap-1 text-subtle hover:text-fg">
           Open on DexScreener <ExternalLink className="size-3" />
         </a>
       </div>
       {demo ? (
-        <div className="grid h-[360px] place-items-center border-t border-border text-sm text-subtle">
+        <div className="grid h-[360px] place-items-center border-t border-border font-mono text-xs text-subtle">
           Chart is not available in demo mode.
         </div>
       ) : (
@@ -414,7 +395,7 @@ function ShareButton({ token: t }: { token: TokenView }) {
             "noopener,noreferrer",
           )
         }
-        className="grid size-9 place-items-center rounded-xl border border-border text-muted hover:bg-surface-2 hover:text-fg"
+        className="grid size-9 place-items-center rounded-lg border border-border bg-surface text-muted transition-colors hover:bg-surface-2 hover:text-fg"
         aria-label="Post on X"
         title="Post on X"
       >
@@ -423,7 +404,7 @@ function ShareButton({ token: t }: { token: TokenView }) {
       <button
         type="button"
         onClick={share}
-        className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-medium text-muted hover:bg-surface-2 hover:text-fg"
+        className="label inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-muted transition-colors hover:bg-surface-2 hover:text-fg"
       >
         {copied ? <Check className="size-4 text-up" /> : <Share2 className="size-4" />}
         {copied ? "Copied" : "Share"}
@@ -465,7 +446,7 @@ function Untracked({ preview: p, onTracked }: { preview: MarketSnapshot; onTrack
             type="button"
             onClick={track}
             disabled={loading}
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 font-semibold text-brand-fg hover:opacity-90 disabled:opacity-70"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-5 font-semibold text-brand-fg transition hover:brightness-110 disabled:opacity-70"
           >
             {loading ? <LoaderCircle className="size-4 animate-spin" /> : <Lock className="size-4" />}
             Track & lock entry

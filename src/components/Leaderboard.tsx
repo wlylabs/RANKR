@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { RefreshCw, Search, Trophy } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { chainMeta } from "@/lib/chains";
@@ -30,8 +30,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={active}
       className={clsx(
-        "h-8 shrink-0 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition",
-        active ? "bg-fg text-bg" : "text-muted hover:bg-surface-2 hover:text-fg",
+        "label h-8 shrink-0 rounded-md px-3 whitespace-nowrap transition-colors",
+        active ? "bg-brand text-brand-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
       )}
     >
       {children}
@@ -84,15 +84,13 @@ export function Leaderboard() {
     <div className="pt-6 sm:pt-10">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            <Trophy className="size-6 text-gold sm:size-7" /> Leaderboard
-          </h1>
-          <p className="mt-1 text-sm text-muted">Every token ranked by how it moved since the first paste on Rankr.</p>
+          <h1 className="font-pixel text-4xl sm:text-5xl">Leaderboard</h1>
+          <p className="mt-2 text-sm text-muted">Every token ranked by how it moved since the first paste on Rankr.</p>
         </div>
         <button
           type="button"
           onClick={() => mutate()}
-          className="inline-flex items-center gap-1.5 text-xs text-subtle hover:text-fg"
+          className="label inline-flex items-center gap-1.5 text-subtle hover:text-fg"
           title="Refresh now"
         >
           <RefreshCw className={clsx("size-3.5", isLoading && "animate-spin")} />
@@ -109,7 +107,7 @@ export function Leaderboard() {
       </div>
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label className="flex h-10 w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 focus-within:border-ring/70 sm:max-w-xs">
+        <label className="flex h-10 w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand sm:max-w-xs">
           <Search className="size-4 text-subtle" />
           <input
             value={query}
@@ -118,11 +116,11 @@ export function Leaderboard() {
               setLimit(PAGE);
             }}
             placeholder="Search $ticker, name or CA"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-subtle"
+            className="min-w-0 flex-1 bg-transparent font-mono text-[13px] caret-brand outline-none placeholder:text-subtle"
           />
         </label>
         <div className="flex items-center gap-2">
-          <div className="flex h-10 items-center rounded-xl border border-border bg-surface p-1">
+          <div className="flex h-10 items-center rounded-lg border border-border bg-surface p-1">
             {(Object.keys(RANGES) as RangeKey[]).map((key) => (
               <button
                 key={key}
@@ -130,7 +128,7 @@ export function Leaderboard() {
                 onClick={() => setParam("range", key, "all")}
                 aria-pressed={range === key}
                 className={clsx(
-                  "h-full rounded-lg px-2.5 text-xs font-semibold uppercase transition",
+                  "h-full rounded-md px-2.5 font-mono text-[11px] uppercase transition-colors",
                   range === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
                 )}
               >
@@ -142,7 +140,7 @@ export function Leaderboard() {
             value={chain}
             onChange={(e) => setParam("chain", e.target.value, "all")}
             aria-label="Chain"
-            className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 text-sm outline-none sm:flex-none"
+            className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 font-mono text-xs uppercase outline-none sm:flex-none"
           >
             <option value="all">All chains</option>
             {chains.map((c) => (
@@ -156,11 +154,11 @@ export function Leaderboard() {
 
       <div className="mt-4">
         {loading ? (
-          <div className="rounded-2xl border border-border bg-surface p-2">
+          <div className="rounded-xl border border-border bg-surface p-1.5">
             <ListSkeleton rows={8} />
           </div>
         ) : !rows.length ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
+          <div className="rounded-xl border border-dashed border-border px-6 py-16 text-center">
             <p className="font-semibold">No tokens match</p>
             <p className="mt-1 text-sm text-muted">
               {tokens.length ? "Try another range, chain or search." : "Nobody has pasted a CA yet. Be the first."}
@@ -171,7 +169,7 @@ export function Leaderboard() {
             <div className="hidden md:block">
               <TokenTable tokens={visible} />
             </div>
-            <div className="rounded-2xl border border-border bg-surface p-1.5 md:hidden">
+            <div className="rounded-xl border border-border bg-surface p-1.5 md:hidden">
               {visible.map((t, i) => (
                 <TokenRow key={t.id} token={t} rank={i + 1} meta={sort === "peak" ? "peak" : "pasted"} />
               ))}
@@ -180,7 +178,7 @@ export function Leaderboard() {
               <button
                 type="button"
                 onClick={() => setLimit((l) => l + PAGE)}
-                className="mt-4 h-11 w-full rounded-xl border border-border text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-fg"
+                className="label mt-4 h-11 w-full rounded-lg border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 Show more ({rows.length - limit} left)
               </button>

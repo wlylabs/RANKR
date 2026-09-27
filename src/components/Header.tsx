@@ -40,7 +40,7 @@ export function Header() {
       <header className="sticky top-0 z-40 border-b border-border/80 bg-bg/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:h-16 sm:px-6">
           <Link href="/" aria-label="Rankr home" className="shrink-0">
-            <Logo size={28} />
+            <Logo size={26} />
           </Link>
           <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Main">
             {NAV.map(({ href, label }) => (
@@ -48,7 +48,7 @@ export function Header() {
                 key={href}
                 href={href}
                 className={clsx(
-                  "rounded-lg px-3 py-2 text-sm font-medium transition",
+                  "label rounded-md px-3 py-2 transition-colors",
                   isActive(pathname, href) ? "bg-surface-2 text-fg" : "text-muted hover:text-fg",
                 )}
               >
@@ -61,7 +61,7 @@ export function Header() {
             <button
               type="button"
               onClick={openDialog}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand px-3 text-sm font-semibold text-brand-fg transition hover:opacity-90 active:scale-[0.98]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-brand-fg transition hover:brightness-110 active:translate-y-px"
             >
               <Plus className="size-4" strokeWidth={2.75} />
               Track<span className="hidden sm:inline"> token</span>
@@ -74,19 +74,19 @@ export function Header() {
         ref={dialogRef}
         onClose={() => setOpen(false)}
         onClick={(e) => e.target === e.currentTarget && closeDialog()}
-        className="m-0 mt-auto w-full max-w-none rounded-t-3xl border border-border bg-bg p-0 text-fg backdrop:bg-black/60 backdrop:backdrop-blur-sm sm:m-auto sm:max-w-xl sm:rounded-3xl"
+        className="m-0 mt-auto w-full max-w-none rounded-t-2xl border border-border bg-bg p-0 text-fg backdrop:bg-black/70 sm:m-auto sm:max-w-xl sm:rounded-xl"
         aria-label="Track a token"
       >
         <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold">Track a token</h2>
-              <p className="text-sm text-muted">Paste a CA. Rankr locks the market cap right now.</p>
+              <h2 className="font-pixel text-2xl">Track a token</h2>
+              <p className="mt-1 text-sm text-muted">Paste a CA. Rankr locks the market cap right now.</p>
             </div>
             <button
               type="button"
               onClick={closeDialog}
-              className="grid size-9 place-items-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg"
+              className="grid size-9 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg"
               aria-label="Close"
             >
               <X className="size-5" />
@@ -114,14 +114,15 @@ export function BottomNav() {
               key={href}
               href={href}
               className={clsx(
-                "flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition",
+                "relative flex flex-col items-center justify-center gap-1 font-mono text-[10px] tracking-wider uppercase transition-colors",
                 active ? "text-fg" : "text-subtle",
               )}
               aria-current={active ? "page" : undefined}
             >
-              <span className={clsx("grid h-7 w-12 place-items-center rounded-full transition", active && "bg-surface-2")}>
-                <Icon className="size-5" strokeWidth={active ? 2.4 : 2} />
+              <span className="relative grid h-6 place-items-center">
+                <Icon className="size-5" strokeWidth={active ? 2.2 : 1.8} />
               </span>
+              <span className={clsx("absolute top-0 h-0.5 w-8 bg-brand transition-opacity", active ? "opacity-100" : "opacity-0")} />
               {label}
             </Link>
           );
@@ -136,10 +137,10 @@ export function Footer() {
     <footer className="mt-16 border-t border-border pb-24 md:pb-0">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-3">
-          <Logo size={22} className="text-fg" />
-          <span className="text-subtle">Paste. Track. Rank.</span>
+          <Logo size={20} className="text-fg" />
+          <span className="label text-subtle">Paste. Track. Rank.</span>
         </div>
-        <p className="text-xs text-subtle">
+        <p className="font-mono text-[11px] text-subtle">
           Market data from{" "}
           <a href="https://dexscreener.com" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-fg hover:underline">
             DexScreener
