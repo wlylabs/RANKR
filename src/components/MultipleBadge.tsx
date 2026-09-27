@@ -3,11 +3,10 @@ import { formatChange, formatMultiple } from "@/lib/format";
 import { tierOf } from "@/lib/metrics";
 
 export function toneOf(multiple: number, flat = "text-muted") {
-  const tier = tierOf(multiple);
-  return tier === "flat" ? flat : tier === "down" || tier === "rekt" ? "text-down" : "text-up";
+  return multiple > 1.005 ? "text-up" : multiple < 0.995 ? "text-down" : flat;
 }
 
-/** "1.45x" from +100% up, "+34.5%" / "-37.2%" below that. Plain colored mono text, 10x+ in bold. */
+/** "3.42x" for gains, "-37.2%" for losses. Plain colored mono text, 10x+ in bold. */
 export function MultipleBadge({
   multiple,
   size = "md",

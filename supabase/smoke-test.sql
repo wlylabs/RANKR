@@ -35,7 +35,7 @@ begin
   assert (r->'record'->>'paste_count')::int = 2;
   assert (r->'record'->>'entry_price_usd')::float8 = 0.00001234, 'entry must stay sealed';
   assert (r->'record'->>'first_pasted_at') = '2026-09-27T05:42:00.123+00:00';
-  assert (r->'record'->>'multiple')::float8 = 2, 'doubled = multiple 2 (Rankr 1x)';
+  assert (r->'record'->>'multiple')::float8 = 2, 'doubled = 2x';
   assert (r->'record'->>'peak_price_usd')::float8 = 0.00002468;
 
   -- 3. Market refresh: peak/low only move outward.

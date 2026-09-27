@@ -28,7 +28,7 @@ create table if not exists public.tokens (
   market           jsonb,                            -- latest DexScreener snapshot
   last_checked_at  timestamptz not null,
 
-  -- Price now / entry price. Rankr shows this as a gain: 1x = +100% = multiple 2.
+  -- Price now / entry price: 2 = 2x (doubled), 0.5 = -50%.
   multiple         double precision generated always as (last_price_usd / entry_price_usd) stored,
   peak_multiple    double precision generated always as (peak_price_usd / entry_price_usd) stored
 );

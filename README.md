@@ -95,8 +95,8 @@ rolls everything back. Run it against a local or throwaway database:
 
 - **Entry**: price and market cap of the most liquid pair at the first paste. Sealed: the app never rewrites
   it and the database rejects changes.
-- **x = gain since the paste. 1x = +100%** (price doubled), 2x = +200%, 10x = +1,000%. A fresh paste is 0%.
-  Below +100% the move is shown as a percentage (+34%, -37%).
+- **x = price now / entry price.** 2x = doubled, 10x = ten times the entry. A fresh paste is 1.00x.
+  Losses are shown as a percentage (-37%).
 - **Peak / low**: the highest / lowest price seen since the paste, updated on every refresh (on page views
   for the tokens on screen, and by the cron job for the rest). Sampled, so a wick between refreshes can be
   missed.

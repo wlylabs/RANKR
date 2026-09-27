@@ -19,7 +19,7 @@ export type MarketUpdate = { id: string; snapshot: MarketSnapshot; at: number };
 
 export type StoreStats = {
   total: number;
-  /** Tokens whose peak reached 1x (+100%) or more. */
+  /** Tokens whose peak reached 2x (price doubled) or more. */
   doubled: number;
   /** Tokens below their entry right now. */
   inRed: number;

@@ -56,7 +56,7 @@ export function HomeFeed() {
   const top = useTokens({ sort: "top", limit: 6 });
   const latest = useTokens({ sort: "new", limit: 6 });
   const best = stats?.best ?? null;
-  const pct = (n: number) => (stats?.total ? `${Math.round((n / stats.total) * 100)}% of pastes` : "—");
+  const pct = (n: number) => (stats?.total ? `${Math.round((n / stats.total) * 100)}% of all pastes` : "—");
 
   return (
     <div className="space-y-6">
@@ -69,9 +69,9 @@ export function HomeFeed() {
       <div className="grid grid-cols-2 divide-border rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x">
         <Stat label="Tracked" value={stats ? stats.total.toLocaleString("en-US") : "…"} hint="tokens since first paste" />
         <Stat
-          label="Hit 1x+"
+          label="Hit 2x+"
           value={stats ? stats.doubled.toLocaleString("en-US") : "…"}
-          hint={stats ? `+100% or more · ${pct(stats.doubled)}` : "+100% or more"}
+          hint={stats ? pct(stats.doubled) : "—"}
         />
         <Stat
           label="Best run"

@@ -74,7 +74,7 @@ export type TokensResponse = {
 
 export type StatsResponse = {
   total: number;
-  /** Tokens that peaked at 1x (+100%) or more. */
+  /** Tokens that peaked at 2x (price doubled) or more. */
   doubled: number;
   inRed: number;
   best: TokenView | null;

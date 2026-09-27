@@ -10,7 +10,6 @@ import { chainMeta } from "@/lib/chains";
 import {
   formatChange,
   formatDate,
-  formatMove,
   formatMultiple,
   formatPercent,
   formatPrice,
@@ -18,12 +17,12 @@ import {
   shortAddress,
 } from "@/lib/format";
 import { fetcher, useMyCalls } from "@/lib/hooks";
-import { MILESTONES, milestonePrice, ratio } from "@/lib/metrics";
+import { MILESTONES, ratio } from "@/lib/metrics";
 import { trackPaste } from "@/lib/track";
 import type { Link as TokenLink, MarketSnapshot, TokenResponse, TokenView } from "@/lib/types";
 import { CopyButton } from "./CopyButton";
 import { DecryptText } from "./DecryptText";
-import { ChangeText, MultipleBadge, toneOf } from "./MultipleBadge";
+import { ChangeText, MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 
 export function TokenDetail({ chain, address, initial }: { chain: string; address: string; initial: TokenResponse }) {
@@ -126,6 +125,10 @@ function StatRow({ label, value, sub }: { label: string; value: ReactNode; sub?:
   );
 }
 
+function tone(multiple: number) {
+  return multiple > 1.005 ? "text-up" : multiple < 0.995 ? "text-down" : "text-fg";
+}
+
 function Tracked({ token: t }: { token: TokenView }) {
   const myCall = useMyCalls().find((c) => c.id === t.id);
   const m = t.market;
@@ -143,13 +146,13 @@ function Tracked({ token: t }: { token: TokenView }) {
               <div
                 className={clsx(
                   "tabular mt-3 font-mono text-6xl leading-none font-medium tracking-[-0.06em] sm:text-7xl",
-                  toneOf(t.multiple, "text-fg"),
+                  tone(t.multiple),
                 )}
               >
                 <DecryptText text={formatMultiple(t.multiple)} duration={700} />
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px]">
-                {t.multiple >= milestonePrice(1) && <ChangeText multiple={t.multiple} />}
+                <ChangeText multiple={t.multiple} />
                 <span className="tabular text-muted">
                   {formatUsd(t.entryMarketCap)} → <span className="text-fg">{formatUsd(t.marketCap)}</span> mc
                 </span>
@@ -237,13 +240,13 @@ function Tracked({ token: t }: { token: TokenView }) {
 }
 
 function Milestones({ token: t }: { token: TokenView }) {
-  const next = MILESTONES.find((x) => t.multiple < milestonePrice(x));
+  const next = MILESTONES.find((x) => t.multiple < x);
   return (
     <Section title="Milestones">
       <ol className="grid grid-cols-4 gap-px overflow-hidden rounded-md border border-border bg-border">
         {MILESTONES.map((x) => {
-          const hit = t.peakMultiple >= milestonePrice(x);
-          const live = t.multiple >= milestonePrice(x);
+          const hit = t.peakMultiple >= x;
+          const live = t.multiple >= x;
           return (
             <li
               key={x}
@@ -256,7 +259,7 @@ function Milestones({ token: t }: { token: TokenView }) {
               {hit && <Check className="absolute top-1 right-1 size-2.5" strokeWidth={3} />}
               <div className="tabular text-sm">{x}x</div>
               <div className="tabular truncate text-[10px] opacity-70">
-                {t.entryMarketCap !== null ? formatUsd(t.entryMarketCap * milestonePrice(x)) : "—"}
+                {t.entryMarketCap !== null ? formatUsd(t.entryMarketCap * x) : "—"}
               </div>
             </li>
           );
@@ -270,8 +273,8 @@ function Milestones({ token: t }: { token: TokenView }) {
         ) : next ? (
           <>
             next <span className="text-fg">{next}x</span>
-            {t.entryMarketCap !== null && <> at {formatUsd(t.entryMarketCap * milestonePrice(next))}</>} · needs{" "}
-            <span className="text-fg">{formatChange(milestonePrice(next) / t.multiple)}</span>
+            {t.entryMarketCap !== null && <> at {formatUsd(t.entryMarketCap * next)}</>} · needs{" "}
+            <span className="text-fg">{formatChange(next / t.multiple)}</span>
           </>
         ) : (
           "every milestone cleared"
@@ -326,7 +329,7 @@ function XIcon({ className }: { className?: string }) {
 
 function ShareButton({ token: t }: { token: TokenView }) {
   const [copied, setCopied] = useState(false);
-  const text = `$${t.symbol} is ${formatMove(t.multiple)} since it was first pasted on Rankr at ${formatUsd(t.entryMarketCap)} MC`;
+  const text = `$${t.symbol} is ${formatMultiple(t.multiple)} since it was first pasted on Rankr at ${formatUsd(t.entryMarketCap)} MC`;
 
   async function share() {
     const url = window.location.href;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bestPair, type Pair } from "./dexscreener";
-import { applySnapshot, milestoneOf, milestonePrice, newRecord, tierOf, toView } from "./metrics";
+import { applySnapshot, milestoneOf, newRecord, tierOf, toView } from "./metrics";
 import type { MarketSnapshot } from "./types";
 
 function snap(priceUsd: number, marketCap: number | null = priceUsd * 1e9): MarketSnapshot {
@@ -56,23 +56,16 @@ describe("records", () => {
   });
 });
 
-describe("tiers and milestones (1x = +100%)", () => {
+describe("tiers and milestones", () => {
   it("buckets multiples", () => {
-    expect(tierOf(11)).toBe("moon"); // +1,000% = 10x
-    expect(tierOf(10.9)).toBe("pump");
-    expect(tierOf(2)).toBe("pump"); // doubled = 1x
+    expect(tierOf(15)).toBe("moon");
+    expect(tierOf(2)).toBe("pump");
     expect(tierOf(1.3)).toBe("up");
     expect(tierOf(1)).toBe("flat");
     expect(tierOf(0.6)).toBe("down");
     expect(tierOf(0.05)).toBe("rekt");
-  });
-
-  it("maps milestones to price multiples", () => {
-    expect(milestonePrice(1)).toBe(2);
-    expect(milestonePrice(10)).toBe(11);
     expect(milestoneOf(1.9)).toBeNull();
-    expect(milestoneOf(2)).toBe(1);
-    expect(milestoneOf(7.3)).toBe(5); // +630%
+    expect(milestoneOf(7.3)).toBe(5);
     expect(milestoneOf(120)).toBe(100);
   });
 });

@@ -1,12 +1,7 @@
 import type { MarketSnapshot, TokenRecord, TokenView } from "./types";
 
-/** Milestones on the token page ladder, in Rankr x (gain): 1x = +100%, so 1x means price doubled. */
-export const MILESTONES = [1, 2, 3, 5, 10, 20, 50, 100];
-
-/** Price multiple a token needs to reach a milestone: 1x -> 2 (doubled), 10x -> 11. */
-export function milestonePrice(x: number): number {
-  return 1 + x;
-}
+/** Milestones shown on the token page ladder. */
+export const MILESTONES = [2, 3, 5, 10, 20, 50, 100, 1000];
 
 /** After this long without a successful refresh the numbers are flagged as stale. */
 const STALE_AFTER_MS = 5 * 60_000;
@@ -70,20 +65,20 @@ export function toView(r: TokenRecord, now = Date.now()): Omit<TokenView, "seal"
   };
 }
 
-/** Highest milestone reached (e.g. 5 for a +730% move), or null below 1x (+100%). */
+/** Highest milestone reached (e.g. 5 for a 7.3x), or null below 2x. */
 export function milestoneOf(multiple: number): number | null {
   let hit: number | null = null;
-  for (const m of MILESTONES) if (multiple >= milestonePrice(m)) hit = m;
+  for (const m of MILESTONES) if (multiple >= m) hit = m;
   return hit;
 }
 
 export type Tier = "moon" | "pump" | "up" | "flat" | "down" | "rekt";
 
 export function tierOf(multiple: number): Tier {
-  if (multiple >= milestonePrice(10)) return "moon"; // 10x+
-  if (multiple >= milestonePrice(1)) return "pump"; // 1x+ (doubled)
-  if (multiple >= 1.0005) return "up";
-  if (multiple > 0.9995) return "flat";
+  if (multiple >= 10) return "moon";
+  if (multiple >= 2) return "pump";
+  if (multiple >= 1.005) return "up";
+  if (multiple > 0.995) return "flat";
   if (multiple > 0.1) return "down";
-  return "rekt"; // -90% or worse
+  return "rekt";
 }

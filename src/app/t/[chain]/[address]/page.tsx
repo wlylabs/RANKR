@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { TokenDetail } from "@/components/TokenDetail";
-import { formatMove, formatMultiple, formatUsd } from "@/lib/format";
+import { formatChange, formatMultiple, formatUsd } from "@/lib/format";
 import { getToken } from "@/lib/rankr";
 import type { TokenResponse } from "@/lib/types";
 
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (token) {
     return {
       title: `$${token.symbol} ${formatMultiple(token.multiple)}`,
-      description: `$${token.symbol} is ${formatMove(token.multiple)} since it was first pasted on Rankr at ${formatUsd(token.entryMarketCap)} market cap.`,
+      description: `$${token.symbol} is ${formatMultiple(token.multiple)} (${formatChange(token.multiple)}) since it was first pasted on Rankr at ${formatUsd(token.entryMarketCap)} market cap.`,
     };
   }
   if (preview) return { title: `$${preview.symbol}`, description: `Track $${preview.symbol} on Rankr.` };
