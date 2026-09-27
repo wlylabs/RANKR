@@ -71,7 +71,7 @@ export function MyCalls() {
               value={withData.length ? `${Math.round((inProfit / withData.length) * 100)}%` : "—"}
               hint={`${inProfit} of ${withData.length}`}
             />
-            <Tile label="2x or better" value={doubled} hint="right now" />
+            <Tile label="1x or better" value={doubled} hint="+100% or more, right now" />
             <Tile
               label="Best call"
               value={best ? <span className={best.multiple >= 1 ? "text-up" : "text-down"}>{formatMultiple(best.multiple)}</span> : "—"}

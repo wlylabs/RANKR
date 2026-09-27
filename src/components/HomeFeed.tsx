@@ -73,9 +73,9 @@ export function HomeFeed() {
       <div className="grid grid-cols-2 divide-border rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x">
         <Stat label="Tracked" value={loading ? "…" : tokens.length.toLocaleString("en-US")} hint="tokens since first paste" />
         <Stat
-          label="Hit 2x+"
+          label="Hit 1x+"
           value={loading ? "…" : hit2x.toLocaleString("en-US")}
-          hint={tokens.length ? `${Math.round((hit2x / tokens.length) * 100)}% of all pastes` : "—"}
+          hint={tokens.length ? `+100% or more · ${Math.round((hit2x / tokens.length) * 100)}% of pastes` : "+100% or more"}
         />
         <Stat
           label="Best run"

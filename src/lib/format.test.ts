@@ -1,15 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { formatChange, formatMultiple, formatPrice, formatUsd, timeAgo } from "./format";
+import { formatChange, formatMove, formatMultiple, formatPrice, formatUsd, timeAgo } from "./format";
 
-describe("formatMultiple", () => {
-  it("shows gains as x and losses as %", () => {
-    expect(formatMultiple(2)).toBe("2.00x");
-    expect(formatMultiple(3.456)).toBe("3.46x");
-    expect(formatMultiple(12.34)).toBe("12.3x");
-    expect(formatMultiple(250.4)).toBe("250x");
-    expect(formatMultiple(1234)).toBe("1,234x");
+describe("formatMultiple (1x = +100%)", () => {
+  it("shows a fresh paste as 0%, not 1x", () => {
+    expect(formatMultiple(1)).toBe("0.0%");
+    expect(formatMultiple(1.0001)).toBe("0.0%");
+  });
+
+  it("uses percentages below +100%", () => {
+    expect(formatMultiple(1.5)).toBe("+50.0%");
+    expect(formatMultiple(1.999)).toBe("+99.9%");
     expect(formatMultiple(0.5)).toBe("-50.0%");
     expect(formatMultiple(0.08)).toBe("-92.0%");
+  });
+
+  it("counts x as gain from +100% up", () => {
+    expect(formatMultiple(2)).toBe("1.00x"); // doubled
+    expect(formatMultiple(2.45)).toBe("1.45x");
+    expect(formatMultiple(3)).toBe("2.00x");
+    expect(formatMultiple(11)).toBe("10.0x");
+    expect(formatMultiple(251)).toBe("250x");
+    expect(formatMultiple(1235)).toBe("1,234x");
+  });
+
+  it("formats sentences with both", () => {
+    expect(formatMove(2.45)).toBe("1.45x (+145%)");
+    expect(formatMove(1.3)).toBe("+30.0%");
   });
 });
 
@@ -18,6 +34,7 @@ describe("formatChange", () => {
     expect(formatChange(1.5)).toBe("+50.0%");
     expect(formatChange(3)).toBe("+200%");
     expect(formatChange(0.25)).toBe("-75.0%");
+    expect(formatChange(1)).toBe("0.0%");
   });
 });
 

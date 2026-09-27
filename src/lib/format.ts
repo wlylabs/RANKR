@@ -38,21 +38,34 @@ export function formatPrice(value: number | null | undefined): string {
   return `$0.0${sub}${digits.replace(/0+$/, "") || "0"}`;
 }
 
-/** Gains read as a multiple (2.45x), losses as a percentage (-37.2%). */
-export function formatMultiple(multiple: number): string {
-  if (!Number.isFinite(multiple)) return "—";
-  if (multiple >= 1) {
-    if (multiple >= 1000) return `${Math.round(multiple).toLocaleString("en-US")}x`;
-    return `${multiple.toFixed(multiple >= 100 ? 0 : multiple >= 10 ? 1 : 2)}x`;
-  }
-  return formatChange(multiple);
+/**
+ * Rankr's x counts the gain, not the price ratio: 1x = +100%, 2x = +200%, 10x = +1,000%.
+ * `multiple` is always price now / entry price, so a fresh paste (multiple 1) is 0%.
+ */
+export function gainOf(multiple: number): number {
+  return multiple - 1;
 }
 
-/** Percentage change for a multiple: 1.5 -> +50%, 0.4 -> -60% */
+/** "1.45x" once a token is up 100% or more; "+34.5%", "0.0%" or "-37.2%" below that. */
+export function formatMultiple(multiple: number): string {
+  if (!Number.isFinite(multiple)) return "—";
+  const gain = gainOf(multiple);
+  if (gain < 1) return formatChange(multiple);
+  if (gain >= 1000) return `${Math.round(gain).toLocaleString("en-US")}x`;
+  return `${gain.toFixed(gain >= 100 ? 0 : gain >= 10 ? 1 : 2)}x`;
+}
+
+/** Both forms for sentences: "1.45x (+145%)", or just the percentage below 1x. */
+export function formatMove(multiple: number): string {
+  return gainOf(multiple) >= 1 ? `${formatMultiple(multiple)} (${formatChange(multiple)})` : formatChange(multiple);
+}
+
+/** Percentage change for a multiple: 1.5 -> +50.0%, 0.4 -> -60.0%, 1 -> 0.0% */
 export function formatChange(multiple: number): string {
   const pct = (multiple - 1) * 100;
   if (!Number.isFinite(pct)) return "—";
   const abs = Math.abs(pct);
+  if (abs < 0.05) return "0.0%";
   const body =
     abs >= 10_000
       ? `${Math.round(abs).toLocaleString("en-US")}`

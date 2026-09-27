@@ -42,7 +42,9 @@ export default async function Image({ params }: { params: Promise<{ chain: strin
               <div style={{ fontFamily: "Geist Mono", fontSize: 190, letterSpacing: "-0.07em", lineHeight: 1, color }}>
                 {formatMultiple(token.multiple)}
               </div>
-              <div style={{ fontFamily: "Geist Mono", fontSize: 40, color, marginBottom: 22 }}>{formatChange(token.multiple)}</div>
+              {token.multiple >= 2 && (
+                <div style={{ fontFamily: "Geist Mono", fontSize: 40, color, marginBottom: 22 }}>{formatChange(token.multiple)}</div>
+              )}
             </div>
             <div style={{ marginTop: 22, fontFamily: "Geist Mono", fontSize: 24, color: OG.muted }}>
               {`entry ${formatUsd(token.entryMarketCap)} → now ${formatUsd(token.marketCap)} · ${formatDate(token.firstPastedAt).toLowerCase()}`}
