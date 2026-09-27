@@ -45,7 +45,7 @@ export default async function Image({ params }: { params: Promise<{ chain: strin
               <div style={{ fontFamily: "Geist Mono", fontSize: 40, color, marginBottom: 22 }}>{formatChange(token.multiple)}</div>
             </div>
             <div style={{ marginTop: 22, fontFamily: "Geist Mono", fontSize: 24, color: OG.muted }}>
-              {`entry ${formatUsd(token.entryMarketCap)} → now ${formatUsd(token.marketCap)} · ${formatDate(token.firstPastedAt).toLowerCase()}`}
+              {`entry ${formatUsd(token.entryMarketCap)} · now ${formatUsd(token.marketCap)} · ${formatDate(token.firstPastedAt).toLowerCase()}`}
             </div>
             <div style={{ marginTop: 10, fontFamily: "Geist Mono", fontSize: 20, color: OG.subtle }}>
               {`seal sha256 ${token.seal.slice(0, 32)}…`}

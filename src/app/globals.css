@@ -108,6 +108,16 @@ body {
 .scrollbar-none {
   scrollbar-width: none;
 }
+
+/* A row that scrolls sideways fades out at its right edge, so a cut-off item reads as "more this way". */
+.fade-end {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+@media (min-width: 40rem) {
+  .fade-end {
+    mask-image: none;
+  }
+}
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
@@ -125,6 +135,30 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.18s ease-out;
+}
+
+/* Live ticks: a number that just moved gets a short wash in its direction's color. */
+@keyframes flash-up {
+  from {
+    background-color: color-mix(in srgb, var(--up) 28%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@keyframes flash-down {
+  from {
+    background-color: color-mix(in srgb, var(--down) 28%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.animate-flash-up {
+  animation: flash-up 1.2s ease-out;
+}
+.animate-flash-down {
+  animation: flash-down 1.2s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

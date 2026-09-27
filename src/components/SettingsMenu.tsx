@@ -1,12 +1,13 @@
 "use client";
 
 import clsx from "clsx";
-import { AppWindow, Check, Download, Moon, Settings, Sun } from "lucide-react";
+import { AppWindow, Bell, Check, Download, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { APP_HOME } from "@/lib/login";
+import { alertsSupported, setAlerts, useAlertsOn } from "@/lib/alerts";
 import { promptInstall, useInstallState } from "@/lib/pwa";
 import { CopyButton } from "./CopyButton";
 
@@ -96,6 +97,8 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
             </div>
           </div>
 
+          <AlertsSwitch />
+
           <div className="border-t border-border py-1">
             <div className="label px-3 pt-1.5 pb-1 text-subtle">App</div>
             {openApp && (
@@ -134,6 +137,54 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Milestone alerts on / off. Hidden where the browser has no notifications (e.g. Safari tabs on iPhone). */
+function AlertsSwitch() {
+  const on = useAlertsOn();
+  const [supported, setSupported] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    setSupported(alertsSupported());
+    setBlocked(alertsSupported() && Notification.permission === "denied");
+  }, [on]);
+  if (!supported) return null;
+
+  return (
+    <div className="flex items-start gap-2.5 border-t border-border px-3 py-2.5">
+      <Bell className="mt-0.5 size-3.5 shrink-0 text-muted" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm text-muted">Milestone alerts</div>
+        <div className="mt-0.5 text-xs text-subtle">
+          {blocked
+            ? "Notifications are blocked for this site in your browser settings."
+            : "2x, 5x, 10x and up on your calls and watchlist, while Rankr is open."}
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Milestone alerts"
+        disabled={blocked}
+        onClick={async () => {
+          const now = await setAlerts(!on);
+          setBlocked(!now && Notification.permission === "denied");
+        }}
+        className={clsx(
+          "relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition-colors disabled:opacity-40",
+          on ? "border-fg bg-fg" : "border-border bg-surface-2",
+        )}
+      >
+        <span
+          className={clsx(
+            "absolute top-1/2 size-3.5 -translate-y-1/2 rounded-full transition-all",
+            on ? "left-[1.1rem] bg-bg" : "left-0.5 bg-subtle",
+          )}
+        />
+      </button>
     </div>
   );
 }

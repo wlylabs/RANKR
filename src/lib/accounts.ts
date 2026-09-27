@@ -1,5 +1,6 @@
 // Accounts (Supabase Auth: one-click guests that can save a sign-in key) with a public username, and
 // per-user calls. Server only.
+import { callerStats } from "./caller-stats";
 import { generateKey, isKeyEmail, keyEmail } from "./key";
 import { MIN_CALLS_FOR_AVG, type CallerSort } from "./params";
 import { viewsOf } from "./rankr";
@@ -129,9 +130,14 @@ export async function recordCall(account: Account, token: TokenView) {
 }
 
 export async function myCalls(account: Account): Promise<CallView[]> {
+  return callsOf(account.id);
+}
+
+/** Every call of one user, newest first, each measured from that user's own entry. */
+async function callsOf(userId: string): Promise<CallView[]> {
   const api = rest();
   if (!api) return [];
-  const rows = await api.rpc<(CallRow & { token: TokenRow })[]>("rankr_my_calls", { p_user: account.id });
+  const rows = await api.rpc<(CallRow & { token: TokenRow })[]>("rankr_my_calls", { p_user: userId });
   const tokens = await viewsOf(rows.map((r) => fromRow(r.token)));
   const byId = new Map(tokens.map((t) => [t.id, t]));
   return rows.flatMap((r) => {
@@ -199,5 +205,24 @@ export async function callers(sort: CallerSort, limit: number, offset: number): 
           }
         : null,
     })),
+  };
+}
+
+/**
+ * A caller's public profile by username (any case): their board numbers and their calls. Null when no
+ * account has that name. Usernames are letters, numbers and "_" (a LIKE wildcard, so it is escaped).
+ */
+export async function callerProfile(name: string): Promise<{ caller: CallerView; calls: CallView[] } | null> {
+  const api = rest();
+  if (!api || !/^\w{1,32}$/.test(name)) return null;
+  const rows = await api.select<{ user_id: string; username: string; official?: boolean }[]>(
+    `profiles?select=user_id,username,official&username=ilike.${encodeURIComponent(name.replace(/_/g, "\\_"))}&limit=2`,
+  );
+  const row = rows.find((r) => r.username.toLowerCase() === name.toLowerCase());
+  if (!row) return null;
+  const calls = await callsOf(row.user_id);
+  return {
+    caller: { userId: row.user_id, username: row.username, official: !!row.official, ...callerStats(calls) },
+    calls,
   };
 }

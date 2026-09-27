@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { DecryptText } from "@/components/DecryptText";
 import { LiveStatus } from "@/components/HomeFeed";
 import { Faq } from "@/components/Landing";
+import { APP_HOME } from "@/lib/login";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -45,7 +47,14 @@ export default function LandingPage() {
         <p className="mt-6 max-w-sm text-[15px] text-pretty text-muted sm:max-w-md sm:text-base">
           Every call is sealed the second it&apos;s pasted, then ranked live.
         </p>
-        <p className="mt-5 font-mono text-[11px] text-subtle">free · no wallet · no email</p>
+        {/* One quiet next step: plain text, no button, no arrow. */}
+        <Link
+          href={APP_HOME}
+          className="mt-8 text-sm font-medium text-fg underline decoration-border-strong underline-offset-[6px] transition-colors hover:decoration-fg"
+        >
+          Start tracking
+        </Link>
+        <p className="mt-6 font-mono text-[11px] text-subtle">free · no wallet · no email</p>
       </section>
 
       <section aria-label="How Rankr works" className="border-y border-border">
