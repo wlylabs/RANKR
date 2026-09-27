@@ -3,7 +3,7 @@
 import { KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { APP_HOME, LANDING, loginHref } from "@/lib/login";
+import { APP_HOME, loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeyReveal, KeySignInForm } from "./Key";
 import { OfficialBadge } from "./OfficialBadge";
@@ -16,18 +16,17 @@ const LINK = "text-muted underline-offset-4 hover:text-fg hover:underline";
 /** Save a sign-in key (or make a new one), change the name, sign out. */
 export function Account() {
   const router = useRouter();
-  const { available, ready, userId, username, hasKey, official, signOut } = useAuth();
+  const { available, ready, userId, username, hasKey, official, justSignedOut, signOut } = useAuth();
   const [saved, setSaved] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
-  // Signing out heads to the landing page, not the sign-in redirect below.
-  const [leaving, setLeaving] = useState(false);
   // Kept while the new key is on screen, so it stays up after hasKey flips.
   const [shownKey, setShownKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (leaving) return;
+    // Signing out heads to the landing page, not to sign in again.
+    if (justSignedOut) return;
     if (!available || (ready && (!userId || !username))) router.replace(available ? loginHref("/account") : APP_HOME);
-  }, [leaving, available, ready, userId, username, router]);
+  }, [justSignedOut, available, ready, userId, username, router]);
 
   if (!ready || !userId || !username) {
     return (
@@ -35,12 +34,6 @@ export function Account() {
         <LoaderCircle className="size-5 animate-spin text-subtle" />
       </div>
     );
-  }
-
-  async function out() {
-    setLeaving(true);
-    await signOut();
-    router.replace(LANDING);
   }
 
   const keyProps = { username, shownKey, setShownKey };
@@ -89,7 +82,7 @@ export function Account() {
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              onClick={out}
+              onClick={() => void signOut()}
               className="h-8 rounded-md border border-border px-3 text-sm text-down transition-colors hover:bg-surface-2"
             >
               {hasKey ? "Sign out" : "Sign out anyway"}

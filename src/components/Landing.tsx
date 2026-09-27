@@ -6,14 +6,19 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { APP_HOME } from "@/lib/login";
 import { isStandalone } from "@/lib/pwa";
+import { useAuth } from "./AuthProvider";
 import { Reveal } from "./Cinema";
 
-/** The installed app opens on /app; if it ever lands on the landing page (e.g. added from /), go there. */
+/**
+ * The installed app opens on /app; if it ever lands on the landing page (e.g. added from /), go there.
+ * Except right after signing out: that ends on the landing page, in the installed app too.
+ */
 export function StandaloneRedirect() {
   const router = useRouter();
+  const { justSignedOut } = useAuth();
   useEffect(() => {
-    if (isStandalone()) router.replace(APP_HOME);
-  }, [router]);
+    if (isStandalone() && !justSignedOut) router.replace(APP_HOME);
+  }, [justSignedOut, router]);
   return null;
 }
 
