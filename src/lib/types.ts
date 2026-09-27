@@ -100,6 +100,32 @@ export type CallersResponse = { enabled: boolean; total: number; callers: Caller
 /** A caller's public profile: board numbers and calls, newest first. */
 export type CallerProfileResponse = { caller: CallerView; calls: CallView[]; updatedAt: number };
 
+/**
+ * One entry of the feed: a new call ("@userx called $SHIB at $1.2B mc") or a call reaching a milestone
+ * ("$PEPE hit 10x from @userx's call").
+ */
+export type FeedItem = {
+  /** Unique per entry. */
+  id: string;
+  kind: "call" | "milestone";
+  /** The milestone reached (10 = 10x from the caller's entry); null for a call. */
+  tier: number | null;
+  /** When the call was made or the milestone reached. */
+  at: number;
+  /** Null when accounts are off: the entry is a plain paste, not someone's call. */
+  username: string | null;
+  official: boolean;
+  /** The caller's board numbers: calls, and calls at 2x+ right now. */
+  caller: { calls: number; hits: number } | null;
+  token: { id: string; chainId: string; address: string; symbol: string; name: string };
+  /** Market cap at this call's entry. */
+  entryMarketCap: number | null;
+  /** Price now / this call's entry. */
+  multiple: number;
+};
+
+export type FeedResponse = { items: FeedItem[]; updatedAt: number };
+
 export type TokensResponse = {
   tokens: TokenView[];
   /** Matching tokens in total (for paging). */

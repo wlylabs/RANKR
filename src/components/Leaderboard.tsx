@@ -30,7 +30,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 const PAGE = 50;
 
-function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+export function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLButtonElement>(null);
   // On a phone the row scrolls: keep the selected tab in view (e.g. opened on "Most pasted").
   useEffect(() => {

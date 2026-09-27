@@ -21,6 +21,11 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **My calls**: every token you pasted, measured from *your* paste.
 - **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Each
   caller has a public profile at `/u/<username>` with their numbers and every call.
+- **Feed** (`/feed`, and a live ticker under the header): every call as it lands ("@userx called $SHIB at
+  $1.2B mc") and every call that reaches a milestone ("$PEPE hit 10x from @userx's call"), each from the caller's
+  own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone, top callers (the top 25 of
+  the caller board) or the callers you **follow** (Follow on a profile; kept in the browser), by calls or
+  milestones, and by chain. The ticker shows the filter picked on the feed page.
 - **Watchlist**: star a token on its page to follow it under My calls → Watchlist (kept in the browser).
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
   new milestone (2x, 3x, 5x, 10x...), while Rankr is open. A token already past a milestone when first seen
@@ -248,6 +253,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/callers/:username` | a caller's profile: board numbers and calls |
 | `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET/DELETE /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
 | `GET /api/username?name=` | is a username free |
+| `GET /api/feed?scope=all\|top\|following&callers=&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`callers`: followed user ids, for `following`) |
 
 ## How the numbers work
 
@@ -266,12 +272,13 @@ rolls everything back. Run it against a local or throwaway database:
 ```
 src/app/                     pages, API routes, icons, manifest, social cards
   (site)/                    the landing page at / (own header and footer)
-  (app)/                     the app shell (header, bottom nav) and its pages: app (/app), leaderboard, me, t/..., u/...
+  (app)/                     the app shell (header, bottom nav) and its pages: app (/app), feed, leaderboard, me, t/..., u/...
   api/track                  POST { input } -> records a paste
   api/tokens                 GET a leaderboard page (sort, filter, paging)
   api/stats                  GET home page totals
   api/cron/refresh           background price refresh
   api/callers, api/me/*      caller board, your account, username and calls
+  api/feed                   GET the feed: calls and milestones
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, SettingsMenu...)
@@ -282,6 +289,7 @@ src/lib/key.ts               sign-in keys: generate, parse, the key's email, the
 src/lib/username.ts          username rules (reserved names, look-alikes), same as the SQL
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (starred tokens, kept in the browser)
+src/lib/following.ts         followed callers and the feed filter (kept in the browser)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board)
 public/sw.js, offline.html   service worker and the offline page

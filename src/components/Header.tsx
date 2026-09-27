@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { House, Plus, Trophy, UserRound, X } from "lucide-react";
+import { House, Plus, Radio, Trophy, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -13,6 +13,7 @@ import { SettingsMenu } from "./SettingsMenu";
 
 export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
+  { href: "/feed", label: "Feed", icon: Radio },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/me", label: "My calls", icon: UserRound },
 ];
@@ -110,7 +111,7 @@ export function BottomNav() {
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
     >
-      <div className="mx-auto grid h-14 max-w-md grid-cols-3">
+      <div className="mx-auto grid h-14 max-w-md grid-cols-4">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (

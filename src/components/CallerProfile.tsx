@@ -7,6 +7,7 @@ import { useCallerProfile } from "@/lib/hooks";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
 import { toneOf } from "./MultipleBadge";
+import { FollowButton } from "./FollowButton";
 import { CallsView, callRow } from "./MyCalls";
 import { OfficialBadge } from "./OfficialBadge";
 
@@ -54,6 +55,9 @@ export function CallerProfile({ username }: { username: string }) {
             )}
           </p>
         </div>
+        {c && c.userId !== userId && (
+          <FollowButton caller={{ userId: c.userId, username: c.username }} className="ml-auto shrink-0" />
+        )}
       </div>
 
       {!accountsAvailable ? (

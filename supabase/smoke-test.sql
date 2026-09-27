@@ -176,6 +176,25 @@ begin
   r := public.rankr_callers('avg', p_limit => 1, p_offset => 1);
   assert r->'callers'->0->>'username' = 'bravo';
 
+  -- Feed: calls and milestones. CHAR goes 0.2 -> 0.55: A's call (entry 0.1) crosses 2x, 3x and 5x at once,
+  -- B's (entry 2) nothing. Only the highest milestone of that jump shows.
+  update public.tokens set last_price_usd = 0.55, last_checked_at = now() + interval '1 second' where id = 'solana:CCC';
+  assert (select array_agg(tier order by tier) from public.call_milestones where token_id = 'solana:CCC') = array[2, 3, 5],
+         'milestones noted once each, for A only';
+  update public.tokens set last_price_usd = 0.56, last_checked_at = now() + interval '2 seconds' where id = 'solana:CCC';
+  assert (select count(*) from public.call_milestones where token_id = 'solana:CCC') = 3, 'no repeats';
+
+  r := public.rankr_feed();
+  assert jsonb_array_length(r) = 5, 'feed: ' || r::text;
+  assert r->0->>'kind' = 'milestone' and (r->0->>'tier')::int = 5 and r->0->>'username' = 'alpha_caller', r->0::text;
+  assert (r->0->>'caller_calls')::int = 2 and (r->0->>'caller_hits')::int = 2, 'caller numbers: ' || r->0::text;
+  assert r->0->'token'->>'symbol' = 'CHAR' and (r->0->>'entry_price_usd')::float8 = 0.1;
+  assert jsonb_array_length(public.rankr_feed(p_kind => 'milestone')) = 1;
+  assert jsonb_array_length(public.rankr_feed(p_kind => 'call')) = 4;
+  assert jsonb_array_length(public.rankr_feed(p_users => array[b])) = 2, 'following filter';
+  assert jsonb_array_length(public.rankr_feed(p_chain => 'base')) = 1, 'chain filter';
+  assert jsonb_array_length(public.rankr_feed(2)) = 2 and jsonb_array_length(public.rankr_feed(2, 4)) = 1, 'paging';
+
   assert public.rankr_delete_call(b, 'solana:AAA');
   assert not public.rankr_delete_call(b, 'solana:AAA');
 
@@ -210,6 +229,7 @@ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_feed(integer,integer,uuid[],text,text)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_set_username(uuid,text)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_ensure_profile(uuid)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_set_official(text,text,boolean)', 'execute');
