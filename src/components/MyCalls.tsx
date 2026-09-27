@@ -1,16 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { ClipboardPaste, Trash2, UserRound } from "lucide-react";
+import { ClipboardPaste, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
-import { refreshBoards, removeMyCall, useAccountCalls, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
+import { useAccountCalls, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
 import { loginHref } from "@/lib/login";
 import { MAX_LIMIT } from "@/lib/params";
 import { ratio, tierOf } from "@/lib/metrics";
 import { nextResetAt, resetDay } from "@/lib/season";
-import { accountsAvailable, apiFetch } from "@/lib/supabase-browser";
+import { accountsAvailable } from "@/lib/supabase-browser";
 import type { CallView, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { OfficialBadge } from "./OfficialBadge";
@@ -112,14 +112,8 @@ function AccountCalls({
   hasKey: boolean;
   official: boolean;
 }) {
-  const { data, isLoading, mutate } = useAccountCalls(userId);
+  const { data, isLoading } = useAccountCalls(userId);
   const rows = useMemo(() => (data?.calls ?? []).map(callRow), [data]);
-
-  async function remove(row: Row) {
-    await mutate((cur) => cur && { calls: cur.calls.filter((c) => c.tokenId !== row.id) }, { revalidate: false });
-    await apiFetch(`/api/me/calls?token=${encodeURIComponent(row.id)}`, { method: "DELETE" });
-    void refreshBoards();
-  }
 
   return (
     <Page
@@ -141,7 +135,6 @@ function AccountCalls({
       }
       rows={rows}
       loading={isLoading}
-      onRemove={remove}
     />
   );
 }
@@ -160,7 +153,6 @@ function DeviceCalls() {
       intro="Saved on this device."
       rows={rows}
       loading={isLoading && calls.length > 0}
-      onRemove={(row) => removeMyCall(row.id)}
     />
   );
 }
@@ -169,13 +161,11 @@ function Page({
   intro,
   rows,
   loading = false,
-  onRemove,
   children,
 }: {
   intro: React.ReactNode;
   rows: Row[];
   loading?: boolean;
-  onRemove?: (row: Row) => void;
   children?: React.ReactNode;
 }) {
   const watching = useWatchlist().length;
@@ -234,7 +224,7 @@ function Page({
               </Link>
             </div>
           ) : (
-            <CallsView rows={rows} loading={loading} onRemove={onRemove} />
+            <CallsView rows={rows} loading={loading} />
           ))}
         </>
       )}
@@ -244,20 +234,10 @@ function Page({
 
 /**
  * Summary tiles, a sort switch and the list of calls, each measured from the caller's own entry.
- * Used by My calls and by public caller profiles.
+ * Used by My calls and by public caller profiles. Calls can't be removed: they all go with the monthly reset.
  */
-export function CallsView({
-  rows: unsorted,
-  loading = false,
-  onRemove,
-}: {
-  rows: Row[];
-  loading?: boolean;
-  onRemove?: (row: Row) => void;
-}) {
+export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; loading?: boolean }) {
   const [sort, setSort] = useState<keyof typeof SORTS>("new");
-  // The row whose trash button was pressed, waiting on Yes or No.
-  const [confirmId, setConfirmId] = useState<string | null>(null);
   const rows = useMemo(() => [...unsorted].sort(SORTS[sort]), [unsorted, sort]);
   const withData = rows.filter((r) => r.token);
   const inProfit = withData.filter((r) => ["up", "pump", "moon"].includes(tierOf(r.multiple))).length;
@@ -313,8 +293,8 @@ export function CallsView({
 
       <ul className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
         {rows.map((row) => (
-          <li key={row.id} className="group flex items-center gap-2 pr-2 transition-colors hover:bg-surface-2">
-            <Link href={tokenHref(row)} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
+          <li key={row.id} className="transition-colors hover:bg-surface-2">
+            <Link href={tokenHref(row)} className="flex min-w-0 items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <TokenName symbol={row.symbol} name={row.name} className="min-w-0" />
                 <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
@@ -335,40 +315,6 @@ export function CallsView({
                 )}
               </div>
             </Link>
-            {onRemove &&
-              (confirmId === row.id ? (
-                <div className="flex shrink-0 items-center gap-1 text-xs">
-                  <span className="text-muted max-sm:hidden">Remove?</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirmId(null);
-                      onRemove(row);
-                    }}
-                    className="h-7 rounded-md border border-border px-2.5 text-down hover:bg-surface-2"
-                    aria-label={`Yes, remove $${row.symbol} from my calls`}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmId(null)}
-                    className="h-7 rounded-md px-2.5 text-muted hover:text-fg"
-                  >
-                    No
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmId(row.id)}
-                  className="grid size-8 shrink-0 place-items-center rounded-md text-subtle transition hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
-                  aria-label={`Remove $${row.symbol} from my calls`}
-                  title="Remove from my calls"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              ))}
           </li>
         ))}
       </ul>

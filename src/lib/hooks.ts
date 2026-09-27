@@ -288,10 +288,6 @@ export function addMyCall(token: TokenView, now = Date.now()): boolean {
   return true;
 }
 
-export function removeMyCall(id: string) {
-  writeCalls(readCalls().filter((c) => c.id !== id));
-}
-
 export function useMyCalls(): MyCall[] {
   return useSyncExternalStore(subscribe, readCalls, () => EMPTY);
 }

@@ -1181,6 +1181,9 @@ $$;
 -- verified X accounts. Before the wipe, the month's top 10 callers (by hit rate, as on the caller board)
 -- and top 10 tokens (by peak x since the first paste) are kept in public.seasons, shown as "Last month".
 --
+-- Calls can no longer be removed one by one (rankr_delete_call is dropped): they all go with the reset, and
+-- a caller removing their losing calls would dress up their hit rate.
+--
 -- Scheduled with pg_cron when it is enabled (Dashboard -> Database -> Extensions); see supabase/cron.sql.
 -- By hand:   select rankr_end_month();
 -- Stop it:   select cron.unschedule('rankr-monthly-reset');
@@ -1191,6 +1194,8 @@ begin
     raise exception 'rankr: run the earlier migrations first (or use supabase/setup.sql, which runs everything in order)';
   end if;
 end $$;
+
+drop function if exists public.rankr_delete_call(uuid, text);
 
 create table if not exists public.seasons (
   id       bigint generated always as identity primary key,

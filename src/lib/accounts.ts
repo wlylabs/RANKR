@@ -312,12 +312,6 @@ export async function topCallerIds(n: number): Promise<string[]> {
   return topCache.ids;
 }
 
-export async function deleteCall(account: Account, tokenId: string): Promise<boolean> {
-  const api = rest();
-  if (!api) return false;
-  return api.rpc<boolean>("rankr_delete_call", { p_user: account.id, p_token: tokenId });
-}
-
 type CallerRow = {
   user_id: string;
   username: string;

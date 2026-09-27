@@ -202,7 +202,8 @@ test site key `1x00000000000000000000AA` always passes (its secret is `1x0000000
 How it works:
 
 - A **call** is the price at the moment *you* paste a token, taken from the server's market data. The first
-  call per token counts; calls can be deleted but never edited (enforced by the database).
+  call per token counts; calls can't be edited or removed (enforced by the database): they all go with the
+  monthly reset, and nobody can drop their losing calls to dress up their hit rate.
 - **Names**: every new account gets a default name from `sha256(user id)`: the first hex digit picks a
   word (`nonce`, `cipher`, `merkle`, `ledger`, `satoshi`, ...), the next 4 digits follow it (`@nonce_7f3a`;
   more digits if that one is taken). Renaming on `/account`: 3-20 letters, numbers or underscores, unique
@@ -299,7 +300,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
 | `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
 | `GET /api/callers/:username` | a caller's profile: board numbers, bio and links, and calls |
-| `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET/DELETE /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
+| `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
 | `GET /api/feed?scope=all\|top&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first |

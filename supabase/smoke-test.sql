@@ -201,8 +201,10 @@ begin
   assert jsonb_array_length(public.rankr_feed(p_chain => 'base')) = 1, 'chain filter';
   assert jsonb_array_length(public.rankr_feed(2)) = 2 and jsonb_array_length(public.rankr_feed(2, 4)) = 1, 'paging';
 
-  assert public.rankr_delete_call(b, 'solana:AAA');
-  assert not public.rankr_delete_call(b, 'solana:AAA');
+  -- Calls can't be removed one by one (only the monthly reset clears them); the rest of the test goes on
+  -- without this one.
+  assert to_regprocedure('public.rankr_delete_call(uuid,text)') is null, 'no removing calls';
+  delete from public.calls where user_id = b and token_id = 'solana:AAA';
 
   -- Default names: a crypto word + hex from sha256(user id). Stable, valid, and unique.
   v := public.rankr_default_username(c);
