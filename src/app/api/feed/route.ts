@@ -7,18 +7,15 @@ import type { FeedItem, FeedResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 function int(value: string | null, fallback: number, min: number, max: number) {
   const n = Number.parseInt(value ?? "", 10);
   return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
 }
 
 /**
- * GET /api/feed?scope=all|top|following&callers=<uuid>,...&kind=all|call|milestone&chain=solana&limit=20&offset=0
+ * GET /api/feed?scope=all|top&kind=all|call|milestone&chain=solana&limit=20&offset=0
  * Newest calls ("@userx called $SHIB at $1.2B mc") and milestones ("$PEPE hit 10x from @userx's call").
- * "following" takes the followed callers' ids in `callers` (follows are kept in the browser). Without
- * accounts (local dev) pastes stand in for calls, with no caller.
+ * Without accounts (local dev) pastes stand in for calls, with no caller.
  */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
@@ -33,12 +30,7 @@ export async function GET(req: NextRequest) {
   try {
     let items: FeedItem[];
     if (accountsEnabled()) {
-      const users =
-        scope === "following"
-          ? (p.get("callers")?.split(",").filter((id) => UUID.test(id)).slice(0, 200) ?? [])
-          : scope === "top"
-            ? await topCallerIds(FEED_TOP_CALLERS)
-            : null;
+      const users = scope === "top" ? await topCallerIds(FEED_TOP_CALLERS) : null;
       items = await feed({ limit, offset, users, chain, kind });
     } else if (scope !== "all") {
       items = []; // no callers without accounts

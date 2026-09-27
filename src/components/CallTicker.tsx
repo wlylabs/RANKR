@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useFeedScope, useFollowing } from "@/lib/following";
+import { useFeedScope } from "@/lib/feed-scope";
 import { useFeed } from "@/lib/hooks";
 import type { FeedItem } from "@/lib/types";
 import { FeedSentence } from "./FeedLine";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 
-const SCOPE_LABEL = { all: null, top: "Top", following: "Following" } as const;
+const SCOPE_LABEL = { all: null, top: "Top" } as const;
 
 /** One entry: the sentence, then the multiple now (for a call) and how long ago. */
 function Entry({ item, copy }: { item: FeedItem; copy?: boolean }) {
@@ -24,16 +24,13 @@ function Entry({ item, copy }: { item: FeedItem; copy?: boolean }) {
 const MIN_ENTRIES = 10;
 
 /**
- * The live feed as a ticker under the app header, filtered like the feed page (all, top callers or the
- * callers you follow). It scrolls on its own and stops on hover or focus; with reduced motion it stays put
+ * The live feed as a ticker under the app header, filtered like the feed page (everyone or top callers).
+ * It scrolls on its own and stops on hover or focus; with reduced motion it stays put
  * and scrolls by hand.
  */
 export function CallTicker() {
-  const following = useFollowing();
-  const picked = useFeedScope();
-  // "Following" with nobody followed would leave the ticker empty: show everyone instead.
-  const scope = picked === "following" && !following.length ? "all" : picked;
-  const { items } = useFeed({ scope, callers: following.map((f) => f.userId) }, 20);
+  const scope = useFeedScope();
+  const { items } = useFeed({ scope }, 20);
   if (!items.length) return null;
 
   // A short feed is repeated so one copy is wider than the screen and the loop never shows a gap.

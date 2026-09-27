@@ -7,6 +7,7 @@ import { useCallerPages } from "@/lib/hooks";
 import { MIN_CALLS_RANKED, type CallerSort } from "@/lib/params";
 import type { CallerView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
+import { Avatar } from "./Avatar";
 import { MultipleBadge } from "./MultipleBadge";
 import { OfficialBadge } from "./OfficialBadge";
 import { ListSkeleton } from "./TokenList";
@@ -34,6 +35,7 @@ function Caller({ c, me }: { c: CallerView; me: boolean }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
       <Link href={callerHref(c.username)} className="flex min-w-0 items-center gap-1 hover:underline">
+        <Avatar userId={c.userId} size={20} className="mr-1" />
         <span className="truncate font-mono text-[13px]">@{c.username}</span>
         {c.official && <OfficialBadge />}
       </Link>

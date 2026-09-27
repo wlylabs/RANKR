@@ -110,16 +110,12 @@ export type FeedParams = {
   scope?: FeedScope;
   kind?: FeedKind;
   chain?: string | null;
-  /** Followed callers' ids, for scope "following". */
-  callers?: string[];
 };
 
-/** SWR key for a feed query, or null when there is nothing to ask for (following nobody). */
-export function feedKey(p: FeedParams, limit: number, offset = 0): string | null {
-  if (p.scope === "following" && !p.callers?.length) return null;
+/** SWR key for a feed query. */
+export function feedKey(p: FeedParams, limit: number, offset = 0): string {
   const qs = new URLSearchParams();
   if (p.scope && p.scope !== "all") qs.set("scope", p.scope);
-  if (p.scope === "following") qs.set("callers", p.callers!.join(","));
   if (p.kind && p.kind !== "all") qs.set("kind", p.kind);
   if (p.chain) qs.set("chain", p.chain);
   qs.set("limit", String(limit));

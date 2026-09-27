@@ -97,8 +97,21 @@ export type CallerView = {
 
 export type CallersResponse = { enabled: boolean; total: number; callers: CallerView[]; updatedAt: number };
 
-/** A caller's public profile: board numbers and calls, newest first. */
-export type CallerProfileResponse = { caller: CallerView; calls: CallView[]; updatedAt: number };
+/**
+ * What a caller says about themselves (see src/lib/profile.ts). On a public profile `x` is there only once
+ * verified; the account's own view has it either way.
+ */
+export type CallerAbout = {
+  bio: string | null;
+  x: string | null;
+  xVerified: boolean;
+  telegram: string | null;
+  /** A full http(s) link. */
+  website: string | null;
+};
+
+/** A caller's public profile: board numbers, bio and links, and calls, newest first. */
+export type CallerProfileResponse = { caller: CallerView; about: CallerAbout; calls: CallView[]; updatedAt: number };
 
 /**
  * One entry of the feed: a new call ("@userx called $SHIB at $1.2B mc") or a call reaching a milestone
@@ -149,7 +162,9 @@ export type TokenResponse = {
   preview: MarketSnapshot | null;
 };
 
-export type MeResponse = { account: { id: string; username: string | null; hasKey: boolean; official: boolean } };
+export type MeResponse = {
+  account: { id: string; username: string | null; hasKey: boolean; official: boolean; about: CallerAbout };
+};
 
 /** A new sign-in key, returned once. */
 export type KeyResponse = MeResponse & { key: string };

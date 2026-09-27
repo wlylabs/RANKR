@@ -4,11 +4,23 @@ const USER = { id: "00000000-0000-4000-8000-00000000000a", email: "0123456789abc
 const GUEST = { id: "00000000-0000-4000-8000-00000000000b", email: "", is_anonymous: true };
 // Signed up by email before keys: keyless, and the address never leaves the server.
 const OLD_EMAIL = { id: "00000000-0000-4000-8000-00000000000c", email: "caller@example.com" };
+const NO_ABOUT = { bio: null, x: null, xVerified: false, telegram: null, website: null };
+
+type ProfileRow = {
+  username: string;
+  official?: boolean;
+  bio?: string | null;
+  x_handle?: string | null;
+  x_verified_at?: string | null;
+  telegram?: string | null;
+  website?: string | null;
+};
 
 describe("accounts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
-  let profile: { username: string; official?: boolean }[];
+  let profile: ProfileRow[];
   let feedArgs: Record<string, unknown> | null;
+  let verifyOk: boolean;
 
   beforeEach(() => {
     vi.resetModules();
@@ -16,6 +28,7 @@ describe("accounts", () => {
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
     profile = [{ username: "alpha_caller" }];
     feedArgs = null;
+    verifyOk = true;
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const auth = new Headers(init?.headers).get("authorization");
       if (url.endsWith("/auth/v1/user")) {
@@ -68,6 +81,18 @@ describe("accounts", () => {
         profile = [{ username: p_username }];
         return new Response(JSON.stringify({ ok: true, username: p_username }));
       }
+      if (url.endsWith("/rest/v1/rpc/rankr_set_profile")) {
+        const { p_bio, p_x, p_telegram, p_website } = JSON.parse(String(init?.body));
+        const kept = profile[0].x_handle?.toLowerCase() === p_x?.toLowerCase() ? profile[0].x_verified_at : null;
+        profile = [{ ...profile[0], bio: p_bio, x_handle: p_x, x_verified_at: kept, telegram: p_telegram, website: p_website }];
+        return new Response(
+          JSON.stringify({ ok: true, bio: p_bio, x: p_x, x_verified: !!kept, telegram: p_telegram, website: p_website }),
+        );
+      }
+      if (url.endsWith("/rest/v1/rpc/rankr_verify_x")) {
+        if (verifyOk) profile = [{ ...profile[0], x_verified_at: "2026-09-27T12:00:00Z" }];
+        return new Response(JSON.stringify(verifyOk ? { ok: true } : { ok: false, error: "changed" }));
+      }
       return new Response("not found", { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -84,7 +109,7 @@ describe("accounts", () => {
 
   it("verifies the token with Supabase Auth, reads the username and caches", async () => {
     const { accountFromRequest } = await import("./accounts");
-    expect(await accountFromRequest(req("good-token"))).toEqual({ id: USER.id, username: "alpha_caller", hasKey: true, official: false });
+    expect(await accountFromRequest(req("good-token"))).toEqual({ id: USER.id, username: "alpha_caller", hasKey: true, official: false, about: NO_ABOUT });
     expect(await accountFromRequest(req("good-token"))).toMatchObject({ id: USER.id });
 
     expect(urls().filter((u) => u.endsWith("/auth/v1/user"))).toHaveLength(1);
@@ -98,7 +123,7 @@ describe("accounts", () => {
   it("gives a new account its default name, once", async () => {
     profile = [];
     const { accountFromRequest } = await import("./accounts");
-    expect(await accountFromRequest(req("guest-token"))).toEqual({ id: GUEST.id, username: "nonce_7f3a", hasKey: false, official: false });
+    expect(await accountFromRequest(req("guest-token"))).toEqual({ id: GUEST.id, username: "nonce_7f3a", hasKey: false, official: false, about: NO_ABOUT });
     expect(urls().filter((u) => u.endsWith("rankr_ensure_profile"))).toHaveLength(1);
     // An existing profile is just read.
     await accountFromRequest(req("good-token"));
@@ -108,7 +133,7 @@ describe("accounts", () => {
   it("counts an account with a real email as keyless and never returns the email", async () => {
     const { accountFromRequest } = await import("./accounts");
     const account = await accountFromRequest(req("email-token"));
-    expect(account).toEqual({ id: OLD_EMAIL.id, username: "alpha_caller", hasKey: false, official: false });
+    expect(account).toEqual({ id: OLD_EMAIL.id, username: "alpha_caller", hasKey: false, official: false, about: NO_ABOUT });
     expect(JSON.stringify(account)).not.toContain("@");
   });
 
@@ -157,6 +182,70 @@ describe("accounts", () => {
     expect(urls().filter((u) => u.endsWith("rankr_set_username"))).toHaveLength(0);
   });
 
+  it("reads the bio and links, saves them and forgets the cached account", async () => {
+    profile = [{ username: "alpha_caller", bio: "gm", x_handle: "Alpha_X", x_verified_at: "2026-09-27T12:00:00Z", telegram: null }];
+    const { accountFromRequest, setProfile } = await import("./accounts");
+    const account = (await accountFromRequest(req("good-token")))!;
+    expect(account.about).toEqual({ bio: "gm", x: "Alpha_X", xVerified: true, telegram: null, website: null });
+    expect(urls().find((u) => u.includes("/rest/v1/profiles?"))).toContain("select=*");
+
+    // Same X account in another case: still verified.
+    const saved = { bio: "Early on cats.", x: "alpha_x", telegram: "alpha_tg", website: "https://alpha.example" };
+    expect(await setProfile(account, saved)).toEqual({ ...saved, xVerified: true });
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("rankr_set_profile"))!;
+    expect(JSON.parse(String(call[1]?.body))).toEqual({
+      p_user: USER.id,
+      p_bio: "Early on cats.",
+      p_x: "alpha_x",
+      p_telegram: "alpha_tg",
+      p_website: "https://alpha.example",
+    });
+    // Another one starts over.
+    expect((await setProfile(account, { bio: null, x: "bravo_x", telegram: null, website: null }))?.xVerified).toBe(false);
+    expect((await accountFromRequest(req("good-token")))?.about).toEqual({ ...NO_ABOUT, x: "bravo_x" });
+  });
+
+  it("verifies the X account from a public post by that account with the account's code", async () => {
+    profile = [{ username: "alpha_caller", x_handle: "Alpha_X" }];
+    const { accountFromRequest, verifyX } = await import("./accounts");
+    const { xCode } = await import("./profile");
+    const account = (await accountFromRequest(req("good-token")))!;
+    const code = xCode(USER.id, "alpha_x");
+    const link = "https://x.com/Alpha_X/status/1840000000000000001";
+    const post = (author: string, text: string) => async (id: string) => (id === "1840000000000000001" ? { author, text } : null);
+
+    expect(await verifyX(account, "https://x.com/Alpha_X", post("Alpha_X", code))).toMatchObject({ ok: false, status: 400 });
+    expect(await verifyX(account, "https://x.com/Alpha_X/status/2", post("Alpha_X", code))).toMatchObject({ ok: false, status: 404 });
+    expect(await verifyX(account, link, post("someone_else", code))).toEqual({
+      ok: false,
+      error: "That post is from @someone_else, not @Alpha_X.",
+      status: 400,
+    });
+    // A code for another Rankr account proves nothing.
+    expect(await verifyX(account, link, post("alpha_x", xCode(GUEST.id, "alpha_x")))).toMatchObject({ ok: false, status: 400 });
+    expect(urls().filter((u) => u.endsWith("rankr_verify_x"))).toHaveLength(0);
+
+    expect(await verifyX(account, link, post("alpha_x", `gm\n${code.toUpperCase()}`))).toEqual({
+      ok: true,
+      about: { ...NO_ABOUT, x: "Alpha_X", xVerified: true },
+    });
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("rankr_verify_x"))!;
+    expect(JSON.parse(String(call[1]?.body))).toEqual({ p_user: USER.id, p_x: "Alpha_X" });
+    expect((await accountFromRequest(req("good-token")))?.about.xVerified).toBe(true);
+  });
+
+  it("won't verify without an X account, or when it changed meanwhile", async () => {
+    const { accountFromRequest, verifyX } = await import("./accounts");
+    const { xCode } = await import("./profile");
+    const link = "https://x.com/alpha_x/status/1";
+    const read = async () => ({ author: "alpha_x", text: `${xCode(USER.id, "alpha_x")} ${xCode(GUEST.id, "alpha_x")}` });
+    expect(await verifyX((await accountFromRequest(req("good-token")))!, link, read)).toMatchObject({ ok: false, status: 400 });
+
+    profile = [{ username: "nonce_7f3a", x_handle: "alpha_x" }];
+    verifyOk = false;
+    expect(await verifyX((await accountFromRequest(req("guest-token")))!, link, read)).toMatchObject({ ok: false, status: 409 });
+  });
+
   it("marks official callers on the board", async () => {
     const { callers } = await import("./accounts");
     const out = await callers("hits", 50, 0);
@@ -200,7 +289,7 @@ describe("accounts", () => {
     ]);
   });
 
-  it("asks nothing when following nobody", async () => {
+  it("asks nothing for an empty list of callers", async () => {
     const { feed } = await import("./accounts");
     expect(await feed({ limit: 20, offset: 0, users: [], chain: null, kind: null })).toEqual([]);
     expect(feedArgs).toBeNull();
@@ -209,7 +298,7 @@ describe("accounts", () => {
 
 describe("callerProfile", () => {
   let urls: string[];
-  let rows: { user_id: string; username: string; official?: boolean }[];
+  let rows: (ProfileRow & { user_id: string })[];
 
   beforeEach(() => {
     vi.resetModules();
@@ -238,6 +327,17 @@ describe("callerProfile", () => {
     const out = await callerProfile("NONCE_7F3A");
     expect(out?.caller).toMatchObject({ userId: "u1", username: "nonce_7f3a", calls: 0, bestToken: null });
     expect(urls[0]).toContain("username=ilike.NONCE%5C_7F3A");
+  });
+
+  it("shows the bio and Telegram, and the X account only once verified", async () => {
+    const { callerProfile } = await import("./accounts");
+    rows = [
+      { user_id: "u1", username: "nonce_7f3a", bio: "gm", x_handle: "someone_famous", x_verified_at: null, telegram: "nonce_tg", website: "https://nonce.example" },
+    ];
+    const about = { bio: "gm", telegram: "nonce_tg", website: "https://nonce.example" };
+    expect((await callerProfile("nonce_7f3a"))?.about).toEqual({ ...about, x: null, xVerified: false });
+    rows[0].x_verified_at = "2026-09-27T12:00:00Z";
+    expect((await callerProfile("nonce_7f3a"))?.about).toEqual({ ...about, x: "someone_famous", xVerified: true });
   });
 
   it("returns null for unknown or impossible names", async () => {

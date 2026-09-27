@@ -226,7 +226,35 @@ begin
   assert not (public.rankr_set_official('rankr', p_official => false)->>'official')::boolean;
   assert (public.rankr_set_username(b, 'bravo')->>'ok')::boolean, 'unlocked again';
 
+  -- Profiles: bio, X, Telegram and website. A new X account starts unverified; one Rankr account per verified X account.
+  r := public.rankr_set_profile(a, '  Early on cats.  ', 'Alpha_X', 'alpha_tg', 'https://alpha.example');
+  assert r = '{"ok": true, "bio": "Early on cats.", "x": "Alpha_X", "x_verified": false, "telegram": "alpha_tg",
+               "website": "https://alpha.example"}'::jsonb, r::text;
+  assert public.rankr_set_profile(a, null, null, null, 'javascript:alert(1)')->>'error' = 'invalid', 'only http(s) links';
+  assert public.rankr_set_profile(a, null, null, null, 'https://' || repeat('w', 200))->>'error' = 'invalid', 'website too long';
+  assert public.rankr_set_profile(a, repeat('b', 161), null, null)->>'error' = 'invalid', 'bio too long';
+  assert public.rankr_set_profile(a, null, 'no spaces', null)->>'error' = 'invalid';
+  assert public.rankr_set_profile(a, null, null, '1abcd')->>'error' = 'invalid', 'telegram starts with a letter';
+  assert public.rankr_set_profile('00000000-0000-4000-8000-0000000000ff', null, null, null)->>'error' = 'not_found';
+  assert (select bio = 'Early on cats.' and website = 'https://alpha.example' from public.profiles where user_id = a),
+         'a failed save changes nothing';
+  assert public.rankr_verify_x(a, 'someone_else')->>'error' = 'changed';
+  assert (public.rankr_verify_x(a, 'alpha_x')->>'ok')::boolean;
+  r := public.rankr_set_profile(a, 'Early on cats.', 'ALPHA_X', '', '');
+  assert (r->>'x_verified')::boolean and r->>'x' = 'ALPHA_X' and r->'telegram' = 'null'::jsonb and r->'website' = 'null'::jsonb,
+         'same X in another case stays verified: ' || r::text;
+  assert (public.rankr_set_profile(b, '', 'alpha_x', null)->>'ok')::boolean, 'anyone can type it in, unverified';
+  assert (public.rankr_verify_x(b, 'Alpha_X')->>'ok')::boolean;
+  assert (select x_verified_at is null from public.profiles where user_id = a), 'the newest verification wins';
+  assert (select x_verified_at is not null and bio is null from public.profiles where user_id = b);
+  assert not (public.rankr_set_profile(b, null, 'bravo_x', null)->>'x_verified')::boolean, 'another X account starts over';
+  assert public.rankr_ensure_profile(a) = 'alpha_caller';
+
   if exists (select 1 from pg_roles where rolname = 'anon') then
+    assert not has_function_privilege('anon', 'public.rankr_set_profile(uuid,text,text,text,text)', 'execute');
+    assert to_regprocedure('public.rankr_set_profile(uuid,text,text,text)') is null, 'no 4-argument leftover';
+    assert not has_function_privilege('authenticated', 'public.rankr_verify_x(uuid,text)', 'execute');
+    assert has_function_privilege('service_role', 'public.rankr_verify_x(uuid,text)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_feed(integer,integer,uuid[],text,text)', 'execute');

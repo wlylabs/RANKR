@@ -7,6 +7,7 @@ import { APP_HOME, loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeyReveal, KeySignInForm } from "./Key";
 import { OfficialBadge } from "./OfficialBadge";
+import { ProfileSection, XVerify } from "./ProfileForm";
 import { UsernameForm } from "./UsernameForm";
 
 const PRIMARY =
@@ -16,7 +17,7 @@ const LINK = "text-muted underline-offset-4 hover:text-fg hover:underline";
 /** Save a sign-in key (or make a new one), change the name, sign out. */
 export function Account() {
   const router = useRouter();
-  const { available, ready, userId, username, hasKey, official, justSignedOut, signOut } = useAuth();
+  const { available, ready, userId, username, hasKey, official, about, justSignedOut, signOut } = useAuth();
   const [saved, setSaved] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
   // Kept while the new key is on screen, so it stays up after hasKey flips.
@@ -65,6 +66,13 @@ export function Account() {
           <UsernameForm key={username} initial={username} current={username} submitLabel="Save username" onSaved={() => setSaved(true)} />
           {saved && <p className="mt-3 text-xs text-up">Saved.</p>}
         </section>
+      )}
+
+      {about && (
+        <>
+          <ProfileSection key={userId} about={about} />
+          <XVerify userId={userId} username={username} about={about} />
+        </>
       )}
 
       {confirmOut ? (
