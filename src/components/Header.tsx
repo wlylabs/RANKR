@@ -143,10 +143,6 @@ export function Footer() {
             sha256(&quot;rankr&quot;) = {RANKR_SHA256.slice(0, 16)}…{RANKR_SHA256.slice(-8)}
           </p>
         </div>
-        {/* The landing page is for the web; the installed app has no way back to it. */}
-        <Link href="/" className="text-xs text-muted hover:text-fg standalone:hidden">
-          About Rankr
-        </Link>
       </div>
     </footer>
   );

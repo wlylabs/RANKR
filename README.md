@@ -31,8 +31,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, three steps and a
   four-question FAQ. English only: Rankr is for DEX traders everywhere.
   The app itself (paste box + live board) is at **`/app`**.
-- **Settings menu** (the gear in the header): theme, and the app: open it, install it, copy its link. It is the
-  only place with app buttons, so pages stay clean.
+- **Settings menu** (the gear in the header): theme (switching cross-fades the page), milestone alerts, About
+  Rankr (the landing page) or Open app, Install app and the app link. It keeps pages free of app buttons.
 - **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
   offline page (next section).
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme.
