@@ -8,12 +8,14 @@ const OLD_EMAIL = { id: "00000000-0000-4000-8000-00000000000c", email: "caller@e
 describe("accounts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let profile: { username: string; official?: boolean }[];
+  let feedArgs: Record<string, unknown> | null;
 
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv("SUPABASE_URL", "https://x.supabase.co");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
     profile = [{ username: "alpha_caller" }];
+    feedArgs = null;
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const auth = new Headers(init?.headers).get("authorization");
       if (url.endsWith("/auth/v1/user")) {
@@ -41,6 +43,23 @@ describe("accounts", () => {
               { ...caller, user_id: "u2", username: "degen" },
             ],
           }),
+        );
+      }
+      if (url.endsWith("/rest/v1/rpc/rankr_feed")) {
+        feedArgs = JSON.parse(String(init?.body));
+        const now = new Date().toISOString();
+        const token = {
+          id: "solana:ZZZ", chain_id: "solana", address: "ZZZ", name: "Zed", symbol: "ZED", image_url: null,
+          entry_price_usd: 1, entry_market_cap: 1000, first_pasted_at: now, last_pasted_at: now, paste_count: 1,
+          peak_price_usd: 12, peak_at: now, low_price_usd: 1, low_at: now, last_price_usd: 12,
+          market: { priceUsd: 12 }, last_checked_at: now,
+        };
+        return new Response(
+          JSON.stringify([
+            { kind: "milestone", tier: 10, at: "2026-09-27T11:17:50.571+00:00", user_id: "u1", token_id: "solana:ZZZ",
+              entry_price_usd: 2, entry_market_cap: 2000, called_at: now, username: "degen", official: false,
+              caller_calls: 8, caller_hits: 5, token },
+          ]),
         );
       }
       if (url.endsWith("/rest/v1/rpc/rankr_set_username")) {
@@ -160,6 +179,31 @@ describe("accounts", () => {
     expect(accountsEnabled()).toBe(false);
     expect(await accountFromRequest(req("good-token"))).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("reads the feed: milestones measured from the caller's own entry, with their board numbers", async () => {
+    const { feed } = await import("./accounts");
+    const items = await feed({ limit: 20, offset: 0, users: ["u1"], chain: "solana", kind: "milestone" });
+    expect(feedArgs).toEqual({ p_limit: 20, p_offset: 0, p_users: ["u1"], p_chain: "solana", p_kind: "milestone" });
+    expect(items).toEqual([
+      {
+        id: "milestone:u1:solana:ZZZ:10",
+        kind: "milestone",
+        tier: 10,
+        at: Date.parse("2026-09-27T11:17:50.571Z"),
+        username: "degen",
+        official: false,
+        caller: { calls: 8, hits: 5 },
+        token: { id: "solana:ZZZ", chainId: "solana", address: "ZZZ", symbol: "ZED", name: "Zed" },
+        entryMarketCap: 2000,
+        multiple: 6, // price 12, this caller's entry 2
+      },
+    ]);
+  });
+
+  it("asks nothing when following nobody", async () => {
+    const { feed } = await import("./accounts");
+    expect(await feed({ limit: 20, offset: 0, users: [], chain: null, kind: null })).toEqual([]);
+    expect(feedArgs).toBeNull();
   });
 });
 

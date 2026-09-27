@@ -36,3 +36,21 @@ export const MIN_CALLS_RANKED = 5;
  * saved key; official accounts have none). Kept in Postgres when Supabase is set up (src/lib/rate-limit.ts).
  */
 export const PASTE_LIMITS = { ipPerMinute: 20, guestPerDay: 30, keyedPerDay: 200 } as const;
+
+/** Feed filters. "top": callers on the first page of the caller board; "following": callers followed here. */
+export const FEED_SCOPES = ["all", "top", "following"] as const;
+export type FeedScope = (typeof FEED_SCOPES)[number];
+
+export const FEED_KINDS = ["all", "call", "milestone"] as const;
+export type FeedKind = (typeof FEED_KINDS)[number];
+
+export function parseFeedScope(value: string | null | undefined): FeedScope {
+  return FEED_SCOPES.includes(value as FeedScope) ? (value as FeedScope) : "all";
+}
+
+export function parseFeedKind(value: string | null | undefined): FeedKind {
+  return FEED_KINDS.includes(value as FeedKind) ? (value as FeedKind) : "all";
+}
+
+/** "Top callers" in the feed: this many from the top of the caller board (by hit rate). */
+export const FEED_TOP_CALLERS = 25;

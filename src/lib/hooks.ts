@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
-import type { CallerSort, RangeKey, SortKey } from "./params";
+import type { CallerSort, FeedKind, FeedScope, RangeKey, SortKey } from "./params";
 import { authedFetcher } from "./supabase-browser";
 import type { CallerProfileResponse, CallersResponse, FeedResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
 
@@ -106,10 +106,51 @@ export function useCallerPages(sort: CallerSort, pageSize = 50) {
   };
 }
 
-/** The live call feed (newest calls across every caller). */
-export function useFeed(limit = 20) {
-  const { data, error, isLoading } = useSWR<FeedResponse>(`/api/feed?limit=${limit}`, fetcher, LIVE);
+export type FeedParams = {
+  scope?: FeedScope;
+  kind?: FeedKind;
+  chain?: string | null;
+  /** Followed callers' ids, for scope "following". */
+  callers?: string[];
+};
+
+/** SWR key for a feed query, or null when there is nothing to ask for (following nobody). */
+export function feedKey(p: FeedParams, limit: number, offset = 0): string | null {
+  if (p.scope === "following" && !p.callers?.length) return null;
+  const qs = new URLSearchParams();
+  if (p.scope && p.scope !== "all") qs.set("scope", p.scope);
+  if (p.scope === "following") qs.set("callers", p.callers!.join(","));
+  if (p.kind && p.kind !== "all") qs.set("kind", p.kind);
+  if (p.chain) qs.set("chain", p.chain);
+  qs.set("limit", String(limit));
+  if (offset) qs.set("offset", String(offset));
+  return `/api/feed?${qs}`;
+}
+
+/** The newest feed entries (the ticker). */
+export function useFeed(params: FeedParams, limit = 20) {
+  const { data, error, isLoading } = useSWR<FeedResponse>(feedKey(params, limit), fetcher, LIVE);
   return { items: data?.items ?? [], error, isLoading };
+}
+
+/** The feed in pages of `pageSize`; an entry that slides onto the next page as new ones arrive shows once. */
+export function useFeedPages(params: FeedParams, pageSize = 30) {
+  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite<FeedResponse>(
+    (i, prev: FeedResponse | null) => (prev && prev.items.length < pageSize ? null : feedKey(params, pageSize, i * pageSize)),
+    fetcher,
+    { ...LIVE, revalidateAll: true },
+  );
+  const seen = new Set<string>();
+  const items = (data?.flatMap((p) => p.items) ?? []).filter((i) => !seen.has(i.id) && !!seen.add(i.id));
+  const last = data?.[data.length - 1];
+  return {
+    items,
+    hasMore: !!last && last.items.length === pageSize && size * pageSize < 500,
+    error,
+    isLoading,
+    isValidating,
+    loadMore: () => setSize(size + 1),
+  };
 }
 
 export function useStats() {

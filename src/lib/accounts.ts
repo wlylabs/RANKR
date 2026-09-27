@@ -157,12 +157,36 @@ async function callsOf(userId: string): Promise<CallView[]> {
   });
 }
 
-/** The newest calls across every caller, for the live feed. Each is measured from that caller's own entry. */
-export async function recentCalls(limit: number): Promise<FeedItem[]> {
+type FeedRow = CallRow & {
+  kind: "call" | "milestone";
+  tier: number | null;
+  at: string;
+  username: string;
+  official?: boolean;
+  caller_calls: number;
+  caller_hits: number;
+  token: TokenRow;
+};
+
+export type FeedQuery = {
+  limit: number;
+  offset: number;
+  /** Only these callers (user ids); null for everyone. */
+  users: string[] | null;
+  chain: string | null;
+  kind: "call" | "milestone" | null;
+};
+
+/** Newest calls and milestones across callers. Each multiple is measured from that caller's own entry. */
+export async function feed(q: FeedQuery): Promise<FeedItem[]> {
   const api = rest();
-  if (!api) return [];
-  const rows = await api.rpc<(CallRow & { username: string; official?: boolean; token: TokenRow })[]>("rankr_recent_calls", {
-    p_limit: limit,
+  if (!api || (q.users && !q.users.length)) return [];
+  const rows = await api.rpc<FeedRow[]>("rankr_feed", {
+    p_limit: q.limit,
+    p_offset: q.offset,
+    p_users: q.users,
+    p_chain: q.chain,
+    p_kind: q.kind,
   });
   const tokens = await viewsOf(rows.map((r) => fromRow(r.token)));
   const byId = new Map(tokens.map((t) => [t.id, t]));
@@ -172,16 +196,29 @@ export async function recentCalls(limit: number): Promise<FeedItem[]> {
     const price = t.market?.priceUsd || t.entryPriceUsd;
     return [
       {
-        id: `${r.user_id}:${r.token_id}`,
+        id: `${r.kind}:${r.user_id}:${r.token_id}:${r.tier ?? ""}`,
+        kind: r.kind,
+        tier: r.tier,
+        at: Date.parse(r.at),
         username: r.username,
         official: !!r.official,
+        caller: { calls: r.caller_calls, hits: r.caller_hits },
         token: { id: t.id, chainId: t.chainId, address: t.address, symbol: t.symbol, name: t.name },
         entryMarketCap: r.entry_market_cap,
-        calledAt: Date.parse(r.called_at),
         multiple: r.entry_price_usd > 0 ? price / r.entry_price_usd : 1,
       },
     ];
   });
+}
+
+let topCache: { ids: string[]; until: number } | null = null;
+
+/** User ids of the top callers by hit rate (the default caller board), cached for a minute. */
+export async function topCallerIds(n: number): Promise<string[]> {
+  if (topCache && topCache.until > Date.now()) return topCache.ids;
+  const { callers: top } = await callers("rate", n, 0);
+  topCache = { ids: top.map((c) => c.userId), until: Date.now() + 60_000 };
+  return topCache.ids;
 }
 
 export async function deleteCall(account: Account, tokenId: string): Promise<boolean> {
