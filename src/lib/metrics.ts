@@ -51,7 +51,8 @@ export function applySnapshot(r: TokenRecord, s: MarketSnapshot, now: number): T
   return next;
 }
 
-export function toView(r: TokenRecord, now = Date.now()): TokenView {
+/** Everything in a view except the seal, which needs node:crypto and is added server-side. */
+export function toView(r: TokenRecord, now = Date.now()): Omit<TokenView, "seal"> {
   const price = r.market?.priceUsd || r.entryPriceUsd;
   const multiple = ratio(price, r.entryPriceUsd);
   return {

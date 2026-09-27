@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ClipboardPaste, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
+import { ArrowRight, ClipboardPaste, LoaderCircle, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { parseInput } from "@/lib/address";
@@ -10,7 +10,8 @@ import { trackPaste } from "@/lib/track";
 import type { TrackResponse } from "@/lib/types";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
-import { ChainBadge, TokenAvatar } from "./TokenAvatar";
+import { ChainTag } from "./Chain";
+import { TokenName } from "./TokenList";
 
 type Result = TrackResponse & { firstCallByYou: boolean };
 
@@ -69,13 +70,8 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
           e.preventDefault();
           void submit(value);
         }}
-        className={clsx(
-          "group flex items-center gap-2 rounded-xl border border-border bg-surface p-1.5 transition-colors focus-within:border-brand",
-        )}
+        className="flex items-center gap-1.5 rounded-lg border border-border bg-surface p-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors focus-within:border-border-strong"
       >
-        <span className={clsx("ml-2.5 shrink-0 font-mono font-semibold text-brand-ink", lg ? "text-lg" : "text-base")} aria-hidden>
-          &gt;
-        </span>
         <input
           ref={inputRef}
           value={value}
@@ -92,14 +88,14 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
               void submit(text);
             }
           }}
-          placeholder="paste token CA or link"
+          placeholder="Paste a contract address or link"
           aria-label="Token contract address"
           spellCheck={false}
           autoComplete="off"
           autoCapitalize="off"
           className={clsx(
-            "min-w-0 flex-1 bg-transparent font-mono tracking-tight caret-brand outline-none placeholder:text-subtle",
-            lg ? "h-11 text-[15px] sm:h-12" : "h-10 text-sm",
+            "min-w-0 flex-1 bg-transparent px-2.5 font-mono tracking-tight outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-subtle",
+            lg ? "h-10 text-[15px]" : "h-9 text-sm",
           )}
         />
         {value && !loading && (
@@ -120,9 +116,9 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
           <button
             type="button"
             onClick={pasteFromClipboard}
-            className="hidden h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 font-mono text-xs text-muted uppercase transition-colors hover:bg-surface-2 hover:text-fg sm:inline-flex"
+            className="hidden h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg sm:inline-flex"
           >
-            <ClipboardPaste className="size-4" />
+            <ClipboardPaste className="size-3.5" />
             Paste
           </button>
         )}
@@ -131,14 +127,14 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
           onClick={value ? undefined : pasteMode ? pasteFromClipboard : () => inputRef.current?.focus()}
           disabled={loading}
           className={clsx(
-            "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand font-semibold text-brand-fg transition hover:brightness-110 active:translate-y-px disabled:opacity-70",
-            lg ? "h-11 px-4 sm:h-12 sm:px-5" : "h-10 px-3.5 text-sm",
+            "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-fg font-medium text-bg transition-opacity hover:opacity-85 disabled:opacity-60",
+            lg ? "h-10 px-4 text-sm" : "h-9 px-3.5 text-sm",
           )}
         >
           {loading ? (
             <>
               <LoaderCircle className="size-4 animate-spin" />
-              <span className="hidden sm:inline">Tracking</span>
+              <span className="hidden sm:inline">Sealing</span>
             </>
           ) : pasteMode ? (
             <>
@@ -156,7 +152,7 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
       </form>
 
       {error && (
-        <p role="alert" className="animate-pop-in mt-3 flex items-start gap-2 rounded-lg border border-down/30 bg-down-soft px-3 py-2.5 text-left text-sm text-down">
+        <p role="alert" className="animate-fade-in mt-2.5 flex items-start gap-2 text-left text-sm text-down">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           {error}
         </p>
@@ -171,48 +167,39 @@ function TrackResult({ result, onClose }: { result: Result; onClose: () => void 
   const t = result.token;
   const created = result.status === "created";
   return (
-    <div
-      role="status"
-      className="animate-pop-in mt-3 overflow-hidden rounded-xl border border-border bg-surface text-left"
-    >
-      <div
-        className={clsx(
-          "flex items-center gap-2 border-b border-border px-4 py-2 font-mono text-[11px]",
-          created ? "text-brand-ink" : "text-muted",
-        )}
-      >
-        <Lock className="size-3.5" />
-        {created ? (
-          <span>Entry locked at {formatDate(t.firstPastedAt)}. You&apos;re the first to paste this one.</span>
-        ) : (
-          <span>
-            Already on Rankr, first pasted <TimeAgo at={t.firstPastedAt} />.
-            {result.firstCallByYou ? " Saved to your calls from today's price." : ""}
-          </span>
-        )}
+    <div role="status" className="animate-fade-in mt-3 overflow-hidden rounded-lg border border-border bg-surface text-left">
+      <Link href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
+        <div className="min-w-0 flex-1">
+          <TokenName symbol={t.symbol} name={t.name} />
+          <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
+            <ChainTag chainId={t.chainId} /> · entry {formatUsd(t.entryMarketCap)} → now {formatUsd(t.marketCap)}
+          </div>
+        </div>
+        <MultipleBadge multiple={t.multiple} />
+      </Link>
+      <div className="flex items-center gap-2 border-t border-border px-4 py-2 font-mono text-[11px] text-subtle">
+        <span className={clsx("size-1.5 shrink-0 rounded-full", created ? "bg-up" : "bg-subtle")} />
+        <span className="min-w-0 flex-1 truncate">
+          {created ? (
+            <>
+              sealed {formatDate(t.firstPastedAt)} · sha256 <span className="text-muted">{t.seal.slice(0, 16)}</span>
+            </>
+          ) : (
+            <>
+              already sealed <TimeAgo at={t.firstPastedAt} />
+              {result.firstCallByYou ? " · added to your calls" : ""}
+            </>
+          )}
+        </span>
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto grid size-6 place-items-center rounded-md hover:bg-surface-2"
+          className="-mr-1 grid size-6 shrink-0 place-items-center rounded hover:bg-surface-2 hover:text-fg"
           aria-label="Dismiss"
         >
           <X className="size-3.5" />
         </button>
       </div>
-      <Link href={tokenHref(t)} className="flex items-center gap-3 p-4 transition-colors hover:bg-surface-2">
-        <TokenAvatar symbol={t.symbol} imageUrl={t.imageUrl} chainId={t.chainId} size={44} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-bold">${t.symbol}</span>
-            <ChainBadge chainId={t.chainId} />
-          </div>
-          <div className="tabular mt-0.5 truncate font-mono text-xs text-muted">
-            Entry {formatUsd(t.entryMarketCap)} <span className="text-subtle">→</span> now {formatUsd(t.marketCap)}
-          </div>
-        </div>
-        <MultipleBadge multiple={t.multiple} />
-        <ArrowRight className="hidden size-4 text-subtle sm:block" />
-      </Link>
     </div>
   );
 }

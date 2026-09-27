@@ -10,7 +10,8 @@ import { ratio } from "@/lib/metrics";
 import type { TokenView } from "@/lib/types";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
-import { ChainBadge, TokenAvatar } from "./TokenAvatar";
+import { ChainTag } from "./Chain";
+import { TokenName } from "./TokenList";
 
 type Row = { call: MyCall; token: TokenView | undefined; multiple: number; marketCap: number | null };
 
@@ -43,31 +44,27 @@ export function MyCalls() {
   const best = withData.reduce<Row | null>((acc, r) => (!acc || r.multiple > acc.multiple ? r : acc), null);
 
   return (
-    <div className="pt-6 sm:pt-10">
-      <h1 className="font-pixel text-4xl sm:text-5xl">My calls</h1>
-      <p className="mt-2 text-sm text-muted">
+    <div className="pt-10 sm:pt-14">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My calls</h1>
+      <p className="mt-1.5 text-sm text-muted">
         Measured from the moment <em>you</em> pasted. <span className="text-subtle">Saved on this device.</span>
       </p>
 
       {!calls.length ? (
-        <div className="mt-6 rounded-xl border border-dashed border-border px-6 py-16 text-center">
-          <span className="mx-auto grid size-12 place-items-center rounded-lg border border-border bg-surface-2">
-            <ClipboardPaste className="size-5" />
-          </span>
-          <p className="mt-4 font-semibold">No calls yet</p>
-          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
-            Paste a CA and it lands here, tracked from your entry.
-          </p>
+        <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
+          <ClipboardPaste className="mx-auto size-5 text-subtle" />
+          <p className="mt-3 font-medium">No calls yet</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Paste a CA and it lands here, tracked from your entry.</p>
           <Link
             href="/#paste"
-            className="mt-5 inline-flex h-10 items-center rounded-lg bg-brand px-4 text-sm font-semibold text-brand-fg hover:brightness-110"
+            className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
           >
             Paste a CA
           </Link>
         </div>
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x lg:divide-border">
             <Tile label="Calls" value={calls.length} />
             <Tile
               label="In profit"
@@ -82,9 +79,9 @@ export function MyCalls() {
             />
           </div>
 
-          <div className="mt-6 flex items-center justify-between">
-            <h2 className="label text-muted">{calls.length} tokens</h2>
-            <div className="flex rounded-lg border border-border bg-surface p-1">
+          <div className="mt-8 flex items-center justify-between">
+            <h2 className="text-sm font-medium">{calls.length} tokens</h2>
+            <div className="flex h-8 items-center rounded-md border border-border p-0.5">
               {(Object.keys(SORTS) as (keyof typeof SORTS)[]).map((key) => (
                 <button
                   key={key}
@@ -92,7 +89,7 @@ export function MyCalls() {
                   onClick={() => setSort(key)}
                   aria-pressed={sort === key}
                   className={clsx(
-                    "h-7 rounded-md px-2.5 font-mono text-[11px] uppercase transition-colors",
+                    "h-full rounded px-2.5 text-xs capitalize transition-colors",
                     sort === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
                   )}
                 >
@@ -102,38 +99,26 @@ export function MyCalls() {
             </div>
           </div>
 
-          <ul className="mt-3 divide-y divide-border/70 rounded-xl border border-border bg-surface">
+          <ul className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
             {rows.map(({ call, token, multiple, marketCap }) => (
-              <li key={call.id} className="group flex items-center gap-3 px-3 py-3 sm:px-4">
-                <Link href={tokenHref(call)} className="flex min-w-0 flex-1 items-center gap-3">
-                  <TokenAvatar
-                    symbol={call.symbol}
-                    imageUrl={token?.imageUrl ?? call.imageUrl}
-                    chainId={call.chainId}
-                    size={36}
-                  />
+              <li key={call.id} className="group flex items-center gap-2 pr-2 transition-colors hover:bg-surface-2">
+                <Link href={tokenHref(call)} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate font-semibold">${call.symbol}</span>
-                      <ChainBadge chainId={call.chainId} />
-                    </div>
-                    <div className="tabular mt-0.5 truncate font-mono text-[11px] text-muted">
-                      You: {formatUsd(call.entryMarketCap)} → {formatUsd(marketCap)}
-                      <span className="text-subtle">
-                        {" · "}
-                        <TimeAgo at={call.pastedAt} />
-                      </span>
+                    <TokenName symbol={call.symbol} name={call.name} />
+                    <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
+                      <ChainTag chainId={call.chainId} /> · you {formatUsd(call.entryMarketCap)} → {formatUsd(marketCap)} ·{" "}
+                      <TimeAgo at={call.pastedAt} />
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-end gap-0.5">
                     {token ? (
                       <MultipleBadge multiple={multiple} />
                     ) : (
-                      <span className="text-xs text-subtle">{isLoading ? "…" : "no data"}</span>
+                      <span className="font-mono text-xs text-subtle">{isLoading ? "…" : "no data"}</span>
                     )}
                     {token && token.firstPastedAt < call.pastedAt - 60_000 && (
                       <span className="tabular hidden font-mono text-[11px] text-subtle sm:block">
-                        Rankr: {formatMultiple(token.multiple)}
+                        rankr {formatMultiple(token.multiple)}
                       </span>
                     )}
                   </div>
@@ -141,11 +126,11 @@ export function MyCalls() {
                 <button
                   type="button"
                   onClick={() => removeMyCall(call.id)}
-                  className="grid size-8 shrink-0 place-items-center rounded-md text-subtle transition hover:bg-down-soft hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                  className="grid size-8 shrink-0 place-items-center rounded-md text-subtle transition hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   aria-label={`Remove $${call.symbol} from my calls`}
                   title="Remove from my calls"
                 >
-                  <Trash2 className="size-4" />
+                  <Trash2 className="size-3.5" />
                 </button>
               </li>
             ))}
@@ -158,10 +143,10 @@ export function MyCalls() {
 
 function Tile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
-    <div className="bg-surface p-4 sm:p-5">
+    <div className="border-border px-4 py-5 sm:px-6">
       <div className="label text-subtle">{label}</div>
-      <div className="tabular mt-2 font-pixel text-3xl leading-none sm:text-4xl">{value}</div>
-      {hint && <div className="mt-2 truncate text-xs text-muted">{hint}</div>}
+      <div className="tabular mt-2 font-mono text-2xl font-medium tracking-tight sm:text-3xl">{value}</div>
+      {hint && <div className="mt-1 truncate text-xs text-muted">{hint}</div>}
     </div>
   );
 }

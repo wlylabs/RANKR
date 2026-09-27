@@ -2,42 +2,39 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Rankr "Terminal" palette: carbon neutrals, one signal-orange accent, green/red reserved for P&L. */
+/*
+ * Monochrome system: the UI is black / white / greys, color is reserved for P&L.
+ * Hairline borders do the structuring work instead of filled cards.
+ */
 :root {
-  --bg: #f4f4f1;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #ececE8;
-  --border: #dcdcd6;
+  --surface-2: #f4f4f5;
+  --border: #e6e6e6;
+  --border-strong: #d4d4d4;
   --fg: #0a0a0a;
-  --muted: #5d5d58;
-  --subtle: #8e8e88;
-  --brand: #ff5b14;
-  --brand-fg: #0a0a0a;
-  --brand-ink: #d9480a;
-  --up: #0a9950;
-  --up-soft: rgb(10 153 80 / 0.1);
-  --down: #e0294f;
-  --down-soft: rgb(224 41 79 / 0.1);
-  --dot: rgb(10 10 10 / 0.09);
+  --muted: #5e5e5e;
+  --subtle: #737373;
+  --up: #1a7f37;
+  --up-soft: rgb(26 127 55 / 0.08);
+  --down: #cf222e;
+  --down-soft: rgb(207 34 46 / 0.08);
   color-scheme: light;
 }
 
 .dark {
   --bg: #0a0a0a;
-  --surface: #111111;
-  --surface-2: #1a1a1a;
-  --border: #242424;
+  --surface: #0f0f0f;
+  --surface-2: #171717;
+  --border: #232323;
+  --border-strong: #333333;
   --fg: #ededed;
-  --muted: #8a8a8a;
-  --subtle: #5c5c5c;
-  --brand: #ff5b14;
-  --brand-fg: #0a0a0a;
-  --brand-ink: #ff7033;
-  --up: #3ddc84;
-  --up-soft: rgb(61 220 132 / 0.12);
-  --down: #ff4d6a;
-  --down-soft: rgb(255 77 106 / 0.12);
-  --dot: rgb(237 237 237 / 0.07);
+  --muted: #a1a1a1;
+  --subtle: #7a7a7a;
+  --up: #3fb950;
+  --up-soft: rgb(63 185 80 / 0.1);
+  --down: #f85149;
+  --down-soft: rgb(248 81 73 / 0.1);
   color-scheme: dark;
 }
 
@@ -46,19 +43,16 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
-  --color-brand: var(--brand);
-  --color-brand-fg: var(--brand-fg);
-  --color-brand-ink: var(--brand-ink);
   --color-up: var(--up);
   --color-up-soft: var(--up-soft);
   --color-down: var(--down);
   --color-down-soft: var(--down-soft);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-pixel: var(--font-rankr-pixel), var(--font-geist-mono), ui-monospace, monospace;
 }
 
 html {
@@ -73,27 +67,20 @@ body {
 }
 
 ::selection {
-  background: var(--brand);
-  color: var(--brand-fg);
+  background: var(--fg);
+  color: var(--bg);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
-/* Small uppercase mono label: the "terminal" voice for section headers and captions. */
+/* Small mono caption, used for section labels and metadata. */
 .label {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 11px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-/* Faint dot matrix behind the hero */
-.dot-grid {
-  background-image: radial-gradient(var(--dot) 1px, transparent 1.2px);
-  background-size: 16px 16px;
-  mask-image: radial-gradient(70% 70% at 50% 30%, black, transparent 80%);
 }
 
 .scrollbar-none {
@@ -103,25 +90,10 @@ body {
   display: none;
 }
 
-@keyframes blink {
-  0%,
-  49% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
-  }
-}
-
-.cursor-blink {
-  animation: blink 1.1s steps(1) infinite;
-}
-
-@keyframes pop-in {
+@keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -129,8 +101,8 @@ body {
   }
 }
 
-.animate-pop-in {
-  animation: pop-in 0.2s ease-out;
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

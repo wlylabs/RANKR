@@ -56,6 +56,8 @@ export type TokenView = TokenRecord & {
   marketCap: number | null;
   /** True when the latest refresh failed and the numbers are from an older check. */
   stale: boolean;
+  /** SHA-256 over the locked entry (chain, address, entry price, first paste time). */
+  seal: string;
 };
 
 export type TrackResponse = {

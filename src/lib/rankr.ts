@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { parseInput, tokenId } from "./address";
 import { UpstreamError, fetchSnapshots, findToken } from "./dexscreener";
-import { applySnapshot, newRecord, toView } from "./metrics";
+import { applySnapshot, newRecord, toView as statsOf } from "./metrics";
 import { store } from "./store";
 import type { TokenRecord, TokenResponse, TokenView, TrackResponse } from "./types";
 
@@ -16,6 +17,20 @@ export class RankrError extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * Tamper-evident fingerprint of the locked entry. Anyone can recompute it from the
+ * public fields, so a changed entry would no longer match its published seal.
+ */
+export function sealOf(r: Pick<TokenRecord, "chainId" | "address" | "entryPriceUsd" | "firstPastedAt">): string {
+  return createHash("sha256")
+    .update(`${r.chainId}:${r.address}:${r.entryPriceUsd}:${r.firstPastedAt}`)
+    .digest("hex");
+}
+
+function toView(r: TokenRecord, now = Date.now()): TokenView {
+  return { ...statsOf(r, now), seal: sealOf(r) };
 }
 
 async function lookup(address: string, chainHint: string | null) {

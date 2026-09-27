@@ -23,15 +23,16 @@ type RangeKey = keyof typeof RANGES;
 
 const PAGE = 50;
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
+      role="tab"
       onClick={onClick}
-      aria-pressed={active}
+      aria-selected={active}
       className={clsx(
-        "label h-8 shrink-0 rounded-md px-3 whitespace-nowrap transition-colors",
-        active ? "bg-brand text-brand-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
+        "relative h-10 shrink-0 text-sm whitespace-nowrap transition-colors",
+        active ? "text-fg after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-fg" : "text-muted hover:text-fg",
       )}
     >
       {children}
@@ -81,46 +82,46 @@ export function Leaderboard() {
   const loading = isLoading && !tokens.length;
 
   return (
-    <div className="pt-6 sm:pt-10">
+    <div className="pt-10 sm:pt-14">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-pixel text-4xl sm:text-5xl">Leaderboard</h1>
-          <p className="mt-2 text-sm text-muted">Every token ranked by how it moved since the first paste on Rankr.</p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
+          <p className="mt-1.5 text-sm text-muted">Every token ranked by how it moved since its first paste on Rankr.</p>
         </div>
         <button
           type="button"
           onClick={() => mutate()}
-          className="label inline-flex items-center gap-1.5 text-subtle hover:text-fg"
+          className="inline-flex items-center gap-1.5 font-mono text-[11px] text-subtle hover:text-fg"
           title="Refresh now"
         >
-          <RefreshCw className={clsx("size-3.5", isLoading && "animate-spin")} />
-          {updatedAt ? `Updated ${Math.max(0, Math.round((now - updatedAt) / 1000))}s ago` : "Loading"}
+          <RefreshCw className={clsx("size-3", isLoading && "animate-spin")} />
+          {updatedAt ? `updated ${Math.max(0, Math.round((now - updatedAt) / 1000))}s ago` : "loading"}
         </button>
       </div>
 
-      <div className="scrollbar-none -mx-4 mt-6 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="tablist">
+      <div className="scrollbar-none -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0" role="tablist">
         {(Object.keys(SORTS) as SortKey[]).map((key) => (
-          <Chip key={key} active={sort === key} onClick={() => setParam("sort", key, "top")}>
+          <Tab key={key} active={sort === key} onClick={() => setParam("sort", key, "top")}>
             {SORTS[key].label}
-          </Chip>
+          </Tab>
         ))}
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label className="flex h-10 w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand sm:max-w-xs">
-          <Search className="size-4 text-subtle" />
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="flex h-9 w-full items-center gap-2 rounded-md border border-border px-3 transition-colors focus-within:border-border-strong sm:max-w-xs">
+          <Search className="size-3.5 text-subtle" />
           <input
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setLimit(PAGE);
             }}
-            placeholder="Search $ticker, name or CA"
-            className="min-w-0 flex-1 bg-transparent font-mono text-[13px] caret-brand outline-none placeholder:text-subtle"
+            placeholder="Search ticker, name or address"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-subtle"
           />
         </label>
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 items-center rounded-lg border border-border bg-surface p-1">
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="flex h-9 items-center rounded-md border border-border p-0.5">
             {(Object.keys(RANGES) as RangeKey[]).map((key) => (
               <button
                 key={key}
@@ -128,7 +129,7 @@ export function Leaderboard() {
                 onClick={() => setParam("range", key, "all")}
                 aria-pressed={range === key}
                 className={clsx(
-                  "h-full rounded-md px-2.5 font-mono text-[11px] uppercase transition-colors",
+                  "h-full rounded px-2.5 font-mono text-[11px] uppercase transition-colors",
                   range === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
                 )}
               >
@@ -140,7 +141,7 @@ export function Leaderboard() {
             value={chain}
             onChange={(e) => setParam("chain", e.target.value, "all")}
             aria-label="Chain"
-            className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 font-mono text-xs uppercase outline-none sm:flex-none"
+            className="h-9 min-w-0 flex-1 rounded-md border border-border bg-bg px-2.5 text-sm outline-none sm:flex-none"
           >
             <option value="all">All chains</option>
             {chains.map((c) => (
@@ -154,12 +155,12 @@ export function Leaderboard() {
 
       <div className="mt-4">
         {loading ? (
-          <div className="rounded-xl border border-border bg-surface p-1.5">
+          <div className="rounded-lg border border-border">
             <ListSkeleton rows={8} />
           </div>
         ) : !rows.length ? (
-          <div className="rounded-xl border border-dashed border-border px-6 py-16 text-center">
-            <p className="font-semibold">No tokens match</p>
+          <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
+            <p className="font-medium">No tokens match</p>
             <p className="mt-1 text-sm text-muted">
               {tokens.length ? "Try another range, chain or search." : "Nobody has pasted a CA yet. Be the first."}
             </p>
@@ -169,7 +170,7 @@ export function Leaderboard() {
             <div className="hidden md:block">
               <TokenTable tokens={visible} />
             </div>
-            <div className="rounded-xl border border-border bg-surface p-1.5 md:hidden">
+            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border md:hidden">
               {visible.map((t, i) => (
                 <TokenRow key={t.id} token={t} rank={i + 1} meta={sort === "peak" ? "peak" : "pasted"} />
               ))}
@@ -178,7 +179,7 @@ export function Leaderboard() {
               <button
                 type="button"
                 onClick={() => setLimit((l) => l + PAGE)}
-                className="label mt-4 h-11 w-full rounded-lg border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                className="mt-4 h-10 w-full rounded-md border border-border text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 Show more ({rows.length - limit} left)
               </button>

@@ -10,12 +10,12 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(next)}
-      className="grid size-9 place-items-center rounded-lg border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      className="grid size-8 place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-fg"
       aria-label={`Switch to ${next} theme`}
       title={`Switch to ${next} theme`}
     >
-      <Sun className="hidden size-[18px] dark:block" />
-      <Moon className="size-[18px] dark:hidden" />
+      <Sun className="hidden size-4 dark:block" />
+      <Moon className="size-4 dark:hidden" />
     </button>
   );
 }

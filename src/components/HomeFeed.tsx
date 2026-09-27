@@ -9,46 +9,47 @@ import { useTokens } from "@/lib/hooks";
 import type { TokenView } from "@/lib/types";
 import { ListSkeleton, TokenRow } from "./TokenList";
 
-/** "● LIVE · 128 tokens tracked" pill above the hero headline. */
+/** "● 128 tokens tracked" above the hero headline. */
 export function LiveStatus() {
   const { tokens, isLoading } = useTokens();
   return (
-    <span className="label inline-flex items-center gap-2 rounded-md border border-border bg-surface px-2.5 py-1 text-muted">
-      <span className="size-1.5 rounded-full bg-up" />
-      Live
-      <span className="text-subtle">/</span>
+    <span className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted">
+      <span className="relative flex size-1.5">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-50" />
+        <span className="relative inline-flex size-1.5 rounded-full bg-up" />
+      </span>
       <span className="tabular">{isLoading && !tokens.length ? "…" : tokens.length.toLocaleString("en-US")}</span>
-      tokens tracked
+      tokens tracked live
     </span>
   );
 }
 
 function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
-    <div className="bg-surface p-4 sm:p-5">
+    <div className="border-border px-4 py-5 sm:px-6">
       <div className="label text-subtle">{label}</div>
-      <div className="tabular mt-2 truncate font-pixel text-3xl leading-none sm:text-4xl">{value}</div>
-      {hint && <div className="mt-2 truncate text-xs text-muted">{hint}</div>}
+      <div className="tabular mt-2 truncate font-mono text-2xl font-medium tracking-tight sm:text-3xl">{value}</div>
+      {hint && <div className="mt-1 truncate text-xs text-muted">{hint}</div>}
     </div>
   );
 }
 
 function Panel({ title, href, children }: { title: string; href: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="label text-muted">{title}</h2>
-        <Link href={href} className="label inline-flex items-center gap-1 text-subtle hover:text-fg">
-          See all <ArrowRight className="size-3" />
+    <section className="min-w-0 overflow-hidden rounded-lg border border-border">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <h2 className="text-sm font-medium">{title}</h2>
+        <Link href={href} className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">
+          View all <ArrowRight className="size-3" />
         </Link>
       </div>
-      <div className="p-1.5">{children}</div>
+      <div className="divide-y divide-border">{children}</div>
     </section>
   );
 }
 
 function Empty() {
-  return <div className="px-3 py-10 text-center text-sm text-muted">Nothing here yet. Paste the first CA above.</div>;
+  return <div className="px-4 py-12 text-center text-sm text-muted">Nothing here yet. Paste the first CA above.</div>;
 }
 
 export function HomeFeed() {
@@ -62,14 +63,14 @@ export function HomeFeed() {
   const loading = isLoading && !tokens.length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {error && !tokens.length && (
-        <p className="flex items-center gap-2 rounded-lg bg-down-soft px-3 py-2.5 text-sm text-down">
+        <p className="flex items-center gap-2 text-sm text-down">
           <TriangleAlert className="size-4" /> Couldn&apos;t load the board. Retrying…
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
+      <div className="grid grid-cols-2 divide-border rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x">
         <Stat label="Tracked" value={loading ? "…" : tokens.length.toLocaleString("en-US")} hint="tokens since first paste" />
         <Stat
           label="Hit 2x+"
@@ -96,7 +97,7 @@ export function HomeFeed() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Top runners" href="/leaderboard">
           {loading ? <ListSkeleton /> : top.length ? top.map((t, i) => <TokenRow key={t.id} token={t} rank={i + 1} meta="peak" />) : <Empty />}
         </Panel>

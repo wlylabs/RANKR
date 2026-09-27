@@ -5,7 +5,7 @@ import { House, Plus, Trophy, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Logo } from "./Logo";
+import { Logo, RANKR_SHA256 } from "./Logo";
 import { PasteBox } from "./PasteBox";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -37,19 +37,20 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border/80 bg-bg/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 sm:h-16 sm:px-6">
+      <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
           <Link href="/" aria-label="Rankr home" className="shrink-0">
-            <Logo size={26} />
+            <Logo size={24} />
           </Link>
-          <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Main">
+          <nav className="hidden items-center gap-5 md:flex" aria-label="Main">
             {NAV.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
+                aria-current={isActive(pathname, href) ? "page" : undefined}
                 className={clsx(
-                  "label rounded-md px-3 py-2 transition-colors",
-                  isActive(pathname, href) ? "bg-surface-2 text-fg" : "text-muted hover:text-fg",
+                  "text-sm transition-colors",
+                  isActive(pathname, href) ? "text-fg" : "text-muted hover:text-fg",
                 )}
               >
                 {label}
@@ -61,10 +62,10 @@ export function Header() {
             <button
               type="button"
               onClick={openDialog}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-brand-fg transition hover:brightness-110 active:translate-y-px"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-fg px-3 text-sm font-medium text-bg transition-opacity hover:opacity-85"
             >
-              <Plus className="size-4" strokeWidth={2.75} />
-              Track<span className="hidden sm:inline"> token</span>
+              <Plus className="size-3.5" strokeWidth={2.5} />
+              Track
             </button>
           </div>
         </div>
@@ -74,22 +75,22 @@ export function Header() {
         ref={dialogRef}
         onClose={() => setOpen(false)}
         onClick={(e) => e.target === e.currentTarget && closeDialog()}
-        className="m-0 mt-auto w-full max-w-none rounded-t-2xl border border-border bg-bg p-0 text-fg backdrop:bg-black/70 sm:m-auto sm:max-w-xl sm:rounded-xl"
+        className="m-0 mt-auto w-full max-w-none rounded-t-xl border border-border bg-bg p-0 text-fg backdrop:bg-black/50 sm:m-auto sm:max-w-lg sm:rounded-xl"
         aria-label="Track a token"
       >
-        <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <h2 className="font-pixel text-2xl">Track a token</h2>
-              <p className="mt-1 text-sm text-muted">Paste a CA. Rankr locks the market cap right now.</p>
+              <h2 className="font-semibold tracking-tight">Track a token</h2>
+              <p className="mt-0.5 text-sm text-muted">The entry is sealed the moment you paste.</p>
             </div>
             <button
               type="button"
               onClick={closeDialog}
-              className="grid size-9 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg"
+              className="grid size-8 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
               aria-label="Close"
             >
-              <X className="size-5" />
+              <X className="size-4" />
             </button>
           </div>
           {open && <PasteBox autoFocus size="md" />}
@@ -104,9 +105,9 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
     >
-      <div className="mx-auto grid h-16 max-w-md grid-cols-3">
+      <div className="mx-auto grid h-14 max-w-md grid-cols-3">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
@@ -114,15 +115,12 @@ export function BottomNav() {
               key={href}
               href={href}
               className={clsx(
-                "relative flex flex-col items-center justify-center gap-1 font-mono text-[10px] tracking-wider uppercase transition-colors",
+                "flex flex-col items-center justify-center gap-1 text-[11px] transition-colors",
                 active ? "text-fg" : "text-subtle",
               )}
               aria-current={active ? "page" : undefined}
             >
-              <span className="relative grid h-6 place-items-center">
-                <Icon className="size-5" strokeWidth={active ? 2.2 : 1.8} />
-              </span>
-              <span className={clsx("absolute top-0 h-0.5 w-8 bg-brand transition-opacity", active ? "opacity-100" : "opacity-0")} />
+              <Icon className="size-[18px]" strokeWidth={active ? 2.2 : 1.7} />
               {label}
             </Link>
           );
@@ -134,18 +132,20 @@ export function BottomNav() {
 
 export function Footer() {
   return (
-    <footer className="mt-16 border-t border-border pb-24 md:pb-0">
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex items-center gap-3">
-          <Logo size={20} className="text-fg" />
-          <span className="label text-subtle">Paste. Track. Rank.</span>
+    <footer className="mt-20 border-t border-border pb-20 md:pb-0">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+        <div className="space-y-2">
+          <Logo size={20} />
+          <p className="max-w-full truncate font-mono text-[11px] text-subtle" title={`sha256("rankr") = ${RANKR_SHA256}`}>
+            sha256(&quot;rankr&quot;) = {RANKR_SHA256.slice(0, 16)}…{RANKR_SHA256.slice(-8)}
+          </p>
         </div>
-        <p className="font-mono text-[11px] text-subtle">
+        <p className="text-xs text-subtle sm:text-right">
           Market data from{" "}
           <a href="https://dexscreener.com" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-fg hover:underline">
             DexScreener
           </a>
-          . Not financial advice. Memecoins can go to zero.
+          .<br className="hidden sm:block" /> Not financial advice. Memecoins can go to zero.
         </p>
       </div>
     </footer>

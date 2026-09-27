@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { chainMeta } from "@/lib/chains";
 import { formatChange, formatDate, formatMultiple, formatUsd } from "@/lib/format";
-import { OG, OG_SIZE, OgLogo, ogBackground, ogFonts } from "@/lib/og";
+import { OG, OG_SIZE, OgLogo, ogFonts } from "@/lib/og";
 import { getToken } from "@/lib/rankr";
 
 export const alt = "Token performance on Rankr";
@@ -17,50 +17,42 @@ export default async function Image({ params }: { params: Promise<{ chain: strin
     (
       <div
         style={{
-          ...ogBackground,
           width: "100%",
           height: "100%",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           padding: 72,
+          background: OG.bg,
           color: OG.fg,
           fontFamily: "Geist",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <OgLogo size={52} />
-          <div
-            style={{
-              fontFamily: "Geist Mono",
-              fontSize: 24,
-              letterSpacing: 2,
-              color: OG.muted,
-              border: `2px solid ${OG.border}`,
-              borderRadius: 8,
-              padding: "8px 16px",
-            }}
-          >
-            {chainMeta(chain).name.toUpperCase()}
-          </div>
+          <OgLogo size={44} />
+          <div style={{ fontFamily: "Geist Mono", fontSize: 24, color: OG.subtle }}>{chainMeta(chain).name.toLowerCase()}</div>
         </div>
         {token ? (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontFamily: "Pixel", fontSize: 64 }}>{`$${token.symbol}`}</div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 36, marginTop: 8 }}>
-              <div style={{ fontFamily: "Pixel", fontSize: 210, lineHeight: 0.95, color }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 20 }}>
+              <div style={{ fontSize: 60, fontWeight: 600, letterSpacing: "-0.03em" }}>{`$${token.symbol}`}</div>
+              <div style={{ fontSize: 34, color: OG.muted }}>{token.name}</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 32, marginTop: 6 }}>
+              <div style={{ fontFamily: "Geist Mono", fontSize: 190, letterSpacing: "-0.07em", lineHeight: 1, color }}>
                 {formatMultiple(token.multiple)}
               </div>
-              <div style={{ fontFamily: "Geist Mono", fontSize: 44, color, marginBottom: 18 }}>
-                {formatChange(token.multiple)}
-              </div>
+              <div style={{ fontFamily: "Geist Mono", fontSize: 40, color, marginBottom: 22 }}>{formatChange(token.multiple)}</div>
             </div>
-            <div style={{ marginTop: 28, fontFamily: "Geist Mono", fontSize: 26, color: OG.muted }}>
-              {`ENTRY ${formatUsd(token.entryMarketCap)} → NOW ${formatUsd(token.marketCap)} · ${formatDate(token.firstPastedAt).toUpperCase()}`}
+            <div style={{ marginTop: 22, fontFamily: "Geist Mono", fontSize: 24, color: OG.muted }}>
+              {`entry ${formatUsd(token.entryMarketCap)} → now ${formatUsd(token.marketCap)} · ${formatDate(token.firstPastedAt).toLowerCase()}`}
+            </div>
+            <div style={{ marginTop: 10, fontFamily: "Geist Mono", fontSize: 20, color: OG.subtle }}>
+              {`seal sha256 ${token.seal.slice(0, 32)}…`}
             </div>
           </div>
         ) : (
-          <div style={{ fontFamily: "Pixel", fontSize: 84 }}>Track this token on Rankr</div>
+          <div style={{ fontFamily: "Geist Mono", fontSize: 72, letterSpacing: "-0.05em" }}>Track this token on Rankr</div>
         )}
       </div>
     ),

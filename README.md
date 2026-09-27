@@ -15,18 +15,23 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   Peak and lowest point since the paste are recorded too.
 - **Leaderboard**: top gainers, peak x, biggest dumps, newest, most pasted. Filter by 24h / 7d / 30d, chain, and search.
 - **My calls**: every token you pasted, measured from *your* paste (saved in your browser).
-- **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), stats, DexScreener chart,
-  share to X / native share, and a generated social card per token.
+- **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
+  DexScreener chart, share to X / native share, and a generated social card per token.
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme, installable as a PWA.
 
 ## Design
 
-"Terminal" identity: carbon neutrals, one signal-orange accent (`#FF5B14`), green/red kept strictly for P&L.
+Minimal, monochrome, cryptography-flavoured. References: Vercel's Geist design system (monochrome, Swiss,
+hairline borders), "decrypted text" reveal effects, and hash visualisations such as identicons / SSH randomart.
 
-- **Logo**: a bold pixel "r" with a single pixel breaking out above it (the pump). Wordmark set in
-  Geist Pixel Square and outlined to SVG paths (`src/components/Logo.tsx`), so it never depends on font loading.
-- **Type**: Geist Pixel for headlines and big numbers, Geist Mono for data, Geist Sans for body text.
-- Favicon, PWA icons, apple-touch icon and social cards all use the same mark.
+- **Logo**: the letter "r" on a 5x5 matrix. The other 18 cells come from `SHA-256("rankr")`
+  (`fa7f36c0…4e3a`): cell *i* gets a dot when bit pair *i* of the digest is `11`. The mark is literally the
+  name's hash, so no other name produces it. `src/lib/logo.test.ts` recomputes the digest and checks the favicon.
+- **Entry seal**: every token gets `sha256(chain:address:entryPrice:firstPastedAt)`, shown on the token page and
+  after a paste. Anyone can recompute it, so an edited entry would no longer match.
+- **UI**: black / white / greys, color only for P&L (green up, red down). No token icons: tokens are shown as
+  ticker + name. Geist Sans for text, Geist Mono for numbers, addresses and hashes. The hero headline and the
+  big multiple "decrypt" out of random hex on first load (skipped with reduced motion).
 - Colors live as CSS variables in `src/app/globals.css` (dark and light).
 
 ## Stack
@@ -73,7 +78,6 @@ src/app/                     pages, API routes, icons, social cards
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
 src/lib/                     address parsing, DexScreener client, store, metrics, formatting
-src/assets/fonts/            Geist Pixel TTF for social cards (OFL)
 ```
 
 Not financial advice. Memecoins can and do go to zero.
