@@ -5,6 +5,7 @@ import { House, Plus, Trophy, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { AccountButton } from "./Account";
 import { Logo, RANKR_SHA256 } from "./Logo";
 import { PasteBox } from "./PasteBox";
 import { ThemeToggle } from "./ThemeToggle";
@@ -59,6 +60,7 @@ export function Header() {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            <AccountButton />
             <button
               type="button"
               onClick={openDialog}

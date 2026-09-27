@@ -1,3 +1,4 @@
+import { SupabaseRest } from "../supabase-rest";
 import type { MarketSnapshot, TokenRecord } from "../types";
 import type { MarketUpdate, RecordPage, Store, StoreStats, TokenQuery } from "./types";
 
@@ -78,46 +79,18 @@ export function fromRow(row: TokenRow): TokenRecord {
  * supabase/migrations, which keep the entry sealed and make pastes atomic.
  */
 export class SupabaseStore implements Store {
-  private base: string;
+  private rest: SupabaseRest;
 
-  constructor(
-    url: string,
-    private key: string,
-    private fetchImpl: typeof fetch = fetch,
-  ) {
-    this.base = `${url.replace(/\/+$/, "")}/rest/v1`;
+  constructor(url: string, key: string, fetchImpl: typeof fetch = fetch) {
+    this.rest = new SupabaseRest(url, key, fetchImpl);
   }
 
-  private headers(): Record<string, string> {
-    const h: Record<string, string> = { apikey: this.key, "content-type": "application/json", accept: "application/json" };
-    // New secret keys (sb_secret_...) are not JWTs and must only travel in `apikey`.
-    // Legacy service_role keys are JWTs and also go in Authorization.
-    if (this.key.startsWith("eyJ")) h.authorization = `Bearer ${this.key}`;
-    return h;
-  }
-
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await this.fetchImpl(`${this.base}${path}`, {
-      ...init,
-      headers: this.headers(),
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      let message = text;
-      try {
-        message = (JSON.parse(text) as { message?: string }).message ?? text;
-      } catch {
-        /* not JSON */
-      }
-      throw new Error(`Supabase ${res.status}: ${message}`);
-    }
-    return (text ? JSON.parse(text) : null) as T;
+  private request<T>(path: string) {
+    return this.rest.select<T>(path.replace(/^\//, ""));
   }
 
   private rpc<T>(fn: string, args: Record<string, unknown>) {
-    return this.request<T>(`/rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });
+    return this.rest.rpc<T>(fn, args);
   }
 
   async get(id: string) {

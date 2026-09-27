@@ -97,6 +97,13 @@ export async function queryTokens(q: TokenQuery): Promise<{ total: number; token
   return { total: page.total, tokens: fresh.sort(compareRecords(q.sort)).map((r) => toView(r, now)) };
 }
 
+/** Views for arbitrary records, refreshed first if their data is old. */
+export async function viewsOf(records: TokenRecord[]): Promise<TokenView[]> {
+  const fresh = await refresh(records);
+  const now = Date.now();
+  return fresh.map((r) => toView(r, now));
+}
+
 export async function getStats() {
   const s = await store.stats();
   return { total: s.total, doubled: s.doubled, inRed: s.inRed, best: s.best ? toView(s.best) : null, chains: s.chains };

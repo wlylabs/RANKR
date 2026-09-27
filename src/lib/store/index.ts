@@ -1,4 +1,5 @@
 import path from "node:path";
+import { supabaseConfig } from "../supabase-rest";
 import { FileStore } from "./file";
 import { SupabaseStore } from "./supabase";
 import type { Store } from "./types";
@@ -6,18 +7,11 @@ import type { Store } from "./types";
 export type { MarketUpdate, RecordPage, Store, StoreStats, TokenQuery } from "./types";
 
 export function storeKind(): "supabase" | "file" {
-  return process.env.RANKR_MOCK !== "1" && supabaseConfig() ? "supabase" : "file";
-}
-
-function supabaseConfig() {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return url && key ? { url, key } : null;
+  return supabaseConfig() ? "supabase" : "file";
 }
 
 function createStore(): Store {
-  // Mock market data never goes into a real database.
-  const supabase = process.env.RANKR_MOCK === "1" ? null : supabaseConfig();
+  const supabase = supabaseConfig(); // null in mock mode: demo data never goes into a real database
   if (supabase) return new SupabaseStore(supabase.url, supabase.key);
 
   const dir = process.env.RANKR_DATA_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), "data");

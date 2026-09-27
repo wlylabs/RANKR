@@ -16,3 +16,13 @@ export function parseRange(value: string | null | undefined): RangeKey {
 
 /** Max rows per request, and max ids in one `ids` lookup. */
 export const MAX_LIMIT = 100;
+
+export const CALLER_SORTS = ["hits", "avg", "best", "calls"] as const;
+export type CallerSort = (typeof CALLER_SORTS)[number];
+
+export function parseCallerSort(value: string | null | undefined): CallerSort {
+  return CALLER_SORTS.includes(value as CallerSort) ? (value as CallerSort) : "hits";
+}
+
+/** Average x is only meaningful with a few calls behind it. */
+export const MIN_CALLS_FOR_AVG = 3;

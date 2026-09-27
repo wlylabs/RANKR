@@ -3,8 +3,8 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
-import type { RangeKey, SortKey } from "./params";
-import type { StatsResponse, TokenView, TokensResponse } from "./types";
+import type { CallerSort, RangeKey, SortKey } from "./params";
+import type { CallersResponse, StatsResponse, TokenView, TokensResponse } from "./types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -73,6 +73,25 @@ export function useTokenPages(params: Omit<TokensParams, "limit" | "offset" | "i
   };
 }
 
+/** Caller leaderboard in pages of `pageSize`. */
+export function useCallerPages(sort: CallerSort, pageSize = 50) {
+  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite<CallersResponse>(
+    (i, prev: CallersResponse | null) =>
+      prev && prev.callers.length < pageSize ? null : `/api/callers?sort=${sort}&limit=${pageSize}&offset=${i * pageSize}`,
+    fetcher,
+    { ...LIVE, revalidateFirstPage: false },
+  );
+  return {
+    callers: data?.flatMap((p) => p.callers) ?? [],
+    total: data?.[0]?.total ?? 0,
+    enabled: data?.[0]?.enabled ?? true,
+    error,
+    isLoading,
+    isValidating,
+    loadMore: () => setSize(size + 1),
+  };
+}
+
 export function useStats() {
   const { data, error, isLoading } = useSWR<StatsResponse>("/api/stats", fetcher, LIVE);
   return { stats: data ?? null, error, isLoading };
@@ -81,7 +100,9 @@ export function useStats() {
 /** Revalidates every board and stat on the page, e.g. after a paste. */
 export function refreshBoards() {
   // `includes` also matches the "$inf$..." keys of paged boards.
-  return mutate((key) => typeof key === "string" && (key.includes("/api/tokens") || key.includes("/api/stats")));
+  return mutate(
+    (key) => typeof key === "string" && ["/api/tokens", "/api/stats", "/api/me/calls", "/api/callers"].some((p) => key.includes(p)),
+  );
 }
 
 /** Re-renders every `ms` so relative times stay current. */

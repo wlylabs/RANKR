@@ -63,7 +63,38 @@ export type TokenView = TokenRecord & {
 export type TrackResponse = {
   status: "created" | "existing";
   token: TokenView;
+  /** Present when the paste came from a signed-in wallet: that user's call on the token. */
+  call?: { created: boolean; entryPriceUsd: number; calledAt: number } | null;
 };
+
+/** A signed-in user's call: their own entry on a token. */
+export type CallView = {
+  tokenId: string;
+  entryPriceUsd: number;
+  entryMarketCap: number | null;
+  calledAt: number;
+  /** Token price now / this caller's entry. */
+  multiple: number;
+  token: TokenView;
+};
+
+export type MyCallsResponse = { calls: CallView[] };
+
+export type CallerView = {
+  userId: string;
+  chain: string;
+  wallet: string;
+  calls: number;
+  /** Calls at 2x or more right now. */
+  hits: number;
+  /** Calls above entry right now. */
+  wins: number;
+  avgMultiple: number;
+  bestMultiple: number;
+  bestToken: { id: string; address: string; symbol: string; name: string; chainId: string } | null;
+};
+
+export type CallersResponse = { enabled: boolean; total: number; callers: CallerView[]; updatedAt: number };
 
 export type TokensResponse = {
   tokens: TokenView[];

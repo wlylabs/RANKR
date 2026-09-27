@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AuthError, accountFromRequest, recordCall } from "@/lib/accounts";
 import { RankrError, trackToken } from "@/lib/rankr";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,18 @@ export async function POST(req: Request) {
 
   try {
     const chainId = typeof chain === "string" && /^[a-z0-9-]{2,32}$/.test(chain) ? chain : undefined;
+    // A signed-in paste is also that wallet's call. An expired session still tracks the token.
+    const account = await accountFromRequest(req).catch((err) => {
+      if (err instanceof AuthError) return null;
+      throw err;
+    });
     const result = await trackToken(input, chainId);
+    if (account) {
+      result.call = await recordCall(account, result.token).catch((err) => {
+        console.error("[rankr] recording call failed", err);
+        return null;
+      });
+    }
     return NextResponse.json(result, { status: result.status === "created" ? 201 : 200 });
   } catch (err) {
     if (err instanceof RankrError) return NextResponse.json({ error: err.message }, { status: err.status });

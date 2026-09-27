@@ -14,7 +14,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Live multiple**: current price / entry price, shown as `3.42x` for gains and `-37.2%` for losses.
   Peak and lowest point since the paste are recorded too.
 - **Leaderboard**: top gainers, peak x, biggest dumps, newest, most pasted. Filter by 24h / 7d / 30d, chain, and search.
-- **My calls**: every token you pasted, measured from *your* paste (saved in your browser).
+- **My calls**: every token you pasted, measured from *your* paste. Saved in the browser, or synced to your
+  wallet when connected.
+- **Caller leaderboard**: connected wallets ranked by their calls (2x hits, average x, best call).
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme, installable as a PWA.
@@ -57,13 +59,13 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
 - **"no backdating" is enforced by the database**: a trigger rejects any change to a token's entry;
 - a paste is one atomic SQL call, so simultaneous pastes never lose a count;
 - browsers can only read (RLS); every write goes through the server with the secret key;
-- later: wallet login (Sign in with Web3) to sync "My calls", Realtime for a live board.
+- wallet accounts (Supabase Auth, Sign in with Web3) sync "My calls" and power the caller leaderboard.
 
 ### Setup
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, paste `supabase/migrations/20260927000000_rankr_tokens.sql`, run it.
-   (With the Supabase CLI: `supabase link` then `supabase db push`.)
+2. Open **SQL Editor** and run the files in `supabase/migrations/` in order
+   (`…_rankr_tokens.sql`, then `…_rankr_callers.sql`). With the Supabase CLI: `supabase link`, `supabase db push`.
 3. Set the env vars on your host (Vercel etc.):
    ```
    SUPABASE_URL=https://YOUR-PROJECT.supabase.co
@@ -73,6 +75,30 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
    ```
 4. Optional, for peaks/lows while nobody is browsing: run `supabase/cron.sql` (pg_cron + pg_net call
    `/api/cron/refresh` every minute).
+
+### Wallet accounts (optional)
+
+Connect a Solana (Phantom, Solflare, Backpack) or Ethereum (MetaMask, Rabby…) wallet to sync "My calls" across
+devices and appear on the **caller leaderboard** (Leaderboard → Callers).
+
+1. Supabase dashboard → **Authentication → Sign In / Providers → Web3 Wallet**: enable Solana and/or Ethereum.
+2. **Authentication → URL Configuration**: set the Site URL to your domain and add `http://localhost:3000` to the
+   redirect URLs for local dev (the signed message names the page's domain).
+3. Add the public keys to the app env:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # Settings -> API Keys
+   ```
+
+How calls work:
+
+- Signing in only signs a message. No transaction, no fees.
+- A **call** is the price at the moment *you* paste a token while connected, taken from the server's market
+  data. The first call per token counts; calls can be deleted but never edited (enforced by the database).
+- Calls saved on a device before connecting stay on that device (marked "device") and are **not** uploaded,
+  because their entry came from the browser and could be faked. Only server-recorded calls count on the board.
+- The caller board ranks wallets by 2x hits, average x (3+ calls), best call and number of calls, each call
+  measured from the caller's own entry.
 
 Without `SUPABASE_URL` / `SUPABASE_SECRET_KEY` Rankr uses `./data/rankr.json`. `RANKR_MOCK=1` always uses the
 file store, so demo data never reaches a real database.
@@ -90,6 +116,8 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/tokens/:chain/:address` | one token (or a preview if untracked) |
 | `GET /api/stats` | totals for the home page |
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
+| `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
+| `GET /api/me`, `GET/DELETE /api/me/calls` | the signed-in wallet and its calls (`Authorization: Bearer <access token>`) |
 
 ## How the numbers work
 
@@ -111,10 +139,12 @@ src/app/                     pages, API routes, icons, social cards
   api/tokens                 GET a leaderboard page (sort, filter, paging)
   api/stats                  GET home page totals
   api/cron/refresh           background price refresh
+  api/callers, api/me/*      caller board, signed-in wallet and its calls
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
+src/lib/accounts.ts          wallet sessions (Supabase Auth) and calls, server side
 supabase/                    migration, smoke test, optional cron job
 ```
 

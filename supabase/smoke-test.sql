@@ -1,5 +1,5 @@
 -- Smoke test for the Rankr migration. Runs in a transaction and rolls back, so it leaves nothing behind.
--- Run it against a local / throwaway database after applying the migrations:
+-- Run it against a local / throwaway database after applying all migrations:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/smoke-test.sql
 \set QUIET on
 begin;
@@ -116,7 +116,62 @@ begin
     assert has_function_privilege('anon', 'public.rankr_query(text,text,timestamptz,text,text[],integer,integer)', 'execute');
   end if;
 
-  raise notice 'rankr smoke test: all checks passed';
+  raise notice 'rankr smoke test: tokens ok';
+end $$;
+
+-- Callers (needs the 20260927010000_rankr_callers migration).
+do $$
+declare
+  a uuid := '00000000-0000-4000-8000-00000000000a';
+  b uuid := '00000000-0000-4000-8000-00000000000b';
+  r jsonb;
+  failed boolean;
+begin
+  insert into auth.users (id) values (a), (b);
+  perform public.rankr_upsert_profile(a, 'solana', 'WalletA111');
+  perform public.rankr_upsert_profile(b, 'ethereum', '0xwalletb');
+
+  -- AAA's price is now 0.000006, BRAVO 11, CHAR 0.2 (from the block above).
+  r := public.rankr_record_call(a, 'base:0xbbb', 1, 1000000, now());
+  assert (r->>'created')::boolean;
+  r := public.rankr_record_call(a, 'base:0xbbb', 5, 5000000, now());
+  assert not (r->>'created')::boolean and (r->'call'->>'entry_price_usd')::float8 = 1, 'first call wins';
+  perform public.rankr_record_call(a, 'solana:CCC', 0.1, 100, now());      -- 2x
+  perform public.rankr_record_call(b, 'solana:CCC', 2, 2000, now());       -- -90%
+  perform public.rankr_record_call(b, 'solana:AAA', 0.000012, 12000, now()); -- -50%
+
+  failed := false;
+  begin
+    update public.calls set entry_price_usd = 0.0001 where user_id = b;
+  exception when check_violation then failed := true;
+  end;
+  assert failed, 'call entries are sealed';
+
+  r := public.rankr_my_calls(a);
+  assert jsonb_array_length(r) = 2 and r->0->'token'->>'id' is not null;
+
+  r := public.rankr_callers('avg');
+  assert (r->>'total')::int = 2;
+  assert r->'callers'->0->>'wallet' = 'WalletA111', 'A leads on avg: ' || r::text;
+  assert (r->'callers'->0->>'calls')::int = 2 and (r->'callers'->0->>'hits')::int = 2;
+  assert r->'callers'->0->'best_token'->>'symbol' = 'BRAVO';
+  assert (r->'callers'->0->>'best_multiple')::float8 = 11;
+  assert (r->'callers'->1->>'wins')::int = 0;
+  r := public.rankr_callers('calls', p_min_calls => 3);
+  assert (r->>'total')::int = 0, 'min calls filter';
+  r := public.rankr_callers('avg', p_limit => 1, p_offset => 1);
+  assert r->'callers'->0->>'wallet' = '0xwalletb';
+
+  assert public.rankr_delete_call(b, 'solana:AAA');
+  assert not public.rankr_delete_call(b, 'solana:AAA');
+
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
+    assert has_function_privilege('anon', 'public.rankr_callers(text,integer,integer,integer)', 'execute');
+  end if;
+
+  raise notice 'rankr smoke test: callers ok';
 end $$;
 
 rollback;
