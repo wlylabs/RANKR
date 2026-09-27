@@ -6,9 +6,9 @@ export async function requireAccount(req: Request): Promise<Account | NextRespon
   if (!accountsEnabled()) return NextResponse.json({ error: "Accounts are not enabled." }, { status: 404 });
   try {
     const account = await accountFromRequest(req);
-    return account ?? NextResponse.json({ error: "Paste a CA first to get your anonymous id." }, { status: 401 });
+    return account ?? NextResponse.json({ error: "Sign in first.", code: "signin" }, { status: 401 });
   } catch (err) {
-    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message, code: "signin" }, { status: 401 });
     console.error("[rankr] auth failed", err);
     return NextResponse.json({ error: "Could not verify your session." }, { status: 502 });
   }

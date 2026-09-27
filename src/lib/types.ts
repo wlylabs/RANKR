@@ -63,7 +63,7 @@ export type TokenView = TokenRecord & {
 export type TrackResponse = {
   status: "created" | "existing";
   token: TokenView;
-  /** Present when the paste came with an (anonymous) session: that caller's call on the token. */
+  /** The signed-in caller's call on the token (their own entry). */
   call?: { created: boolean; entryPriceUsd: number; calledAt: number } | null;
 };
 
@@ -82,8 +82,7 @@ export type MyCallsResponse = { calls: CallView[] };
 
 export type CallerView = {
   userId: string;
-  /** Public anonymous handle, e.g. "anon-a3f9c1". */
-  handle: string;
+  username: string;
   calls: number;
   /** Calls at 2x or more right now. */
   hits: number;
@@ -118,3 +117,5 @@ export type TokenResponse = {
   /** Live data for a token Rankr has not recorded yet. */
   preview: MarketSnapshot | null;
 };
+
+export type MeResponse = { account: { id: string; email: string | null; username: string | null } };

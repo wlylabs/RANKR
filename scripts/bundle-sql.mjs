@@ -13,6 +13,10 @@ export function bundle() {
     "-- Rankr: complete database setup. Paste this whole file into the Supabase SQL editor and run it.",
     "-- Safe to run again. Generated from supabase/migrations by `npm run db:bundle`; edit those, not this.",
     "",
+    "-- Older migrations define functions over columns that later ones drop; like pg_dump, skip body checks",
+    "-- while (re)creating them. The final functions are defined by the last migrations anyway.",
+    "set check_function_bodies = off;",
+    "",
     parts.join("\n"),
   ].join("\n");
 }

@@ -26,7 +26,7 @@ function winRate(c: CallerView) {
 function Caller({ c, me }: { c: CallerView; me: boolean }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <span className="truncate font-mono text-[13px]">{c.handle}</span>
+      <span className="truncate font-mono text-[13px]">@{c.username}</span>
       {me && <span className="rounded border border-border px-1 font-mono text-[10px] text-muted">you</span>}
     </span>
   );
@@ -59,7 +59,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
         <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
           <p className="font-medium">No callers yet</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-            Paste a CA and you&apos;re on it. Every paste is your call, measured from your own entry. No sign-up.
+            Sign in, paste a CA and you&apos;re on it. Every paste is your call, measured from your own entry.
           </p>
         </div>
       ) : (

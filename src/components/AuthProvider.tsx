@@ -2,34 +2,49 @@
 
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { handleOf } from "@/lib/handle";
+import useSWR from "swr";
 import { refreshBoards } from "@/lib/hooks";
-import { accountsAvailable, browserSupabase } from "@/lib/supabase-browser";
+import { authErrorMessage, loginHref } from "@/lib/login";
+import { accountsAvailable, apiFetch, authedFetcher, browserSupabase } from "@/lib/supabase-browser";
+import type { MeResponse } from "@/lib/types";
 
 type AuthState = {
-  /** Anonymous accounts are configured for this deployment. */
+  /** Accounts are configured for this deployment. Without them, pasting works without an account. */
   available: boolean;
-  /** The stored session has been read. */
+  /** The stored session (and, when signed in, the profile) has been read. */
   ready: boolean;
   userId: string | null;
-  /** Public handle, e.g. "anon-a3f9c1". */
-  handle: string | null;
-  /** Drops this browser's anonymous id; the next paste starts a new one. */
-  resetIdentity: () => Promise<void>;
+  /** Only ever shown to its owner. */
+  email: string | null;
+  /** Public name on the caller board. Null until picked, and pasting needs one. */
+  username: string | null;
+  /** Emails a sign-in link (and code). New emails get an account. */
+  sendLink: (email: string, next?: string) => Promise<void>;
+  /** Signs in with the code from the email, for when the link opens in another browser. */
+  verifyCode: (email: string, code: string) => Promise<void>;
+  saveUsername: (username: string) => Promise<void>;
+  signOut: () => Promise<void>;
+};
+
+const unavailable = async () => {
+  throw new Error("Accounts are not set up on this deployment.");
 };
 
 const AuthContext = createContext<AuthState>({
   available: false,
   ready: true,
   userId: null,
-  handle: null,
-  resetIdentity: async () => {},
+  email: null,
+  username: null,
+  sendLink: unavailable,
+  verifyCode: unavailable,
+  saveUsername: unavailable,
+  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [ready, setReady] = useState(!accountsAvailable);
-  const [handle, setHandle] = useState<string | null>(null);
+  const [sessionRead, setSessionRead] = useState(!accountsAvailable);
   const userId = session?.user.id ?? null;
 
   useEffect(() => {
@@ -37,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) return;
     sb.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setReady(true);
+      setSessionRead(true);
     });
     const { data } = sb.auth.onAuthStateChange((_event, next) => {
       setSession(next);
@@ -46,22 +61,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    let live = true;
-    if (userId) handleOf(userId).then((h) => live && setHandle(h));
-    else setHandle(null);
-    return () => {
-      live = false;
-    };
-  }, [userId]);
+  const meKey = userId ? `/api/me?u=${userId}` : null;
+  const me = useSWR<MeResponse>(meKey, authedFetcher, { revalidateOnFocus: false });
+  const profileRead = !userId || me.data !== undefined || me.error !== undefined;
 
-  const resetIdentity = useCallback(async () => {
+  const sendLink = useCallback(async (email: string, next?: string) => {
+    const sb = browserSupabase();
+    if (!sb) return unavailable();
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}${loginHref(next)}` },
+    });
+    if (error) throw new Error(authErrorMessage(error));
+  }, []);
+
+  const verifyCode = useCallback(async (email: string, code: string) => {
+    const sb = browserSupabase();
+    if (!sb) return unavailable();
+    const { error } = await sb.auth.verifyOtp({ email, token: code, type: "email" });
+    if (error) throw new Error(authErrorMessage(error));
+  }, []);
+
+  const { mutate } = me;
+  const saveUsername = useCallback(
+    async (username: string) => {
+      const res = await apiFetch("/api/me/username", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Could not save your username.");
+      await mutate(body as MeResponse, { revalidate: false });
+      void refreshBoards();
+    },
+    [mutate],
+  );
+
+  const signOut = useCallback(async () => {
     await browserSupabase()?.auth.signOut({ scope: "local" });
   }, []);
 
+  const account = me.data?.account;
   const value = useMemo<AuthState>(
-    () => ({ available: accountsAvailable, ready, userId, handle, resetIdentity }),
-    [ready, userId, handle, resetIdentity],
+    () => ({
+      available: accountsAvailable,
+      ready: sessionRead && profileRead,
+      userId,
+      email: account?.email ?? session?.user.email ?? null,
+      username: account?.id === userId ? (account?.username ?? null) : null,
+      sendLink,
+      verifyCode,
+      saveUsername,
+      signOut,
+    }),
+    [sessionRead, profileRead, userId, account, session, sendLink, verifyCode, saveUsername, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

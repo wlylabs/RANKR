@@ -1,6 +1,10 @@
 -- Rankr: complete database setup. Paste this whole file into the Supabase SQL editor and run it.
 -- Safe to run again. Generated from supabase/migrations by `npm run db:bundle`; edit those, not this.
 
+-- Older migrations define functions over columns that later ones drop; like pg_dump, skip body checks
+-- while (re)creating them. The final functions are defined by the last migrations anyway.
+set check_function_bodies = off;
+
 -- ===== 20260927000000_rankr_tokens.sql =====
 
 -- Rankr schema: one row per token, entry sealed at the first paste.
@@ -376,12 +380,11 @@ begin
   end if;
 end $$;
 
--- ===== 20260927020000_rankr_anon.sql =====
+-- ===== 20260927030000_rankr_accounts.sql =====
 
--- Anonymous callers (Supabase Auth anonymous sign-ins) instead of wallets.
---
--- Every caller gets a public handle derived from their user id: "anon-" + the first 6 hex chars
--- of sha256(user_id). No wallet, email or name is stored or shown.
+-- Accounts: sign in with an email magic link (Supabase Auth), then pick a username.
+-- A profile is just the public username; no wallet, and the email is never exposed.
+-- Pasting requires a profile, so every call belongs to a named account.
 
 do $$
 begin
@@ -390,27 +393,63 @@ begin
   end if;
 end $$;
 
-create or replace function public.rankr_handle(p_user uuid) returns text
-language sql immutable as $$
-  select 'anon-' || left(encode(sha256(convert_to(p_user::text, 'UTF8')), 'hex'), 6);
-$$;
+-- Drop the wallet columns (and the short-lived anonymous handle, if it was ever applied).
+alter table public.profiles drop column if exists chain;
+alter table public.profiles drop column if exists wallet;
+alter table public.profiles add column if not exists username text;
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'profiles' and column_name = 'handle') then
+    update public.profiles set username = replace(handle, '-', '_') where username is null;
+    alter table public.profiles drop column handle;
+  end if;
+end $$;
+update public.profiles
+   set username = 'user_' || left(encode(sha256(convert_to(user_id::text, 'UTF8')), 'hex'), 8)
+ where username is null;
+alter table public.profiles alter column username set not null;
 
-alter table public.profiles add column if not exists handle text;
-alter table public.profiles alter column chain drop not null;
-alter table public.profiles alter column wallet drop not null;
-update public.profiles set handle = public.rankr_handle(user_id) where handle is null;
-alter table public.profiles alter column handle set not null;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_username_format') then
+    alter table public.profiles add constraint profiles_username_format check (username ~ '^[A-Za-z0-9_]{3,20}$');
+  end if;
+end $$;
+create unique index if not exists profiles_username_lower_key on public.profiles (lower(username));
 
--- Profiles are now just a handle.
+drop function if exists public.rankr_handle(uuid);
+drop function if exists public.rankr_upsert_profile(uuid);
 drop function if exists public.rankr_upsert_profile(uuid, text, text);
-create or replace function public.rankr_upsert_profile(p_user uuid) returns text
-language sql as $$
-  insert into public.profiles (user_id, handle) values (p_user, public.rankr_handle(p_user))
-  on conflict (user_id) do update set handle = excluded.handle
-  returning handle;
+
+-- Same rules as src/lib/username.ts.
+create or replace function public.rankr_username_problem(p_username text, p_user uuid default null) returns text
+language sql stable as $$
+  select case
+    when p_username is null or p_username !~ '^[A-Za-z0-9_]{3,20}$' then 'invalid'
+    when lower(p_username) in ('admin', 'rankr', 'support', 'root', 'system', 'null', 'undefined', 'anon', 'me') then 'reserved'
+    when exists (select 1 from public.profiles
+                 where lower(username) = lower(p_username) and user_id is distinct from p_user) then 'taken'
+  end;
 $$;
 
--- Caller leaderboard, now keyed by handle. sort: avg | hits | best | calls. Returns {total, callers}.
+-- Sets or changes a user's username. Returns {ok, username} or {ok: false, error: invalid | reserved | taken}.
+create or replace function public.rankr_set_username(p_user uuid, p_username text) returns jsonb
+language plpgsql as $$
+declare
+  v_problem text := public.rankr_username_problem(p_username, p_user);
+begin
+  if v_problem is not null then
+    return jsonb_build_object('ok', false, 'error', v_problem);
+  end if;
+  insert into public.profiles (user_id, username) values (p_user, p_username)
+  on conflict (user_id) do update set username = excluded.username;
+  return jsonb_build_object('ok', true, 'username', p_username);
+exception when unique_violation then
+  return jsonb_build_object('ok', false, 'error', 'taken');
+end $$;
+
+-- Caller leaderboard, by username. sort: avg | hits | best | calls. Returns {total, callers}.
 create or replace function public.rankr_callers(
   p_sort text default 'hits',
   p_min_calls integer default 1,
@@ -435,7 +474,7 @@ language sql stable as $$
     from per_call group by user_id
   ),
   f as (
-    select a.*, p.handle
+    select a.*, p.username
     from agg a join public.profiles p using (user_id)
     where a.calls >= greatest(p_min_calls, 1)
   ),
@@ -461,13 +500,13 @@ language sql stable as $$
   );
 $$;
 
-revoke all on function public.rankr_upsert_profile(uuid) from public;
+revoke all on function public.rankr_set_username(uuid, text) from public;
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
-    revoke all on function public.rankr_upsert_profile(uuid) from anon, authenticated;
+    revoke all on function public.rankr_set_username(uuid, text) from anon, authenticated;
   end if;
   if exists (select 1 from pg_roles where rolname = 'service_role') then
-    grant execute on function public.rankr_upsert_profile(uuid) to service_role;
+    grant execute on function public.rankr_set_username(uuid, text) to service_role;
   end if;
 end $$;

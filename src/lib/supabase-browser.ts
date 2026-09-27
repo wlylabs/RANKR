@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/** Anonymous accounts are on only when the public Supabase URL and key are configured. */
+/** Accounts are on only when the public Supabase URL and key are configured. */
 export const accountsAvailable = Boolean(URL && KEY);
 
 let client: SupabaseClient | null = null;
@@ -14,7 +14,14 @@ let client: SupabaseClient | null = null;
 export function browserSupabase(): SupabaseClient | null {
   if (!accountsAvailable) return null;
   client ??= createClient(URL!, KEY!, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      // The magic link lands on /login with the session in the URL fragment. Implicit flow (not PKCE)
+      // so the link also works when it's opened in a different browser than the one that asked for it.
+      detectSessionInUrl: true,
+      flowType: "implicit",
+    },
   });
   return client;
 }
@@ -24,30 +31,6 @@ export async function accessToken(): Promise<string | null> {
   if (!sb) return null;
   const { data } = await sb.auth.getSession();
   return data.session?.access_token ?? null;
-}
-
-let starting: Promise<string | null> | null = null;
-
-/**
- * The caller's access token, creating an anonymous account on first use. Called on paste, so
- * people who only browse never get an account. Null if accounts are off or sign-in failed.
- */
-export function ensureSession(): Promise<string | null> {
-  starting ??= (async () => {
-    const sb = browserSupabase();
-    if (!sb) return null;
-    const existing = await accessToken();
-    if (existing) return existing;
-    const { data, error } = await sb.auth.signInAnonymously();
-    if (error) {
-      console.warn("[rankr] anonymous sign-in failed, pasting without an id:", error.message);
-      return null;
-    }
-    return data.session?.access_token ?? null;
-  })().finally(() => {
-    starting = null;
-  });
-  return starting;
 }
 
 /** fetch() that carries the caller's session (if any) to our API. */

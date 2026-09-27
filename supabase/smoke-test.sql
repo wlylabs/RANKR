@@ -119,7 +119,7 @@ begin
   raise notice 'rankr smoke test: tokens ok';
 end $$;
 
--- Anonymous callers (needs all migrations).
+-- Accounts and callers (needs all migrations).
 do $$
 declare
   a uuid := '00000000-0000-4000-8000-00000000000a';
@@ -128,9 +128,19 @@ declare
   failed boolean;
 begin
   insert into auth.users (id) values (a), (b);
-  assert public.rankr_upsert_profile(a) = public.rankr_handle(a);
-  assert public.rankr_upsert_profile(a) ~ '^anon-[0-9a-f]{6}$', 'handle format';
-  perform public.rankr_upsert_profile(b);
+
+  -- Usernames: format, reserved words, case-insensitive uniqueness.
+  assert public.rankr_set_username(a, 'x') = '{"ok": false, "error": "invalid"}'::jsonb;
+  assert public.rankr_set_username(a, 'Admin')->>'error' = 'reserved';
+  assert (public.rankr_set_username(a, 'Alpha_Caller')->>'ok')::boolean;
+  assert public.rankr_set_username(b, 'alpha_caller')->>'error' = 'taken', 'case-insensitive';
+  assert (public.rankr_set_username(a, 'alpha_caller')->>'ok')::boolean, 'own name, new case';
+  assert (public.rankr_set_username(b, 'bravo')->>'ok')::boolean;
+  assert public.rankr_username_problem('bravo') = 'taken';
+  assert public.rankr_username_problem('charlie') is null;
+  assert not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'profiles' and column_name in ('wallet', 'chain', 'handle')),
+         'no wallet columns';
 
   -- AAA's price is now 0.000006, BRAVO 11, CHAR 0.2 (from the block above).
   r := public.rankr_record_call(a, 'base:0xbbb', 1, 1000000, now());
@@ -153,8 +163,7 @@ begin
 
   r := public.rankr_callers('avg');
   assert (r->>'total')::int = 2;
-  assert r->'callers'->0->>'handle' = public.rankr_handle(a), 'A leads on avg: ' || r::text;
-  assert not (r->'callers'->0 ? 'wallet'), 'no wallet in the public board';
+  assert r->'callers'->0->>'username' = 'alpha_caller', 'A leads on avg: ' || r::text;
   assert (r->'callers'->0->>'calls')::int = 2 and (r->'callers'->0->>'hits')::int = 2;
   assert r->'callers'->0->'best_token'->>'symbol' = 'BRAVO';
   assert (r->'callers'->0->>'best_multiple')::float8 = 11;
@@ -162,7 +171,7 @@ begin
   r := public.rankr_callers('calls', p_min_calls => 3);
   assert (r->>'total')::int = 0, 'min calls filter';
   r := public.rankr_callers('avg', p_limit => 1, p_offset => 1);
-  assert r->'callers'->0->>'handle' = public.rankr_handle(b);
+  assert r->'callers'->0->>'username' = 'bravo';
 
   assert public.rankr_delete_call(b, 'solana:AAA');
   assert not public.rankr_delete_call(b, 'solana:AAA');
@@ -170,11 +179,11 @@ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
-    assert not has_function_privilege('anon', 'public.rankr_upsert_profile(uuid)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_set_username(uuid,text)', 'execute');
     assert has_function_privilege('anon', 'public.rankr_callers(text,integer,integer,integer)', 'execute');
   end if;
 
-  raise notice 'rankr smoke test: callers ok';
+  raise notice 'rankr smoke test: accounts ok';
 end $$;
 
 rollback;

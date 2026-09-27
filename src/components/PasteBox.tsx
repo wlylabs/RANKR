@@ -1,13 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ClipboardPaste, LoaderCircle, TriangleAlert, X } from "lucide-react";
+import { ArrowRight, ClipboardPaste, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { parseInput } from "@/lib/address";
 import { formatDate, formatUsd, tokenHref } from "@/lib/format";
-import { trackPaste } from "@/lib/track";
+import { loginHref, loginToPaste } from "@/lib/login";
+import { PasteError, rememberPendingPaste, takePendingPaste, trackPaste } from "@/lib/track";
 import type { TrackResponse } from "@/lib/types";
+import { useAuth } from "./AuthProvider";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
@@ -15,7 +18,23 @@ import { TokenName } from "./TokenList";
 
 type Result = TrackResponse & { firstCallByYou: boolean };
 
-export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size?: "md" | "lg" }) {
+/**
+ * The CA input. With accounts on, pasting needs a signed-in account with a username: a signed-out
+ * paste goes through /login and comes back as `/?ca=...`, which the box with `resumeFromUrl` tracks.
+ */
+export function PasteBox({
+  autoFocus,
+  size = "lg",
+  resumeFromUrl,
+}: {
+  autoFocus?: boolean;
+  size?: "md" | "lg";
+  resumeFromUrl?: boolean;
+}) {
+  const router = useRouter();
+  const { available, ready, userId, username } = useAuth();
+  const needsAccount = available && ready && (!userId || !username);
+  const resumed = useRef(false);
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +47,25 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
+  // Back from signing in with a CA to track. Only a paste made here is sent; any other ?ca= just fills the box.
+  useEffect(() => {
+    if (!resumeFromUrl || resumed.current || !ready || needsAccount) return;
+    const url = new URL(window.location.href);
+    const ca = url.searchParams.get("ca");
+    if (!ca) return;
+    resumed.current = true;
+    url.searchParams.delete("ca");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    setValue(ca);
+    if (takePendingPaste(ca)) void submit(ca);
+    else inputRef.current?.focus();
+  }, [resumeFromUrl, ready, needsAccount]);
+
+  function signInToPaste(input: string) {
+    rememberPendingPaste(input);
+    router.push(loginToPaste(input));
+  }
+
   async function submit(raw: string) {
     const input = raw.trim();
     if (!input || loading) return;
@@ -36,6 +74,7 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
       setError("That doesn't look like a contract address. Paste a CA or a pump.fun / DexScreener link.");
       return;
     }
+    if (needsAccount) return signInToPaste(input);
     setLoading(true);
     setError(null);
     setResult(null);
@@ -43,6 +82,7 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
       setResult(await trackPaste(input));
       setValue("");
     } catch (err) {
+      if (err instanceof PasteError && err.code) return signInToPaste(input);
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -150,6 +190,28 @@ export function PasteBox({ autoFocus, size = "lg" }: { autoFocus?: boolean; size
           )}
         </button>
       </form>
+
+      {needsAccount && !error && (
+        <p className={clsx("mt-2.5 flex items-center gap-1.5 text-xs text-subtle", lg && "justify-center")}>
+          <Lock className="size-3 shrink-0" />
+          {userId ? (
+            <span>
+              <Link href={loginHref()} className="text-fg underline-offset-4 hover:underline">
+                Pick a username
+              </Link>{" "}
+              to start pasting.
+            </span>
+          ) : (
+            <span>
+              Pasting needs an account.{" "}
+              <Link href={loginHref()} className="text-fg underline-offset-4 hover:underline">
+                Sign in with email
+              </Link>
+              , no password.
+            </span>
+          )}
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="animate-fade-in mt-2.5 flex items-start gap-2 text-left text-sm text-down">

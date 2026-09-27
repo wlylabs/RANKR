@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthError, accountFromRequest, recordCall } from "@/lib/accounts";
+import { AuthError, accountFromRequest, accountsEnabled, recordCall, type Account } from "@/lib/accounts";
 import { RankrError, trackToken } from "@/lib/rankr";
 
 export const dynamic = "force-dynamic";
@@ -35,13 +35,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Paste a token contract address." }, { status: 400 });
   }
 
+  // With accounts set up, every paste is somebody's call: sign in and pick a username first.
+  let account: Account | null = null;
+  if (accountsEnabled()) {
+    try {
+      account = await accountFromRequest(req);
+    } catch (err) {
+      if (!(err instanceof AuthError)) {
+        console.error("[rankr] auth failed", err);
+        return NextResponse.json({ error: "Could not verify your session. Try again." }, { status: 502 });
+      }
+    }
+    if (!account) return NextResponse.json({ error: "Sign in to paste.", code: "signin" }, { status: 401 });
+    if (!account.username) {
+      return NextResponse.json({ error: "Pick a username to paste.", code: "username" }, { status: 403 });
+    }
+  }
+
   try {
     const chainId = typeof chain === "string" && /^[a-z0-9-]{2,32}$/.test(chain) ? chain : undefined;
-    // A paste with a session is also that caller's call. An expired session still tracks the token.
-    const account = await accountFromRequest(req).catch((err) => {
-      if (err instanceof AuthError) return null;
-      throw err;
-    });
     const result = await trackToken(input, chainId);
     if (account) {
       result.call = await recordCall(account, result.token).catch((err) => {
