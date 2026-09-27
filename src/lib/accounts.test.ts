@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const USER = { id: "00000000-0000-4000-8000-00000000000a", email: "caller@example.com" };
+const USER = { id: "00000000-0000-4000-8000-00000000000a", email: "0123456789abcdef0123456789abcdef@key.rankr.invalid" };
 const GUEST = { id: "00000000-0000-4000-8000-00000000000b", email: "", is_anonymous: true };
+// Signed up by email before keys: keyless, and the address never leaves the server.
+const OLD_EMAIL = { id: "00000000-0000-4000-8000-00000000000c", email: "caller@example.com" };
 
 describe("accounts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -17,6 +19,7 @@ describe("accounts", () => {
       if (url.endsWith("/auth/v1/user")) {
         if (auth === "Bearer good-token") return new Response(JSON.stringify(USER));
         if (auth === "Bearer guest-token") return new Response(JSON.stringify(GUEST));
+        if (auth === "Bearer email-token") return new Response(JSON.stringify(OLD_EMAIL));
         return new Response(JSON.stringify({ msg: "invalid JWT" }), { status: 401 });
       }
       if (url.endsWith("/rest/v1/rpc/rankr_ensure_profile")) {
@@ -24,6 +27,10 @@ describe("accounts", () => {
         return new Response(JSON.stringify("nonce_7f3a"));
       }
       if (url.includes("/rest/v1/profiles?")) return new Response(JSON.stringify(profile));
+      if (url.includes("/auth/v1/admin/users/")) {
+        if (init?.method !== "PUT") return new Response("method", { status: 405 });
+        return new Response(JSON.stringify({ id: url.split("/").pop(), ...JSON.parse(String(init.body)) }));
+      }
       if (url.endsWith("/rest/v1/rpc/rankr_set_username")) {
         const { p_username } = JSON.parse(String(init?.body));
         if (p_username.toLowerCase() === "taken_name") return new Response(JSON.stringify({ ok: false, error: "taken" }));
@@ -46,7 +53,7 @@ describe("accounts", () => {
 
   it("verifies the token with Supabase Auth, reads the username and caches", async () => {
     const { accountFromRequest } = await import("./accounts");
-    expect(await accountFromRequest(req("good-token"))).toEqual({ ...USER, username: "alpha_caller", guest: false });
+    expect(await accountFromRequest(req("good-token"))).toEqual({ id: USER.id, username: "alpha_caller", hasKey: true });
     expect(await accountFromRequest(req("good-token"))).toMatchObject({ id: USER.id });
 
     expect(urls().filter((u) => u.endsWith("/auth/v1/user"))).toHaveLength(1);
@@ -60,11 +67,40 @@ describe("accounts", () => {
   it("gives a new account its default name, once", async () => {
     profile = [];
     const { accountFromRequest } = await import("./accounts");
-    expect(await accountFromRequest(req("guest-token"))).toEqual({ id: GUEST.id, email: null, username: "nonce_7f3a", guest: true });
+    expect(await accountFromRequest(req("guest-token"))).toEqual({ id: GUEST.id, username: "nonce_7f3a", hasKey: false });
     expect(urls().filter((u) => u.endsWith("rankr_ensure_profile"))).toHaveLength(1);
     // An existing profile is just read.
     await accountFromRequest(req("good-token"));
     expect(urls().filter((u) => u.endsWith("rankr_ensure_profile"))).toHaveLength(1);
+  });
+
+  it("counts an account with a real email as keyless and never returns the email", async () => {
+    const { accountFromRequest } = await import("./accounts");
+    const account = await accountFromRequest(req("email-token"));
+    expect(account).toEqual({ id: OLD_EMAIL.id, username: "alpha_caller", hasKey: false });
+    expect(JSON.stringify(account)).not.toContain("@");
+  });
+
+  it("makes a key: the key's email (confirmed) and the key as password, then forgets the cached account", async () => {
+    const { accountFromRequest, makeKey } = await import("./accounts");
+    const { keyEmail, parseKey } = await import("./key");
+    const account = (await accountFromRequest(req("guest-token")))!;
+    const key = await makeKey(account);
+    expect(parseKey(key)).toBe(key);
+
+    const call = fetchMock.mock.calls.find(([url]) => String(url).includes("/auth/v1/admin/users/"))!;
+    expect(String(call[0])).toBe(`https://x.supabase.co/auth/v1/admin/users/${GUEST.id}`);
+    expect(call[1]?.method).toBe("PUT");
+    expect(JSON.parse(String(call[1]?.body))).toEqual({ email: await keyEmail(key), password: key, email_confirm: true });
+    // The admin call uses the secret key, not the user's token.
+    expect(new Headers(call[1]?.headers).get("apikey")).toBe("sb_secret_test");
+    expect(new Headers(call[1]?.headers).get("authorization")).toBeNull();
+
+    // A new key each time.
+    expect(await makeKey(account)).not.toBe(key);
+    // Cache dropped: the next request asks Supabase Auth again.
+    await accountFromRequest(req("guest-token"));
+    expect(urls().filter((u) => u.endsWith("/auth/v1/user"))).toHaveLength(2);
   });
 
   it("sets a username, refusing bad or taken ones, and forgets the cached account", async () => {

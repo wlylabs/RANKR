@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Paste a token contract address." }, { status: 400 });
   }
 
-  // With accounts set up, every paste is somebody's call: sign in (as a guest or by email) first.
+  // With accounts set up, every paste is somebody's call: sign in (as a guest or with a key) first.
   let account: Account | null = null;
   if (accountsEnabled()) {
     try {

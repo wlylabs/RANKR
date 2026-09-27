@@ -32,8 +32,8 @@ describe("loginHref", () => {
 
 describe("authErrorMessage", () => {
   it("explains the common Supabase Auth errors", () => {
-    expect(authErrorMessage({ code: "otp_expired", message: "Token has expired or is invalid" })).toMatch(/wrong or has expired/);
-    expect(authErrorMessage({ code: "over_email_send_rate_limit" })).toMatch(/Too many/);
+    expect(authErrorMessage({ code: "invalid_credentials", message: "Invalid login credentials" })).toMatch(/No account has that key/);
+    expect(authErrorMessage({ code: "over_request_rate_limit" })).toMatch(/Too many/);
   });
 
   it("falls back to the server's message", () => {

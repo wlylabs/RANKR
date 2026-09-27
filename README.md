@@ -15,9 +15,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   Peak and lowest point since the paste are recorded too.
 - **Leaderboard**: top gainers, peak x, biggest dumps, newest, most pasted. Filter by 24h / 7d / 30d, chain, and search.
 - **Accounts**: pasting needs an account, so every call on Rankr has a name behind it. Continue as a
-  **guest** in one click, or sign in with an **email link** (or the code in it), no password. Every account
-  starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`, and can rename itself. Guests can add
-  an email later to keep their account. Emails are never shown.
+  **guest** in one click; save a **key** (`rk-7F3A-K9QX-2MPD-W8HT-ZC4N`) any time to sign in on any device.
+  No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
+  and can rename itself.
 - **My calls**: every token you pasted, measured from *your* paste.
 - **Caller leaderboard**: callers ranked by their calls (2x hits, average x, best call), by username.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
@@ -62,7 +62,7 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
 - **"no backdating" is enforced by the database**: a trigger rejects any change to a token's entry;
 - a paste is one atomic SQL call, so simultaneous pastes never lose a count;
 - browsers can only read (RLS); every write goes through the server with the secret key;
-- Supabase Auth handles accounts (anonymous guests, email magic link), and each caller's calls are rows tied
+- Supabase Auth handles accounts (anonymous guests with a sign-in key), and each caller's calls are rows tied
   to their account.
 
 ### Setup
@@ -81,37 +81,30 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
    NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # Settings -> API Keys, public
    ```
-4. Set up email sign-in (next section).
+4. Turn on guests and keys in Supabase Auth (next section).
 5. Optional, for peaks/lows while nobody is browsing: run `supabase/cron.sql` (pg_cron + pg_net call
    `/api/cron/refresh` every minute).
 
-### Accounts (guest or email)
+### Accounts (guest + key)
 
-Pasting needs an account. Someone signed out who pastes a CA goes to `/login` and picks one:
+Pasting needs an account. Someone signed out who pastes a CA goes to `/login`:
 
-- **Continue as guest**: one click, no email. A Supabase anonymous account that lives in that browser.
-- **Email**: a sign-in link **and** a code in one email (the code is for when the email is opened on
-  another device). The same link creates the account the first time.
+- **Continue as guest**: one click. A Supabase anonymous account that lives in that browser.
+- **Sign in with key**: paste a key saved earlier.
 
 Either way they land back on the home page and the CA they pasted is tracked. Browsing needs no account.
 
-In the Supabase dashboard:
+A guest saves a key on `/account` (the header avatar, the account menu, "My calls" and the paste result all
+point there until one is saved). The key is shown once, with copy and download, next to a 5x5 dot pattern from
+its hash; the same pattern shows up when the key is pasted to sign in, so the two can be matched at a glance.
+The same page makes a new key: the old one stops working and other devices are signed out.
 
-1. **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins** (guests) and keep **Email**
-   enabled with "Allow new users to sign up" on.
-2. **Authentication → URL Configuration**: Site URL = `https://your-domain`. Add `http://localhost:3000/**`
-   to Redirect URLs for local dev.
-3. **Custom SMTP (needed for email sign-in)**: Supabase's built-in mailer only delivers to members of your
-   Supabase team and only a couple of emails per hour. Add any SMTP provider (Resend, Postmark, SES, ...) under
-   **Authentication → Emails → SMTP Settings**, then raise the email limit under **Authentication → Rate Limits**.
-   Guests work without it.
-4. **Authentication → Emails → Templates**: add the code to **Magic Link**, **Confirm signup** (first sign-in)
-   and **Change Email Address** (a guest adding an email):
-   ```html
-   <p><a href="{{ .ConfirmationURL }}">Continue</a></p>
-   <p>Or enter this code: <strong>{{ .Token }}</strong></p>
-   ```
-5. Optional, against guest spam: **Authentication → Attack Protection → CAPTCHA** (Supabase caps anonymous
+In the Supabase dashboard (no SMTP, email templates or redirect URLs needed):
+
+1. **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins** (guests) and keep
+   **Email** enabled with **Confirm email** on. Keys sign in through the Email provider; with confirmation on,
+   nobody can make an account by signing up with an email directly.
+2. Optional, against guest spam: **Authentication → Attack Protection → CAPTCHA** (Supabase caps anonymous
    sign-ins at 30 per hour per IP by default, adjustable under Rate Limits).
 
 How it works:
@@ -124,8 +117,17 @@ How it works:
   ignoring case, a few names reserved. Calls follow the account, not the name. Profiles hold only the name:
   no email, no wallet.
 - **Guests** exist only in the browser that created them; clearing site data loses access (their calls
-  stay on the board). Adding an email on `/account` turns the guest into a normal account with the same id,
-  name and calls. Signing out a guest asks for confirmation first.
+  stay on the board). Signing out without a key asks for confirmation first.
+- **Keys** (`src/lib/key.ts`): `rk-` and 20 Crockford base32 characters, 100 random bits, forgiving about
+  case, dashes and O/0, I/L/1 when pasted. In Supabase Auth a key is an email + password: the email is made up
+  from the key (`<sha256 of the key, 32 hex>@key.rankr.invalid`, a domain that can never receive mail) and the
+  password is the key itself, so the key alone finds and opens the account. `POST /api/me/key` generates the
+  key on the server and sets both on the user with the Admin API, already confirmed, so nothing is ever sent;
+  the user id stays, so the name and calls stay. Supabase stores only a bcrypt hash of the password and Rankr
+  never stores the key; a lost key can't be recovered. Rankr tells keyed accounts apart by that email, not by
+  Supabase's `is_anonymous` flag, so if you ever clean up old guests, only delete users with no email.
+- Accounts made with an email link before keys count as guests: they stay signed in where they are and can
+  save a key (which replaces the email). Their email is never sent to the browser.
 - `/api/track` checks the access token with Supabase Auth and refuses pastes without an account (401); the UI
   sends people to `/login` and back with their CA.
 - The caller board ranks callers by 2x hits, average x (3+ calls), best call and number of calls.
@@ -146,7 +148,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/stats` | totals for the home page |
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
 | `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
-| `GET /api/me`, `POST /api/me/username` `{username}`, `GET/DELETE /api/me/calls` | your account, username and calls (`Authorization: Bearer <access token>`) |
+| `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET/DELETE /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
 | `GET /api/username?name=` | is a username free |
 
 ## How the numbers work
@@ -170,12 +172,13 @@ src/app/                     pages, API routes, icons, social cards
   api/stats                  GET home page totals
   api/cron/refresh           background price refresh
   api/callers, api/me/*      caller board, your account, username and calls
-  login, account             guest / email sign-in, rename, keep a guest account
+  login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
-src/lib/accounts.ts          accounts (Supabase Auth: guests, email), names and calls, server side
+src/lib/accounts.ts          accounts (Supabase Auth: guests, keys), names and calls, server side
+src/lib/key.ts               sign-in keys: generate, parse, the key's email, the dot pattern
 supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```
 

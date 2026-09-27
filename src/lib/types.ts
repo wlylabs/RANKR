@@ -118,4 +118,7 @@ export type TokenResponse = {
   preview: MarketSnapshot | null;
 };
 
-export type MeResponse = { account: { id: string; email: string | null; username: string | null; guest: boolean } };
+export type MeResponse = { account: { id: string; username: string | null; hasKey: boolean } };
+
+/** A new sign-in key, returned once. */
+export type KeyResponse = MeResponse & { key: string };

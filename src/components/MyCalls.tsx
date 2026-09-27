@@ -69,7 +69,7 @@ function accountRow(c: CallView): Row {
 }
 
 export function MyCalls() {
-  const { available, ready, userId, username, guest } = useAuth();
+  const { available, ready, userId, username, hasKey } = useAuth();
   if (!available) return <DeviceCalls />;
   if (!ready) return <Page intro={null} rows={[]} loading />;
   if (!userId || !username) {
@@ -81,7 +81,7 @@ export function MyCalls() {
           <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
             {userId
               ? "Your calls show up on the caller board under it."
-              : "Every CA you paste is your call, tracked from your own entry and ranked on the caller board. Continue as a guest in one click, or use your email."}
+              : "Every CA you paste is your call, tracked from your own entry and ranked on the caller board. Continue as a guest in one click, or sign in with your key."}
           </p>
           <Link
             href={loginHref("/me")}
@@ -93,10 +93,10 @@ export function MyCalls() {
       </Page>
     );
   }
-  return <AccountCalls userId={userId} username={username} guest={guest} />;
+  return <AccountCalls userId={userId} username={username} hasKey={hasKey} />;
 }
 
-function AccountCalls({ userId, username, guest }: { userId: string; username: string; guest: boolean }) {
+function AccountCalls({ userId, username, hasKey }: { userId: string; username: string; hasKey: boolean }) {
   const { data, isLoading, mutate } = useAccountCalls(userId);
   const rows = useMemo(() => (data?.calls ?? []).map(accountRow), [data]);
 
@@ -111,12 +111,12 @@ function AccountCalls({ userId, username, guest }: { userId: string; username: s
       intro={
         <>
           Recorded as <span className="font-mono text-fg">@{username}</span> and ranked on the caller board.
-          {guest && (
+          {!hasKey && (
             <>
               {" "}
               Guest account, this browser only:{" "}
               <Link href="/account" className="text-fg underline-offset-4 hover:underline">
-                add an email to keep it
+                save your key to keep it
               </Link>
               .
             </>

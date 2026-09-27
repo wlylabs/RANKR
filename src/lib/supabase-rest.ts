@@ -65,6 +65,11 @@ export class SupabaseRest {
     return this.send<T>(`/rest/v1/rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });
   }
 
+  /** PUT /auth/v1/admin/users/<id>: changes a user as an admin (needs the secret key). */
+  adminUpdateUser<T>(id: string, attrs: Record<string, unknown>) {
+    return this.send<T>(`/auth/v1/admin/users/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(attrs) });
+  }
+
   /** The user behind a Supabase Auth access token, or null if the token is not valid. */
   async user<T>(accessToken: string): Promise<T | null> {
     try {

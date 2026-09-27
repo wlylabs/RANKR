@@ -124,9 +124,3 @@ export function UsernameForm({
     </form>
   );
 }
-
-/** A starting suggestion from the email's local part, if it makes a valid username. */
-export function suggestUsername(email: string | null): string {
-  const base = (email ?? "").split("@")[0].replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 20);
-  return checkUsername(base) ? "" : base;
-}

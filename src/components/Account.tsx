@@ -1,23 +1,25 @@
 "use client";
 
-import { LoaderCircle, LogOut, Mail } from "lucide-react";
+import { KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
+import { KeyReveal, KeySignInForm } from "./Key";
 import { UsernameForm } from "./UsernameForm";
 
-const INPUT =
-  "h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none transition-colors placeholder:text-subtle/60 focus:border-border-strong";
 const PRIMARY =
   "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-fg px-4 text-sm font-medium text-bg transition-opacity hover:opacity-85 disabled:opacity-50";
+const LINK = "text-muted underline-offset-4 hover:text-fg hover:underline";
 
-/** Change the name, keep a guest account by adding an email, sign out. */
+/** Save a sign-in key (or make a new one), change the name, sign out. */
 export function Account() {
   const router = useRouter();
-  const { available, ready, userId, email, username, guest, signOut } = useAuth();
+  const { available, ready, userId, username, hasKey, signOut } = useAuth();
   const [saved, setSaved] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
+  // Kept while the new key is on screen, so it stays up after hasKey flips.
+  const [shownKey, setShownKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!available || (ready && (!userId || !username))) router.replace(available ? loginHref("/account") : "/");
@@ -36,15 +38,16 @@ export function Account() {
     router.replace("/");
   }
 
+  const keyProps = { username, shownKey, setShownKey };
   return (
     <div className="mx-auto max-w-lg pt-10 sm:pt-14">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Account</h1>
       <p className="mt-1.5 text-sm text-muted">
         You are <span className="font-mono text-fg">@{username}</span> on the caller board
-        {guest ? ", as a guest." : "."}
+        {hasKey ? "." : ", as a guest."}
       </p>
 
-      {guest && <KeepAccount />}
+      {hasKey && !shownKey ? <KeySection {...keyProps} /> : <SaveKey {...keyProps} />}
 
       <section className="mt-6 rounded-lg border border-border p-5">
         <h2 className="text-sm font-medium">Change username</h2>
@@ -53,19 +56,17 @@ export function Account() {
         {saved && <p className="mt-3 text-xs text-up">Saved.</p>}
       </section>
 
-      {!guest && (
-        <section className="mt-6 rounded-lg border border-border p-5">
-          <h2 className="text-sm font-medium">Email</h2>
-          <p className="mt-1 font-mono text-sm break-all text-muted">{email}</p>
-          <p className="mt-2 text-xs text-subtle">Private. Only used to send your sign-in links.</p>
-        </section>
-      )}
-
-      {guest && confirmOut ? (
+      {confirmOut ? (
         <div className="mt-6 rounded-lg border border-down/40 p-4">
           <p className="text-sm">
-            Guest accounts can&apos;t sign back in. After signing out, <span className="font-mono">@{username}</span> and its
-            calls stay on the board but you lose access. Add an email first to keep it.
+            {hasKey ? (
+              <>You&apos;ll need your key to sign back in as <span className="font-mono">@{username}</span>.</>
+            ) : (
+              <>
+                Without a key you can&apos;t sign back in. <span className="font-mono">@{username}</span> and its calls stay
+                on the board but you lose access. Save your key first to keep it.
+              </>
+            )}
           </p>
           <div className="mt-3 flex gap-2">
             <button
@@ -73,7 +74,7 @@ export function Account() {
               onClick={out}
               className="h-8 rounded-md border border-border px-3 text-sm text-down transition-colors hover:bg-surface-2"
             >
-              Sign out anyway
+              {hasKey ? "Sign out" : "Sign out anyway"}
             </button>
             <button
               type="button"
@@ -87,7 +88,7 @@ export function Account() {
       ) : (
         <button
           type="button"
-          onClick={() => (guest ? setConfirmOut(true) : void out())}
+          onClick={() => setConfirmOut(true)}
           className="mt-6 inline-flex h-9 items-center gap-2 rounded-md border border-border px-3.5 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
         >
           <LogOut className="size-3.5" /> Sign out
@@ -97,109 +98,121 @@ export function Account() {
   );
 }
 
-/** Guest -> email account. Same user, so the name and calls stay. */
-function KeepAccount() {
-  const { addEmail, verifyEmailCode } = useAuth();
-  const [email, setEmail] = useState("");
-  const [sentTo, setSentTo] = useState<string | null>(null);
-  const [code, setCode] = useState("");
+type KeyProps = { username: string; shownKey: string | null; setShownKey: (key: string | null) => void };
+
+function useMakeKey(setShownKey: (key: string) => void) {
+  const { makeKey } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function run(fn: () => Promise<void>) {
+  async function run() {
     setBusy(true);
     setError(null);
     try {
-      await fn();
+      setShownKey(await makeKey());
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
   }
+  return { run, busy, error };
+}
+
+function ErrorLine({ error }: { error: string | null }) {
+  return error ? (
+    <p role="alert" className="mt-3 text-sm text-down">
+      {error}
+    </p>
+  ) : null;
+}
+
+/** Guest -> keyed account (same user, so the name and calls stay), or switch to an account you have a key for. */
+function SaveKey({ username, shownKey, setShownKey }: KeyProps) {
+  const make = useMakeKey(setShownKey);
+  const [switching, setSwitching] = useState(false);
 
   return (
     <section className="mt-8 rounded-lg border border-border-strong bg-surface p-5">
-      <h2 className="text-sm font-medium">Keep this account</h2>
-      <p className="mt-1 text-sm text-muted">
-        A guest account lives in this browser only. Clear your browser data or switch devices and it&apos;s gone. Add an
-        email to sign in anywhere; your name and calls stay the same.
-      </p>
-      {!sentTo ? (
-        <form
-          className="mt-5 flex flex-col gap-2 sm:flex-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const to = email.trim();
-            if (to) void run(async () => {
-              await addEmail(to);
-              setSentTo(to);
-            });
-          }}
-        >
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError(null);
-            }}
-            autoComplete="email"
-            placeholder="you@example.com"
-            aria-label="Email"
-            className={INPUT}
-          />
-          <button type="submit" disabled={!email.trim() || busy} className={`${PRIMARY} h-11 shrink-0`}>
-            {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Mail className="size-4" />}
-            Add email
-          </button>
-        </form>
+      <h2 className="text-sm font-medium">{shownKey ? "Your key" : "Save your key"}</h2>
+      {shownKey ? (
+        <KeyReveal value={shownKey} username={username} onDone={() => setShownKey(null)} />
       ) : (
-        <form
-          className="mt-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (code.length >= 6) void run(() => verifyEmailCode(sentTo, code));
-          }}
-        >
-          <p className="text-sm text-muted">
-            We sent a link to <span className="text-fg">{sentTo}</span>. Open it on this device, or enter the code:
+        <>
+          <p className="mt-1 text-sm text-muted">
+            A guest account lives in this browser only. Clear your browser data or switch devices and it&apos;s gone. A
+            key signs you in anywhere, no email or password; your name and calls stay the same.
           </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <input
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value.replace(/\D/g, "").slice(0, 10));
-                setError(null);
-              }}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="000000"
-              aria-label="Code from the email"
-              className={`${INPUT} text-center font-mono tracking-[0.4em]`}
-            />
-            <button type="submit" disabled={code.length < 6 || busy} className={`${PRIMARY} h-11 shrink-0`}>
-              {busy && <LoaderCircle className="size-4 animate-spin" />}
-              Confirm
+          <button type="button" onClick={make.run} disabled={make.busy} className={`${PRIMARY} mt-5`}>
+            {make.busy ? <LoaderCircle className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+            Make my key
+          </button>
+          <ErrorLine error={make.error} />
+          <div className="mt-5 border-t border-border pt-4 text-xs">
+            {switching ? (
+              <>
+                <p className="mb-4 text-sm text-muted">
+                  This browser switches to the account the key belongs to.{" "}
+                  <span className="font-mono text-fg">@{username}</span> stays on the board, but without a key you
+                  can&apos;t come back to it.
+                </p>
+                <KeySignInForm autoFocus />
+                <button type="button" onClick={() => setSwitching(false)} className={`${LINK} mt-3`}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setSwitching(true)} className={LINK}>
+                Already have a key? Sign in with it
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** A keyed account: the key can't be shown again, only replaced. */
+function KeySection({ setShownKey }: KeyProps) {
+  const make = useMakeKey(setShownKey);
+  const [confirm, setConfirm] = useState(false);
+
+  return (
+    <section className="mt-8 rounded-lg border border-border p-5">
+      <h2 className="text-sm font-medium">Sign-in key</h2>
+      <p className="mt-1 text-sm text-muted">
+        Your key is the only way back into this account. Rankr keeps only a hash of it, so it can&apos;t show it again.
+      </p>
+      {confirm ? (
+        <div className="mt-4 rounded-md border border-border p-3">
+          <p className="text-sm">Your current key stops working right away and other devices are signed out.</p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={make.run}
+              disabled={make.busy}
+              className="inline-flex h-8 items-center gap-2 rounded-md bg-fg px-3 text-sm font-medium text-bg hover:opacity-85 disabled:opacity-50"
+            >
+              {make.busy && <LoaderCircle className="size-3.5 animate-spin" />}
+              Make a new key
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirm(false)}
+              className="h-8 rounded-md px-3 text-sm text-muted hover:text-fg"
+            >
+              Cancel
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSentTo(null);
-              setCode("");
-              setError(null);
-            }}
-            className="mt-3 text-xs text-muted underline-offset-4 hover:text-fg hover:underline"
-          >
-            Use a different email
+          <ErrorLine error={make.error} />
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted">
+          Lost it, or someone else might have it?{" "}
+          <button type="button" onClick={() => setConfirm(true)} className="text-fg underline-offset-4 hover:underline">
+            Make a new key
           </button>
-        </form>
-      )}
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-down">
-          {error}
+          .
         </p>
       )}
     </section>
