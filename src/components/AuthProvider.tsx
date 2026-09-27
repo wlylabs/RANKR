@@ -2,7 +2,7 @@
 
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as mutateKeys } from "swr";
 import { refreshBoards } from "@/lib/hooks";
 import { authErrorMessage, loginHref } from "@/lib/login";
 import { accountsAvailable, apiFetch, authedFetcher, browserSupabase } from "@/lib/supabase-browser";
@@ -16,12 +16,19 @@ type AuthState = {
   userId: string | null;
   /** Only ever shown to its owner. */
   email: string | null;
-  /** Public name on the caller board. Null until picked, and pasting needs one. */
+  /** Public name on the caller board. New accounts get a default one (e.g. nonce_7f3a). */
   username: string | null;
+  /** A one-click guest account: no email, lives in this browser until an email is added. */
+  guest: boolean;
+  /** Creates a guest account. */
+  continueAsGuest: () => Promise<void>;
   /** Emails a sign-in link (and code). New emails get an account. */
   sendLink: (email: string, next?: string) => Promise<void>;
   /** Signs in with the code from the email, for when the link opens in another browser. */
   verifyCode: (email: string, code: string) => Promise<void>;
+  /** Guest only: attaches an email (confirmed by link or code), keeping the account and its calls. */
+  addEmail: (email: string) => Promise<void>;
+  verifyEmailCode: (email: string, code: string) => Promise<void>;
   saveUsername: (username: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -36,8 +43,12 @@ const AuthContext = createContext<AuthState>({
   userId: null,
   email: null,
   username: null,
+  guest: false,
+  continueAsGuest: unavailable,
   sendLink: unavailable,
   verifyCode: unavailable,
+  addEmail: unavailable,
+  verifyEmailCode: unavailable,
   saveUsername: unavailable,
   signOut: async () => {},
 });
@@ -57,6 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = sb.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       void refreshBoards();
+      // e.g. a guest who just confirmed an email: re-read the account.
+      void mutateKeys((key) => typeof key === "string" && key.startsWith("/api/me?"));
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -64,6 +77,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const meKey = userId ? `/api/me?u=${userId}` : null;
   const me = useSWR<MeResponse>(meKey, authedFetcher, { revalidateOnFocus: false });
   const profileRead = !userId || me.data !== undefined || me.error !== undefined;
+
+  const continueAsGuest = useCallback(async () => {
+    const sb = browserSupabase();
+    if (!sb) return unavailable();
+    const { error } = await sb.auth.signInAnonymously();
+    if (error) throw new Error(authErrorMessage(error));
+  }, []);
+
+  const addEmail = useCallback(async (email: string) => {
+    const sb = browserSupabase();
+    if (!sb) return unavailable();
+    const { error } = await sb.auth.updateUser({ email }, { emailRedirectTo: `${window.location.origin}/account` });
+    if (error) throw new Error(authErrorMessage(error));
+  }, []);
+
+  const verifyEmailCode = useCallback(async (email: string, code: string) => {
+    const sb = browserSupabase();
+    if (!sb) return unavailable();
+    const { error } = await sb.auth.verifyOtp({ email, token: code, type: "email_change" });
+    if (error) throw new Error(authErrorMessage(error));
+  }, []);
 
   const sendLink = useCallback(async (email: string, next?: string) => {
     const sb = browserSupabase();
@@ -108,14 +142,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       available: accountsAvailable,
       ready: sessionRead && profileRead,
       userId,
-      email: account?.email ?? session?.user.email ?? null,
+      email: account?.email || session?.user.email || null,
       username: account?.id === userId ? (account?.username ?? null) : null,
+      guest: !!session?.user.is_anonymous,
+      continueAsGuest,
       sendLink,
       verifyCode,
+      addEmail,
+      verifyEmailCode,
       saveUsername,
       signOut,
     }),
-    [sessionRead, profileRead, userId, account, session, sendLink, verifyCode, saveUsername, signOut],
+    [
+      sessionRead,
+      profileRead,
+      userId,
+      account,
+      session,
+      continueAsGuest,
+      sendLink,
+      verifyCode,
+      addEmail,
+      verifyEmailCode,
+      saveUsername,
+      signOut,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

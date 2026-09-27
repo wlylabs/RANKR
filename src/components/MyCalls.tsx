@@ -69,7 +69,7 @@ function accountRow(c: CallView): Row {
 }
 
 export function MyCalls() {
-  const { available, ready, userId, username } = useAuth();
+  const { available, ready, userId, username, guest } = useAuth();
   if (!available) return <DeviceCalls />;
   if (!ready) return <Page intro={null} rows={[]} loading />;
   if (!userId || !username) {
@@ -77,26 +77,26 @@ export function MyCalls() {
       <Page intro={null} rows={[]}>
         <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
           <UserRound className="mx-auto size-5 text-subtle" />
-          <p className="mt-3 font-medium">{userId ? "Pick a username" : "Sign in to see your calls"}</p>
+          <p className="mt-3 font-medium">{userId ? "Pick a name" : "Sign in to see your calls"}</p>
           <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
             {userId
               ? "Your calls show up on the caller board under it."
-              : "Every CA you paste is your call, tracked from your own entry and ranked on the caller board."}
+              : "Every CA you paste is your call, tracked from your own entry and ranked on the caller board. Continue as a guest in one click, or use your email."}
           </p>
           <Link
             href={loginHref("/me")}
             className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
           >
-            {userId ? "Pick a username" : "Sign in with email"}
+            {userId ? "Pick a name" : "Sign in"}
           </Link>
         </div>
       </Page>
     );
   }
-  return <AccountCalls userId={userId} username={username} />;
+  return <AccountCalls userId={userId} username={username} guest={guest} />;
 }
 
-function AccountCalls({ userId, username }: { userId: string; username: string }) {
+function AccountCalls({ userId, username, guest }: { userId: string; username: string; guest: boolean }) {
   const { data, isLoading, mutate } = useAccountCalls(userId);
   const rows = useMemo(() => (data?.calls ?? []).map(accountRow), [data]);
 
@@ -111,6 +111,16 @@ function AccountCalls({ userId, username }: { userId: string; username: string }
       intro={
         <>
           Recorded as <span className="font-mono text-fg">@{username}</span> and ranked on the caller board.
+          {guest && (
+            <>
+              {" "}
+              Guest account, this browser only:{" "}
+              <Link href="/account" className="text-fg underline-offset-4 hover:underline">
+                add an email to keep it
+              </Link>
+              .
+            </>
+          )}
         </>
       }
       rows={rows}

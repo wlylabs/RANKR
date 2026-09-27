@@ -14,8 +14,10 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Live multiple**: current price / entry price, shown as `3.42x` for gains and `-37.2%` for losses.
   Peak and lowest point since the paste are recorded too.
 - **Leaderboard**: top gainers, peak x, biggest dumps, newest, most pasted. Filter by 24h / 7d / 30d, chain, and search.
-- **Accounts**: sign in with an email link (or the code in it), no password, then pick a username. Pasting
-  needs an account, so every call on Rankr has a name behind it. Your email is never shown.
+- **Accounts**: pasting needs an account, so every call on Rankr has a name behind it. Continue as a
+  **guest** in one click, or sign in with an **email link** (or the code in it), no password. Every account
+  starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`, and can rename itself. Guests can add
+  an email later to keep their account. Emails are never shown.
 - **My calls**: every token you pasted, measured from *your* paste.
 - **Caller leaderboard**: callers ranked by their calls (2x hits, average x, best call), by username.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
@@ -60,7 +62,8 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
 - **"no backdating" is enforced by the database**: a trigger rejects any change to a token's entry;
 - a paste is one atomic SQL call, so simultaneous pastes never lose a count;
 - browsers can only read (RLS); every write goes through the server with the secret key;
-- Supabase Auth handles accounts (email magic link), and each caller's calls are rows tied to their account.
+- Supabase Auth handles accounts (anonymous guests, email magic link), and each caller's calls are rows tied
+  to their account.
 
 ### Setup
 
@@ -82,38 +85,49 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
 5. Optional, for peaks/lows while nobody is browsing: run `supabase/cron.sql` (pg_cron + pg_net call
    `/api/cron/refresh` every minute).
 
-### Accounts (email magic link)
+### Accounts (guest or email)
 
-Pasting needs an account. Someone signed out who pastes a CA goes to `/login`, gets an email with a sign-in
-link **and** a code, and after the first sign-in picks a username. Then they land back on the home page and the
-CA they pasted is tracked. Browsing (boards, token pages) needs no account.
+Pasting needs an account. Someone signed out who pastes a CA goes to `/login` and picks one:
+
+- **Continue as guest**: one click, no email. A Supabase anonymous account that lives in that browser.
+- **Email**: a sign-in link **and** a code in one email (the code is for when the email is opened on
+  another device). The same link creates the account the first time.
+
+Either way they land back on the home page and the CA they pasted is tracked. Browsing needs no account.
 
 In the Supabase dashboard:
 
-1. **Authentication → Sign In / Providers → Email**: enabled (the default). Leave "Allow new users to sign up"
-   on. If you turned on anonymous sign-ins for an earlier version of Rankr, turn them off.
+1. **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins** (guests) and keep **Email**
+   enabled with "Allow new users to sign up" on.
 2. **Authentication → URL Configuration**: Site URL = `https://your-domain`. Add `http://localhost:3000/**`
-   to Redirect URLs for local dev. The link sends people to `/login` on your site.
-3. **Custom SMTP (required for real users)**: Supabase's built-in mailer only delivers to members of your
+   to Redirect URLs for local dev.
+3. **Custom SMTP (needed for email sign-in)**: Supabase's built-in mailer only delivers to members of your
    Supabase team and only a couple of emails per hour. Add any SMTP provider (Resend, Postmark, SES, ...) under
    **Authentication → Emails → SMTP Settings**, then raise the email limit under **Authentication → Rate Limits**.
-4. **Authentication → Emails → Templates**: add the code to the **Magic Link** and **Confirm signup** templates
-   (a first sign-in uses "Confirm signup"), so people who open the email on another device can type it in:
+   Guests work without it.
+4. **Authentication → Emails → Templates**: add the code to **Magic Link**, **Confirm signup** (first sign-in)
+   and **Change Email Address** (a guest adding an email):
    ```html
-   <h2>Sign in to Rankr</h2>
-   <p><a href="{{ .ConfirmationURL }}">Sign in</a></p>
+   <p><a href="{{ .ConfirmationURL }}">Continue</a></p>
    <p>Or enter this code: <strong>{{ .Token }}</strong></p>
    ```
+5. Optional, against guest spam: **Authentication → Attack Protection → CAPTCHA** (Supabase caps anonymous
+   sign-ins at 30 per hour per IP by default, adjustable under Rate Limits).
 
 How it works:
 
 - A **call** is the price at the moment *you* paste a token, taken from the server's market data. The first
   call per token counts; calls can be deleted but never edited (enforced by the database).
-- **Usernames**: 3-20 letters, numbers or underscores, unique ignoring case, a few names reserved. They can be
-  changed on `/account`; calls follow the account, not the name. Profiles hold only the username: no email,
-  no wallet.
-- `/api/track` checks the access token with Supabase Auth and refuses pastes without an account (401) or
-  without a username (403); the UI sends people to `/login` and back with their CA.
+- **Names**: every new account gets a default name from `sha256(user id)`: the first hex digit picks a
+  word (`nonce`, `cipher`, `merkle`, `ledger`, `satoshi`, ...), the next 4 digits follow it (`@nonce_7f3a`;
+  more digits if that one is taken). Renaming on `/account`: 3-20 letters, numbers or underscores, unique
+  ignoring case, a few names reserved. Calls follow the account, not the name. Profiles hold only the name:
+  no email, no wallet.
+- **Guests** exist only in the browser that created them; clearing site data loses access (their calls
+  stay on the board). Adding an email on `/account` turns the guest into a normal account with the same id,
+  name and calls. Signing out a guest asks for confirmation first.
+- `/api/track` checks the access token with Supabase Auth and refuses pastes without an account (401); the UI
+  sends people to `/login` and back with their CA.
 - The caller board ranks callers by 2x hits, average x (3+ calls), best call and number of calls.
 - Without the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` vars (local dev), there are no accounts: pasting works
   for everyone and "My calls" is kept in the browser.
@@ -156,12 +170,12 @@ src/app/                     pages, API routes, icons, social cards
   api/stats                  GET home page totals
   api/cron/refresh           background price refresh
   api/callers, api/me/*      caller board, your account, username and calls
-  login, account             email sign-in + username, account settings
+  login, account             guest / email sign-in, rename, keep a guest account
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
-src/lib/accounts.ts          accounts (Supabase Auth), usernames and calls, server side
+src/lib/accounts.ts          accounts (Supabase Auth: guests, email), names and calls, server side
 supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```
 

@@ -29,6 +29,10 @@ export function authErrorMessage(err: { code?: string; message?: string } | null
       return "New sign-ups are closed right now.";
     case "over_request_rate_limit":
       return "Too many attempts. Wait a moment and try again.";
+    case "anonymous_provider_disabled":
+      return "Guest accounts are turned off here. Sign in with email instead.";
+    case "email_exists":
+      return "That email already has a Rankr account. Sign out and sign in with it instead.";
   }
   return err?.message || "Something went wrong. Try again.";
 }

@@ -32,7 +32,8 @@ export function PasteBox({
   resumeFromUrl?: boolean;
 }) {
   const router = useRouter();
-  const { available, ready, userId, username } = useAuth();
+  const { available, ready, userId, username, continueAsGuest } = useAuth();
+  const [joining, setJoining] = useState(false);
   const needsAccount = available && ready && (!userId || !username);
   const resumed = useRef(false);
   const [value, setValue] = useState("");
@@ -204,10 +205,29 @@ export function PasteBox({
           ) : (
             <span>
               Pasting needs an account.{" "}
+              <button
+                type="button"
+                disabled={joining}
+                onClick={async () => {
+                  setJoining(true);
+                  try {
+                    await continueAsGuest();
+                    inputRef.current?.focus();
+                  } catch (err) {
+                    setError((err as Error).message);
+                  } finally {
+                    setJoining(false);
+                  }
+                }}
+                className="text-fg underline-offset-4 hover:underline disabled:opacity-60"
+              >
+                {joining ? "Creating…" : "Continue as guest"}
+              </button>{" "}
+              or{" "}
               <Link href={loginHref()} className="text-fg underline-offset-4 hover:underline">
-                Sign in with email
+                sign in with email
               </Link>
-              , no password.
+              .
             </span>
           )}
         </p>

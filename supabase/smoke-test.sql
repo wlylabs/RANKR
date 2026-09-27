@@ -124,7 +124,10 @@ do $$
 declare
   a uuid := '00000000-0000-4000-8000-00000000000a';
   b uuid := '00000000-0000-4000-8000-00000000000b';
+  c uuid := '00000000-0000-4000-8000-00000000000c';
+  d uuid := '00000000-0000-4000-8000-00000000000d';
   r jsonb;
+  v text;
   failed boolean;
 begin
   insert into auth.users (id) values (a), (b);
@@ -176,10 +179,21 @@ begin
   assert public.rankr_delete_call(b, 'solana:AAA');
   assert not public.rankr_delete_call(b, 'solana:AAA');
 
+  -- Default names: a crypto word + hex from sha256(user id). Stable, valid, and unique.
+  v := public.rankr_default_username(c);
+  assert v ~ '^(nonce|cipher|hash|salt|merkle|ledger|block|shard|vault|epoch|proof|oracle|genesis|keccak|satoshi|entropy)_[0-9a-f]{4}$', v;
+  assert public.rankr_username_problem(v) is null and public.rankr_username_problem(public.rankr_default_username(c, 12)) is null;
+  insert into auth.users (id) values (c), (d);
+  assert (public.rankr_set_username(d, v)->>'ok')::boolean;                -- somebody took c's default name
+  assert public.rankr_ensure_profile(c) = public.rankr_default_username(c, 6), 'taken default gets more hex';
+  assert public.rankr_ensure_profile(c) = public.rankr_default_username(c, 6), 'idempotent';
+  assert public.rankr_ensure_profile(a) = 'alpha_caller', 'existing name kept';
+
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_set_username(uuid,text)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_ensure_profile(uuid)', 'execute');
     assert has_function_privilege('anon', 'public.rankr_callers(text,integer,integer,integer)', 'execute');
   end if;
 

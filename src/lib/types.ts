@@ -118,4 +118,4 @@ export type TokenResponse = {
   preview: MarketSnapshot | null;
 };
 
-export type MeResponse = { account: { id: string; email: string | null; username: string | null } };
+export type MeResponse = { account: { id: string; email: string | null; username: string | null; guest: boolean } };

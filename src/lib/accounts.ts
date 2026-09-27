@@ -1,4 +1,5 @@
-// Accounts (Supabase Auth, email magic link) with a public username, and per-user calls. Server only.
+// Accounts (Supabase Auth: one-click guests or email magic link) with a public username, and per-user
+// calls. Server only.
 import { MIN_CALLS_FOR_AVG, type CallerSort } from "./params";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
@@ -6,8 +7,12 @@ import { SupabaseRest, supabaseConfig } from "./supabase-rest";
 import type { CallView, CallerView, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 
-/** A signed-in user. `username` is null until they pick one; the email is never shown publicly. */
-export type Account = { id: string; email: string | null; username: string | null };
+/**
+ * A signed-in user. New accounts get a default name (e.g. nonce_7f3a) they can change. `guest` accounts
+ * (anonymous sign-in) have no email and live in one browser until an email is added. The email is never
+ * shown publicly.
+ */
+export type Account = { id: string; email: string | null; username: string | null; guest: boolean };
 
 export class AuthError extends Error {}
 
@@ -43,13 +48,15 @@ export async function accountFromRequest(req: Request): Promise<Account | null> 
   const hit = verified.get(token);
   if (hit && hit.until > Date.now()) return hit.account;
 
-  const user = await api.user<{ id: string; email?: string | null }>(token);
+  const user = await api.user<{ id: string; email?: string | null; is_anonymous?: boolean }>(token);
   if (!user?.id) throw new AuthError("Your session expired. Sign in again.");
 
   const rows = await api.select<{ username: string }[]>(
     `profiles?select=username&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
   );
-  const account: Account = { id: user.id, email: user.email ?? null, username: rows[0]?.username ?? null };
+  // First sight of this account: give it its default name.
+  const username = rows[0]?.username ?? (await api.rpc<string>("rankr_ensure_profile", { p_user: user.id }));
+  const account: Account = { id: user.id, email: user.email || null, username, guest: !!user.is_anonymous };
   if (verified.size > 5_000) verified.clear();
   verified.set(token, { account, until: Date.now() + 60_000 });
   return account;
