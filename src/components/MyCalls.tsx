@@ -252,6 +252,8 @@ export function CallsView({
   onRemove?: (row: Row) => void;
 }) {
   const [sort, setSort] = useState<keyof typeof SORTS>("new");
+  // The row whose trash button was pressed, waiting on Yes or No.
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const rows = useMemo(() => [...unsorted].sort(SORTS[sort]), [unsorted, sort]);
   const withData = rows.filter((r) => r.token);
   const inProfit = withData.filter((r) => ["up", "pump", "moon"].includes(tierOf(r.multiple))).length;
@@ -329,17 +331,40 @@ export function CallsView({
                 )}
               </div>
             </Link>
-            {onRemove && (
-              <button
-                type="button"
-                onClick={() => onRemove(row)}
-                className="grid size-8 shrink-0 place-items-center rounded-md text-subtle transition hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
-                aria-label={`Remove $${row.symbol} from my calls`}
-                title="Remove from my calls"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            )}
+            {onRemove &&
+              (confirmId === row.id ? (
+                <div className="flex shrink-0 items-center gap-1 text-xs">
+                  <span className="text-muted max-sm:hidden">Remove?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmId(null);
+                      onRemove(row);
+                    }}
+                    className="h-7 rounded-md border border-border px-2.5 text-down hover:bg-surface-2"
+                    aria-label={`Yes, remove $${row.symbol} from my calls`}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(null)}
+                    className="h-7 rounded-md px-2.5 text-muted hover:text-fg"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmId(row.id)}
+                  className="grid size-8 shrink-0 place-items-center rounded-md text-subtle transition hover:text-down sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                  aria-label={`Remove $${row.symbol} from my calls`}
+                  title="Remove from my calls"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              ))}
           </li>
         ))}
       </ul>

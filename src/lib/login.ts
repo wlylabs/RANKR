@@ -3,6 +3,9 @@
 /** The app's home: the paste box and the live board. The landing page is at /. */
 export const APP_HOME = "/app";
 
+/** The landing page. Signing out ends up here. */
+export const LANDING = "/";
+
 export function safeNext(next: string | null | undefined, fallback = APP_HOME): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
   return next;

@@ -3,7 +3,7 @@
 import { KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { APP_HOME, loginHref } from "@/lib/login";
+import { APP_HOME, LANDING, loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeyReveal, KeySignInForm } from "./Key";
 import { OfficialBadge } from "./OfficialBadge";
@@ -19,12 +19,15 @@ export function Account() {
   const { available, ready, userId, username, hasKey, official, signOut } = useAuth();
   const [saved, setSaved] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
+  // Signing out heads to the landing page, not the sign-in redirect below.
+  const [leaving, setLeaving] = useState(false);
   // Kept while the new key is on screen, so it stays up after hasKey flips.
   const [shownKey, setShownKey] = useState<string | null>(null);
 
   useEffect(() => {
+    if (leaving) return;
     if (!available || (ready && (!userId || !username))) router.replace(available ? loginHref("/account") : APP_HOME);
-  }, [available, ready, userId, username, router]);
+  }, [leaving, available, ready, userId, username, router]);
 
   if (!ready || !userId || !username) {
     return (
@@ -35,8 +38,9 @@ export function Account() {
   }
 
   async function out() {
+    setLeaving(true);
     await signOut();
-    router.replace(APP_HOME);
+    router.replace(LANDING);
   }
 
   const keyProps = { username, shownKey, setShownKey };

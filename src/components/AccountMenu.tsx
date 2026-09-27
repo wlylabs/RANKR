@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { callerHref } from "@/lib/format";
-import { loginHref } from "@/lib/login";
+import { LANDING, loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { OfficialBadge } from "./OfficialBadge";
 
@@ -113,7 +113,7 @@ export function AccountMenu() {
                   onClick={async () => {
                     setOpen(false);
                     await signOut();
-                    router.refresh();
+                    router.push(LANDING);
                   }}
                   className="h-7 rounded-md border border-border px-2.5 text-xs text-down hover:bg-surface-2"
                 >
