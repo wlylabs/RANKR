@@ -49,35 +49,73 @@ npm test             # unit tests
 npm run build && npm start
 ```
 
-## Storage
+## Storage: Supabase
 
-| Setup | What to set | Where data lives |
-| --- | --- | --- |
-| Local / VPS / Docker | nothing | `./data/rankr.json` (change with `RANKR_DATA_DIR`) |
-| Vercel / serverless | `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (or Vercel KV's `KV_REST_API_URL` + `KV_REST_API_TOKEN`) | one Redis hash, `rankr:tokens` |
+Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. Supabase fits the concept:
 
-Serverless file systems are not persistent, so use Redis there. Set `NEXT_PUBLIC_SITE_URL` to your domain so share
-links and social cards use absolute URLs. See `.env.example`.
+- the leaderboard is sorted, filtered and paged by Postgres (indexed), not in the browser;
+- **"no backdating" is enforced by the database**: a trigger rejects any change to a token's entry;
+- a paste is one atomic SQL call, so simultaneous pastes never lose a count;
+- browsers can only read (RLS); every write goes through the server with the secret key;
+- later: wallet login (Sign in with Web3) to sync "My calls", Realtime for a live board.
+
+### Setup
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Open **SQL Editor**, paste `supabase/migrations/20260927000000_rankr_tokens.sql`, run it.
+   (With the Supabase CLI: `supabase link` then `supabase db push`.)
+3. Set the env vars on your host (Vercel etc.):
+   ```
+   SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+   SUPABASE_SECRET_KEY=sb_secret_...        # Settings -> API Keys. Server-side only.
+   CRON_SECRET=some-long-random-string
+   NEXT_PUBLIC_SITE_URL=https://your-domain
+   ```
+4. Optional, for peaks/lows while nobody is browsing: run `supabase/cron.sql` (pg_cron + pg_net call
+   `/api/cron/refresh` every minute).
+
+Without `SUPABASE_URL` / `SUPABASE_SECRET_KEY` Rankr uses `./data/rankr.json`. `RANKR_MOCK=1` always uses the
+file store, so demo data never reaches a real database.
+
+`supabase/smoke-test.sql` checks the schema (sealed entry, atomic pastes, sorting, stats, privileges) and
+rolls everything back. Run it against a local or throwaway database:
+`psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/smoke-test.sql`.
+
+### API
+
+| Route | What |
+| --- | --- |
+| `POST /api/track` `{input}` | paste a CA / link |
+| `GET /api/tokens?sort=top\|peak\|losers\|new\|hot&range=24h\|7d\|30d\|all&chain=&q=&ids=&limit=&offset=` | leaderboard page |
+| `GET /api/tokens/:chain/:address` | one token (or a preview if untracked) |
+| `GET /api/stats` | totals for the home page |
+| `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
 
 ## How the numbers work
 
-- **Entry**: price and market cap of the most liquid pair at the first paste.
-- **Multiple**: `current price / entry price`. Price is used rather than market cap because supply is fixed for most
-  memecoins and price is always present in the API; market cap is shown alongside.
-- **Peak / low**: updated whenever Rankr refreshes the token (list and token views refresh anything older than 15s,
-  in batches of 30 addresses per DexScreener call). They are sampled, so a wick between refreshes can be missed.
-- **Pair migration** (e.g. pump.fun bonding curve → PumpSwap/Raydium) is handled because the best pair is re-picked
-  on every refresh.
+- **Entry**: price and market cap of the most liquid pair at the first paste. Sealed: the app never rewrites
+  it and the database rejects changes.
+- **x = gain since the paste. 1x = +100%** (price doubled), 2x = +200%, 10x = +1,000%. A fresh paste is 0%.
+  Below +100% the move is shown as a percentage (+34%, -37%).
+- **Peak / low**: the highest / lowest price seen since the paste, updated on every refresh (on page views
+  for the tokens on screen, and by the cron job for the rest). Sampled, so a wick between refreshes can be
+  missed.
+- **Pair migration** (e.g. pump.fun bonding curve → PumpSwap/Raydium) is handled because the best pair is
+  re-picked on every refresh.
 
 ## Project layout
 
 ```
 src/app/                     pages, API routes, icons, social cards
   api/track                  POST { input } -> records a paste
-  api/tokens                 GET all tracked tokens (with live data)
+  api/tokens                 GET a leaderboard page (sort, filter, paging)
+  api/stats                  GET home page totals
+  api/cron/refresh           background price refresh
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
-src/lib/                     address parsing, DexScreener client, store, metrics, formatting
+src/lib/                     address parsing, DexScreener client, metrics, formatting
+src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
+supabase/                    migration, smoke test, optional cron job
 ```
 
 Not financial advice. Memecoins can and do go to zero.

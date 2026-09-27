@@ -2,7 +2,7 @@ import { sameAddress, tokenId } from "./address";
 import { mockSnapshot } from "./mock";
 import type { Link, MarketSnapshot } from "./types";
 
-const API = "https://api.dexscreener.com";
+const API = (process.env.DEXSCREENER_API_URL ?? "https://api.dexscreener.com").replace(/\/+$/, "");
 const BATCH = 30; // max addresses per /tokens/v1 call
 
 export const MOCK = process.env.RANKR_MOCK === "1";

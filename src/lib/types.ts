@@ -67,6 +67,18 @@ export type TrackResponse = {
 
 export type TokensResponse = {
   tokens: TokenView[];
+  /** Matching tokens in total (for paging). */
+  total: number;
+  updatedAt: number;
+};
+
+export type StatsResponse = {
+  total: number;
+  /** Tokens that peaked at 1x (+100%) or more. */
+  doubled: number;
+  inRed: number;
+  best: TokenView | null;
+  chains: string[];
   updatedAt: number;
 };
 

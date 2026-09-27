@@ -6,9 +6,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
 import { removeMyCall, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
-import { ratio } from "@/lib/metrics";
+import { MAX_LIMIT } from "@/lib/params";
+import { ratio, tierOf } from "@/lib/metrics";
 import type { TokenView } from "@/lib/types";
-import { MultipleBadge } from "./MultipleBadge";
+import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
 import { TokenName } from "./TokenList";
@@ -23,7 +24,8 @@ const SORTS = {
 
 export function MyCalls() {
   const calls = useMyCalls();
-  const { tokens, isLoading } = useTokens();
+  // Live data for the calls on this device (the newest MAX_LIMIT of them).
+  const { tokens, isLoading } = useTokens({ ids: calls.slice(0, MAX_LIMIT).map((c) => c.id), limit: MAX_LIMIT });
   const [sort, setSort] = useState<keyof typeof SORTS>("new");
 
   const rows = useMemo(() => {
@@ -39,7 +41,7 @@ export function MyCalls() {
   }, [calls, tokens, sort]);
 
   const withData = rows.filter((r) => r.token);
-  const inProfit = withData.filter((r) => r.multiple >= 1).length;
+  const inProfit = withData.filter((r) => ["up", "pump", "moon"].includes(tierOf(r.multiple))).length;
   const doubled = withData.filter((r) => r.multiple >= 2).length;
   const best = withData.reduce<Row | null>((acc, r) => (!acc || r.multiple > acc.multiple ? r : acc), null);
 
@@ -74,7 +76,7 @@ export function MyCalls() {
             <Tile label="1x or better" value={doubled} hint="+100% or more, right now" />
             <Tile
               label="Best call"
-              value={best ? <span className={best.multiple >= 1 ? "text-up" : "text-down"}>{formatMultiple(best.multiple)}</span> : "—"}
+              value={best ? <span className={toneOf(best.multiple, "text-fg")}>{formatMultiple(best.multiple)}</span> : "—"}
               hint={best ? `$${best.call.symbol}` : undefined}
             />
           </div>

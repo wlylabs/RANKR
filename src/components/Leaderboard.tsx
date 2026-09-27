@@ -3,23 +3,19 @@
 import clsx from "clsx";
 import { RefreshCw, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { chainMeta } from "@/lib/chains";
-import { useNow, useTokens } from "@/lib/hooks";
-import type { TokenView } from "@/lib/types";
+import { useNow, useStats, useTokenPages } from "@/lib/hooks";
+import { parseRange, parseSort, RANGES, SORT_KEYS, type RangeKey, type SortKey } from "@/lib/params";
 import { ListSkeleton, TokenRow, TokenTable } from "./TokenList";
 
-const SORTS = {
-  top: { label: "Top gainers", fn: (a: TokenView, b: TokenView) => b.multiple - a.multiple },
-  peak: { label: "Peak x", fn: (a: TokenView, b: TokenView) => b.peakMultiple - a.peakMultiple },
-  losers: { label: "Biggest dumps", fn: (a: TokenView, b: TokenView) => a.multiple - b.multiple },
-  new: { label: "Newest", fn: (a: TokenView, b: TokenView) => b.firstPastedAt - a.firstPastedAt },
-  hot: { label: "Most pasted", fn: (a: TokenView, b: TokenView) => b.pasteCount - a.pasteCount || b.lastPastedAt - a.lastPastedAt },
-} as const;
-type SortKey = keyof typeof SORTS;
-
-const RANGES = { "24h": 86_400_000, "7d": 7 * 86_400_000, "30d": 30 * 86_400_000, all: Infinity } as const;
-type RangeKey = keyof typeof RANGES;
+const SORT_LABELS: Record<SortKey, string> = {
+  top: "Top gainers",
+  peak: "Peak x",
+  losers: "Biggest dumps",
+  new: "Newest",
+  hot: "Most pasted",
+};
 
 const PAGE = 50;
 
@@ -44,41 +40,33 @@ export function Leaderboard() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const { tokens, isLoading, updatedAt, mutate } = useTokens();
   const now = useNow(15_000);
 
-  const sort: SortKey = (params.get("sort") as SortKey) in SORTS ? (params.get("sort") as SortKey) : "top";
-  const range: RangeKey = (params.get("range") as RangeKey) in RANGES ? (params.get("range") as RangeKey) : "all";
+  const sort = parseSort(params.get("sort"));
+  const range = parseRange(params.get("range"));
   const chain = params.get("chain") ?? "all";
   const [query, setQuery] = useState("");
-  const [limit, setLimit] = useState(PAGE);
+  const [q, setQ] = useState("");
+
+  // Search waits for a pause in typing before hitting the server.
+  useEffect(() => {
+    const id = setTimeout(() => setQ(query.trim().replace(/^\$/, "")), 300);
+    return () => clearTimeout(id);
+  }, [query]);
+
+  const { tokens, total, isLoading, isValidating, updatedAt, loadMore, mutate } = useTokenPages(
+    { sort, range, chain: chain === "all" ? null : chain, q: q || null },
+    PAGE,
+  );
+  const chains = useStats().stats?.chains ?? [];
 
   function setParam(key: string, value: string, fallback: string) {
     const next = new URLSearchParams(params.toString());
     if (value === fallback) next.delete(key);
     else next.set(key, value);
-    setLimit(PAGE);
     router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   }
 
-  const chains = useMemo(() => [...new Set(tokens.map((t) => t.chainId))].sort(), [tokens]);
-
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase().replace(/^\$/, "");
-    return tokens
-      .filter((t) => now - t.firstPastedAt <= RANGES[range])
-      .filter((t) => chain === "all" || t.chainId === chain)
-      .filter(
-        (t) =>
-          !q ||
-          t.symbol.toLowerCase().includes(q) ||
-          t.name.toLowerCase().includes(q) ||
-          t.address.toLowerCase() === q,
-      )
-      .sort(SORTS[sort].fn);
-  }, [tokens, now, range, chain, query, sort]);
-
-  const visible = rows.slice(0, limit);
   const loading = isLoading && !tokens.length;
 
   return (
@@ -94,15 +82,15 @@ export function Leaderboard() {
           className="inline-flex items-center gap-1.5 font-mono text-[11px] text-subtle hover:text-fg"
           title="Refresh now"
         >
-          <RefreshCw className={clsx("size-3", isLoading && "animate-spin")} />
+          <RefreshCw className={clsx("size-3", isValidating && "animate-spin")} />
           {updatedAt ? `updated ${Math.max(0, Math.round((now - updatedAt) / 1000))}s ago` : "loading"}
         </button>
       </div>
 
       <div className="scrollbar-none -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0" role="tablist">
-        {(Object.keys(SORTS) as SortKey[]).map((key) => (
+        {SORT_KEYS.map((key) => (
           <Tab key={key} active={sort === key} onClick={() => setParam("sort", key, "top")}>
-            {SORTS[key].label}
+            {SORT_LABELS[key]}
           </Tab>
         ))}
       </div>
@@ -112,10 +100,7 @@ export function Leaderboard() {
           <Search className="size-3.5 text-subtle" />
           <input
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setLimit(PAGE);
-            }}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search ticker, name or address"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-subtle"
           />
@@ -158,30 +143,33 @@ export function Leaderboard() {
           <div className="rounded-lg border border-border">
             <ListSkeleton rows={8} />
           </div>
-        ) : !rows.length ? (
+        ) : !tokens.length ? (
           <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
             <p className="font-medium">No tokens match</p>
             <p className="mt-1 text-sm text-muted">
-              {tokens.length ? "Try another range, chain or search." : "Nobody has pasted a CA yet. Be the first."}
+              {q || range !== "all" || chain !== "all"
+                ? "Try another range, chain or search."
+                : "Nobody has pasted a CA yet. Be the first."}
             </p>
           </div>
         ) : (
           <>
             <div className="hidden md:block">
-              <TokenTable tokens={visible} />
+              <TokenTable tokens={tokens} />
             </div>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border md:hidden">
-              {visible.map((t, i) => (
+              {tokens.map((t, i) => (
                 <TokenRow key={t.id} token={t} rank={i + 1} meta={sort === "peak" ? "peak" : "pasted"} />
               ))}
             </div>
-            {rows.length > limit && (
+            {total > tokens.length && (
               <button
                 type="button"
-                onClick={() => setLimit((l) => l + PAGE)}
+                onClick={() => loadMore()}
+                disabled={isValidating}
                 className="mt-4 h-10 w-full rounded-md border border-border text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
-                Show more ({rows.length - limit} left)
+                Show more ({total - tokens.length} left)
               </button>
             )}
           </>
