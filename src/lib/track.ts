@@ -33,8 +33,8 @@ export async function trackPaste(input: string, chain?: string): Promise<TrackRe
   return { ...result, firstCallByYou };
 }
 
-// A paste that had to go through sign-in first. Kept in localStorage (the email link may open in a new tab)
-// so that coming back to /?ca=... tracks it, while a /?ca=... link from someone else only fills the box.
+// A paste that had to go through sign-in first. Kept in localStorage so that coming back to /?ca=...
+// tracks it, while a /?ca=... link from someone else only fills the box.
 const PENDING_KEY = "rankr:pending-paste";
 const PENDING_MS = 60 * 60_000;
 

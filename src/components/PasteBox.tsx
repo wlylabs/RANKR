@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ClipboardPaste, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
+import { ArrowRight, ClipboardPaste, KeyRound, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -32,7 +32,7 @@ export function PasteBox({
   resumeFromUrl?: boolean;
 }) {
   const router = useRouter();
-  const { available, ready, userId, username, continueAsGuest } = useAuth();
+  const { available, ready, userId, username, hasKey, continueAsGuest } = useAuth();
   const [joining, setJoining] = useState(false);
   const needsAccount = available && ready && (!userId || !username);
   const resumed = useRef(false);
@@ -225,7 +225,7 @@ export function PasteBox({
               </button>{" "}
               or{" "}
               <Link href={loginHref()} className="text-fg underline-offset-4 hover:underline">
-                sign in with email
+                sign in with your key
               </Link>
               .
             </span>
@@ -240,12 +240,19 @@ export function PasteBox({
         </p>
       )}
 
-      {result && <TrackResult result={result} onClose={() => setResult(null)} />}
+      {result && (
+        <TrackResult
+          result={result}
+          keepAs={available && userId && username && !hasKey ? username : null}
+          onClose={() => setResult(null)}
+        />
+      )}
     </div>
   );
 }
 
-function TrackResult({ result, onClose }: { result: Result; onClose: () => void }) {
+/** `keepAs`: a guest without a key, nudged to save one now that the account holds a call. */
+function TrackResult({ result, keepAs, onClose }: { result: Result; keepAs: string | null; onClose: () => void }) {
   const t = result.token;
   const created = result.status === "created";
   return (
@@ -282,6 +289,18 @@ function TrackResult({ result, onClose }: { result: Result; onClose: () => void 
           <X className="size-3.5" />
         </button>
       </div>
+      {keepAs && (
+        <Link
+          href="/account"
+          className="flex items-center gap-2 border-t border-border px-4 py-2 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        >
+          <KeyRound className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            <span className="font-mono">@{keepAs}</span> lives in this browser only. Save your key to keep it.
+          </span>
+          <ArrowRight className="size-3.5 shrink-0" />
+        </Link>
+      )}
     </div>
   );
 }

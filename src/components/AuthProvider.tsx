@@ -2,11 +2,12 @@
 
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import useSWR, { mutate as mutateKeys } from "swr";
+import useSWR from "swr";
 import { refreshBoards } from "@/lib/hooks";
-import { authErrorMessage, loginHref } from "@/lib/login";
+import { keyEmail, parseKey } from "@/lib/key";
+import { authErrorMessage } from "@/lib/login";
 import { accountsAvailable, apiFetch, authedFetcher, browserSupabase } from "@/lib/supabase-browser";
-import type { MeResponse } from "@/lib/types";
+import type { KeyResponse, MeResponse } from "@/lib/types";
 
 type AuthState = {
   /** Accounts are configured for this deployment. Without them, pasting works without an account. */
@@ -14,21 +15,18 @@ type AuthState = {
   /** The stored session (and, when signed in, the profile) has been read. */
   ready: boolean;
   userId: string | null;
-  /** Only ever shown to its owner. */
-  email: string | null;
   /** Public name on the caller board. New accounts get a default one (e.g. nonce_7f3a). */
   username: string | null;
-  /** A one-click guest account: no email, lives in this browser until an email is added. */
-  guest: boolean;
+  /** The account has a sign-in key. Without one it is a guest that lives in this browser only. */
+  hasKey: boolean;
+  /** An official account: check badge, name locked. */
+  official: boolean;
   /** Creates a guest account. */
   continueAsGuest: () => Promise<void>;
-  /** Emails a sign-in link (and code). New emails get an account. */
-  sendLink: (email: string, next?: string) => Promise<void>;
-  /** Signs in with the code from the email, for when the link opens in another browser. */
-  verifyCode: (email: string, code: string) => Promise<void>;
-  /** Guest only: attaches an email (confirmed by link or code), keeping the account and its calls. */
-  addEmail: (email: string) => Promise<void>;
-  verifyEmailCode: (email: string, code: string) => Promise<void>;
+  /** Signs in with a key. A guest signed in here is left behind. */
+  signInWithKey: (key: string) => Promise<void>;
+  /** Gives the account a new key and returns it, once. An older key stops working; other devices are signed out. */
+  makeKey: () => Promise<string>;
   saveUsername: (username: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -41,14 +39,12 @@ const AuthContext = createContext<AuthState>({
   available: false,
   ready: true,
   userId: null,
-  email: null,
   username: null,
-  guest: false,
+  hasKey: false,
+  official: false,
   continueAsGuest: unavailable,
-  sendLink: unavailable,
-  verifyCode: unavailable,
-  addEmail: unavailable,
-  verifyEmailCode: unavailable,
+  signInWithKey: unavailable,
+  makeKey: unavailable,
   saveUsername: unavailable,
   signOut: async () => {},
 });
@@ -68,8 +64,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = sb.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       void refreshBoards();
-      // e.g. a guest who just confirmed an email: re-read the account.
-      void mutateKeys((key) => typeof key === "string" && key.startsWith("/api/me?"));
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -85,38 +79,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(authErrorMessage(error));
   }, []);
 
-  const addEmail = useCallback(async (email: string) => {
+  const signInWithKey = useCallback(async (input: string) => {
     const sb = browserSupabase();
     if (!sb) return unavailable();
-    const { error } = await sb.auth.updateUser({ email }, { emailRedirectTo: `${window.location.origin}/account` });
-    if (error) throw new Error(authErrorMessage(error));
-  }, []);
-
-  const verifyEmailCode = useCallback(async (email: string, code: string) => {
-    const sb = browserSupabase();
-    if (!sb) return unavailable();
-    const { error } = await sb.auth.verifyOtp({ email, token: code, type: "email_change" });
-    if (error) throw new Error(authErrorMessage(error));
-  }, []);
-
-  const sendLink = useCallback(async (email: string, next?: string) => {
-    const sb = browserSupabase();
-    if (!sb) return unavailable();
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}${loginHref(next)}` },
-    });
-    if (error) throw new Error(authErrorMessage(error));
-  }, []);
-
-  const verifyCode = useCallback(async (email: string, code: string) => {
-    const sb = browserSupabase();
-    if (!sb) return unavailable();
-    const { error } = await sb.auth.verifyOtp({ email, token: code, type: "email" });
+    const key = parseKey(input);
+    if (!key) throw new Error("That isn't a Rankr key. It looks like rk- and 20 letters and numbers.");
+    const { error } = await sb.auth.signInWithPassword({ email: await keyEmail(key), password: key });
     if (error) throw new Error(authErrorMessage(error));
   }, []);
 
   const { mutate } = me;
+  const makeKey = useCallback(async () => {
+    const res = await apiFetch("/api/me/key", { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body?.error ?? "Could not make your key. Try again.");
+    const { key, account } = body as KeyResponse;
+    await mutate({ account }, { revalidate: false });
+    // Whoever had the old key is signed out everywhere but here.
+    await browserSupabase()
+      ?.auth.signOut({ scope: "others" })
+      .catch(() => {});
+    return key;
+  }, [mutate]);
+
   const saveUsername = useCallback(
     async (username: string) => {
       const res = await apiFetch("/api/me/username", {
@@ -136,37 +121,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await browserSupabase()?.auth.signOut({ scope: "local" });
   }, []);
 
-  const account = me.data?.account;
+  const account = me.data?.account?.id === userId ? me.data?.account : undefined;
   const value = useMemo<AuthState>(
     () => ({
       available: accountsAvailable,
       ready: sessionRead && profileRead,
       userId,
-      email: account?.email || session?.user.email || null,
-      username: account?.id === userId ? (account?.username ?? null) : null,
-      guest: !!session?.user.is_anonymous,
+      username: account?.username ?? null,
+      hasKey: !!account?.hasKey,
+      official: !!account?.official,
       continueAsGuest,
-      sendLink,
-      verifyCode,
-      addEmail,
-      verifyEmailCode,
+      signInWithKey,
+      makeKey,
       saveUsername,
       signOut,
     }),
-    [
-      sessionRead,
-      profileRead,
-      userId,
-      account,
-      session,
-      continueAsGuest,
-      sendLink,
-      verifyCode,
-      addEmail,
-      verifyEmailCode,
-      saveUsername,
-      signOut,
-    ],
+    [sessionRead, profileRead, userId, account, continueAsGuest, signInWithKey, makeKey, saveUsername, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

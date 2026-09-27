@@ -7,12 +7,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
+import { OfficialBadge } from "./OfficialBadge";
 
 const ITEM = "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
 
 /** Header: "Sign in" when signed out, the username with a menu when signed in. */
 export function AccountMenu() {
-  const { available, ready, userId, email, username, guest, signOut } = useAuth();
+  const { available, ready, userId, username, hasKey, official, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -58,16 +59,19 @@ export function AccountMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`Account: @${username}`}
+        aria-label={`Account: @${username}${hasKey ? "" : ", key not saved"}`}
         className={clsx(
           "inline-flex h-8 items-center gap-2 rounded-md border border-border pr-1 pl-1 font-mono text-xs transition-colors hover:bg-surface-2 sm:pr-2.5",
           open && "bg-surface-2",
         )}
       >
-        <span className="grid size-6 place-items-center rounded bg-surface-2 text-[11px] font-medium text-fg uppercase">
+        <span className="relative grid size-6 place-items-center rounded bg-surface-2 text-[11px] font-medium text-fg uppercase">
           {username[0]}
+          {/* Until a key is saved: the account only lives in this browser. */}
+          {!hasKey && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-fg ring-2 ring-bg" />}
         </span>
         <span className="hidden max-w-32 truncate sm:inline">@{username}</span>
+        {official && <OfficialBadge className="hidden sm:inline-block" />}
       </button>
       {open && (
         <div
@@ -75,12 +79,15 @@ export function AccountMenu() {
           className="animate-fade-in absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-bg shadow-lg"
         >
           <div className="border-b border-border px-3 py-2.5">
-            <div className="truncate font-mono text-xs text-fg">@{username}</div>
-            <div className="mt-0.5 truncate text-xs text-subtle">{guest ? "Guest · this browser only" : email}</div>
+            <div className="flex items-center gap-1 font-mono text-xs text-fg">
+              <span className="truncate">@{username}</span>
+              {official && <OfficialBadge />}
+            </div>
+            <div className="mt-0.5 truncate text-xs text-subtle">{hasKey ? "Key saved · sign in anywhere" : "Guest · this browser only"}</div>
           </div>
-          {guest && (
+          {!hasKey && (
             <Link href="/account" role="menuitem" className={clsx(ITEM, "text-fg")}>
-              <KeyRound className="size-3.5" /> Keep account: add email
+              <KeyRound className="size-3.5" /> Save your key
             </Link>
           )}
           <Link href="/me" role="menuitem" className={ITEM}>
@@ -92,7 +99,9 @@ export function AccountMenu() {
           {confirmOut ? (
             <div className="border-t border-border px-3 py-2.5">
               <p className="text-xs text-muted">
-                Guests can&apos;t sign back in. You&apos;ll lose access to @{username}.
+                {hasKey
+                  ? "You'll need your key to sign back in."
+                  : `Without a key you can't sign back in. You'll lose access to @${username}.`}
               </p>
               <div className="mt-2 flex gap-2">
                 <button
@@ -119,12 +128,7 @@ export function AccountMenu() {
             <button
               type="button"
               role="menuitem"
-              onClick={async () => {
-                if (guest) return setConfirmOut(true);
-                setOpen(false);
-                await signOut();
-                router.refresh();
-              }}
+              onClick={() => setConfirmOut(true)}
               className={clsx(ITEM, "border-t border-border")}
             >
               <LogOut className="size-3.5" /> Sign out

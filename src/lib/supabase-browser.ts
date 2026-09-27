@@ -17,10 +17,8 @@ export function browserSupabase(): SupabaseClient | null {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      // The magic link lands on /login with the session in the URL fragment. Implicit flow (not PKCE)
-      // so the link also works when it's opened in a different browser than the one that asked for it.
-      detectSessionInUrl: true,
-      flowType: "implicit",
+      // Guests and keys sign in right on the page: no links, nothing to pick up from the URL.
+      detectSessionInUrl: false,
     },
   });
   return client;

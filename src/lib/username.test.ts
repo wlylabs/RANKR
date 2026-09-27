@@ -14,4 +14,11 @@ describe("checkUsername", () => {
     expect(checkUsername("ünï")).toBe("invalid");
     expect(checkUsername("Admin")).toBe("reserved");
   });
+  it("reserves look-alikes of the project, like the SQL rules", () => {
+    for (const name of ["rankr", "Rankr_Team", "RANKRbot", "the_official", "OfficialCaller"]) {
+      expect(checkUsername(name), name).toBe("reserved");
+    }
+    expect(checkUsername("ranker")).toBeNull();
+    expect(checkUsername("my_rankr")).toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
-// Accounts (Supabase Auth: one-click guests or email magic link) with a public username, and per-user
-// calls. Server only.
+// Accounts (Supabase Auth: one-click guests that can save a sign-in key) with a public username, and
+// per-user calls. Server only.
+import { generateKey, isKeyEmail, keyEmail } from "./key";
 import { MIN_CALLS_FOR_AVG, type CallerSort } from "./params";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
@@ -8,11 +9,11 @@ import type { CallView, CallerView, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 
 /**
- * A signed-in user. New accounts get a default name (e.g. nonce_7f3a) they can change. `guest` accounts
- * (anonymous sign-in) have no email and live in one browser until an email is added. The email is never
- * shown publicly.
+ * A signed-in user. New accounts get a default name (e.g. nonce_7f3a) they can change. Every account starts
+ * as a guest (anonymous sign-in) that lives in one browser; `hasKey` once it has a key to sign in anywhere.
+ * `official` accounts (set by the project owner, see rankr_set_official) show a check badge and keep their name.
  */
-export type Account = { id: string; email: string | null; username: string | null; guest: boolean };
+export type Account = { id: string; username: string | null; hasKey: boolean; official: boolean };
 
 export class AuthError extends Error {}
 
@@ -48,18 +49,32 @@ export async function accountFromRequest(req: Request): Promise<Account | null> 
   const hit = verified.get(token);
   if (hit && hit.until > Date.now()) return hit.account;
 
-  const user = await api.user<{ id: string; email?: string | null; is_anonymous?: boolean }>(token);
+  const user = await api.user<{ id: string; email?: string | null }>(token);
   if (!user?.id) throw new AuthError("Your session expired. Sign in again.");
 
-  const rows = await api.select<{ username: string }[]>(
-    `profiles?select=username&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
+  const rows = await api.select<{ username: string; official?: boolean }[]>(
+    `profiles?select=username,official&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
   );
   // First sight of this account: give it its default name.
   const username = rows[0]?.username ?? (await api.rpc<string>("rankr_ensure_profile", { p_user: user.id }));
-  const account: Account = { id: user.id, email: user.email || null, username, guest: !!user.is_anonymous };
+  // Accounts from before keys may still carry a real email: they count as keyless and it is never sent out.
+  const account: Account = { id: user.id, username, hasKey: isKeyEmail(user.email), official: !!rows[0]?.official };
   if (verified.size > 5_000) verified.clear();
   verified.set(token, { account, until: Date.now() + 60_000 });
   return account;
+}
+
+/**
+ * Gives the account a new sign-in key and returns it (the only time it is readable); an older key stops
+ * working. Same user, so the name and calls stay. The key's email is set already confirmed: nothing is sent.
+ */
+export async function makeKey(account: Account): Promise<string> {
+  const api = rest();
+  if (!api) throw new Error("Accounts are not enabled.");
+  const key = generateKey();
+  await api.adminUpdateUser(account.id, { email: await keyEmail(key), password: key, email_confirm: true });
+  forget(account.id);
+  return key;
 }
 
 /** Sets or changes the account's public username. */
@@ -69,6 +84,7 @@ export async function setUsername(
 ): Promise<{ ok: true; username: string } | { ok: false; error: UsernameProblem }> {
   const api = rest();
   if (!api) return { ok: false, error: "invalid" };
+  if (account.official) return { ok: false, error: "locked" };
   const problem = checkUsername(name);
   if (problem) return { ok: false, error: problem };
   const out = await api.rpc<{ ok: boolean; username?: string; error?: UsernameProblem }>("rankr_set_username", {
@@ -144,6 +160,7 @@ export async function deleteCall(account: Account, tokenId: string): Promise<boo
 type CallerRow = {
   user_id: string;
   username: string;
+  official?: boolean;
   calls: number;
   hits: number;
   wins: number;
@@ -166,6 +183,7 @@ export async function callers(sort: CallerSort, limit: number, offset: number): 
     callers: out.callers.map((c) => ({
       userId: c.user_id,
       username: c.username,
+      official: !!c.official,
       calls: c.calls,
       hits: c.hits,
       wins: c.wins,
