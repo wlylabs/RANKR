@@ -100,6 +100,23 @@ export type CallersResponse = { enabled: boolean; total: number; callers: Caller
 /** A caller's public profile: board numbers and calls, newest first. */
 export type CallerProfileResponse = { caller: CallerView; calls: CallView[]; updatedAt: number };
 
+/** One entry of the live call feed: "@userx called $SHIB at $1.2B mc". */
+export type FeedItem = {
+  /** Caller + token, unique per entry. */
+  id: string;
+  /** Null when accounts are off: the entry is a plain paste, not someone's call. */
+  username: string | null;
+  official: boolean;
+  token: { id: string; chainId: string; address: string; symbol: string; name: string };
+  /** Market cap at this call's entry. */
+  entryMarketCap: number | null;
+  calledAt: number;
+  /** Price now / this call's entry. */
+  multiple: number;
+};
+
+export type FeedResponse = { items: FeedItem[]; updatedAt: number };
+
 export type TokensResponse = {
   tokens: TokenView[];
   /** Matching tokens in total (for paging). */

@@ -5,7 +5,7 @@ import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import type { CallerSort, RangeKey, SortKey } from "./params";
 import { authedFetcher } from "./supabase-browser";
-import type { CallerProfileResponse, CallersResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
+import type { CallerProfileResponse, CallersResponse, FeedResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -106,6 +106,12 @@ export function useCallerPages(sort: CallerSort, pageSize = 50) {
   };
 }
 
+/** The live call feed (newest calls across every caller). */
+export function useFeed(limit = 20) {
+  const { data, error, isLoading } = useSWR<FeedResponse>(`/api/feed?limit=${limit}`, fetcher, LIVE);
+  return { items: data?.items ?? [], error, isLoading };
+}
+
 export function useStats() {
   const { data, error, isLoading } = useSWR<StatsResponse>("/api/stats", fetcher, LIVE);
   return { stats: data ?? null, error, isLoading };
@@ -121,7 +127,7 @@ export function useAccountCalls(userId: string | null) {
 export function refreshBoards() {
   // `includes` also matches the "$inf$..." keys of paged boards.
   return mutate(
-    (key) => typeof key === "string" && ["/api/tokens", "/api/stats", "/api/me/calls", "/api/callers"].some((p) => key.includes(p)),
+    (key) => typeof key === "string" && ["/api/tokens", "/api/stats", "/api/me/calls", "/api/callers", "/api/feed"].some((p) => key.includes(p)),
   );
 }
 

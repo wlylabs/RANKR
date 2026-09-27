@@ -6,7 +6,7 @@ import { MIN_CALLS_RANKED, type CallerSort } from "./params";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
-import type { CallView, CallerView, TokenView } from "./types";
+import type { CallView, CallerView, FeedItem, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 
 /**
@@ -152,6 +152,33 @@ async function callsOf(userId: string): Promise<CallView[]> {
         calledAt: Date.parse(r.called_at),
         multiple: r.entry_price_usd > 0 ? price / r.entry_price_usd : 1,
         token,
+      },
+    ];
+  });
+}
+
+/** The newest calls across every caller, for the live feed. Each is measured from that caller's own entry. */
+export async function recentCalls(limit: number): Promise<FeedItem[]> {
+  const api = rest();
+  if (!api) return [];
+  const rows = await api.rpc<(CallRow & { username: string; official?: boolean; token: TokenRow })[]>("rankr_recent_calls", {
+    p_limit: limit,
+  });
+  const tokens = await viewsOf(rows.map((r) => fromRow(r.token)));
+  const byId = new Map(tokens.map((t) => [t.id, t]));
+  return rows.flatMap((r) => {
+    const t = byId.get(r.token_id);
+    if (!t) return [];
+    const price = t.market?.priceUsd || t.entryPriceUsd;
+    return [
+      {
+        id: `${r.user_id}:${r.token_id}`,
+        username: r.username,
+        official: !!r.official,
+        token: { id: t.id, chainId: t.chainId, address: t.address, symbol: t.symbol, name: t.name },
+        entryMarketCap: r.entry_market_cap,
+        calledAt: Date.parse(r.called_at),
+        multiple: r.entry_price_usd > 0 ? price / r.entry_price_usd : 1,
       },
     ];
   });

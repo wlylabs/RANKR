@@ -176,6 +176,13 @@ begin
   r := public.rankr_callers('avg', p_limit => 1, p_offset => 1);
   assert r->'callers'->0->>'username' = 'bravo';
 
+  -- Live feed: newest calls first, each with its caller's name and token.
+  r := public.rankr_recent_calls();
+  assert jsonb_array_length(r) = 4, 'feed: ' || r::text;
+  assert (select bool_and(x->>'username' in ('alpha_caller', 'bravo') and x->'token'->>'symbol' is not null)
+          from jsonb_array_elements(r) x), 'feed rows: ' || r::text;
+  assert jsonb_array_length(public.rankr_recent_calls(2)) = 2, 'feed limit';
+
   assert public.rankr_delete_call(b, 'solana:AAA');
   assert not public.rankr_delete_call(b, 'solana:AAA');
 
@@ -210,6 +217,7 @@ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_recent_calls(integer)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_set_username(uuid,text)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_ensure_profile(uuid)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_set_official(text,text,boolean)', 'execute');
