@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeyReveal, KeySignInForm } from "./Key";
+import { OfficialBadge } from "./OfficialBadge";
 import { UsernameForm } from "./UsernameForm";
 
 const PRIMARY =
@@ -15,7 +16,7 @@ const LINK = "text-muted underline-offset-4 hover:text-fg hover:underline";
 /** Save a sign-in key (or make a new one), change the name, sign out. */
 export function Account() {
   const router = useRouter();
-  const { available, ready, userId, username, hasKey, signOut } = useAuth();
+  const { available, ready, userId, username, hasKey, official, signOut } = useAuth();
   const [saved, setSaved] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
   // Kept while the new key is on screen, so it stays up after hasKey flips.
@@ -43,18 +44,31 @@ export function Account() {
     <div className="mx-auto max-w-lg pt-10 sm:pt-14">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Account</h1>
       <p className="mt-1.5 text-sm text-muted">
-        You are <span className="font-mono text-fg">@{username}</span> on the caller board
-        {hasKey ? "." : ", as a guest."}
+        You are <span className="font-mono text-fg">@{username}</span>
+        {official && <OfficialBadge className="ml-1" />} on the caller board
+        {official ? ", as an official account." : hasKey ? "." : ", as a guest."}
       </p>
 
       {hasKey && !shownKey ? <KeySection {...keyProps} /> : <SaveKey {...keyProps} />}
 
-      <section className="mt-6 rounded-lg border border-border p-5">
-        <h2 className="text-sm font-medium">Change username</h2>
-        <p className="mt-1 mb-5 text-sm text-muted">Your calls move with you. The old name becomes free for others.</p>
-        <UsernameForm key={username} initial={username} current={username} submitLabel="Save username" onSaved={() => setSaved(true)} />
-        {saved && <p className="mt-3 text-xs text-up">Saved.</p>}
-      </section>
+      {official ? (
+        <section className="mt-6 rounded-lg border border-border p-5">
+          <h2 className="flex items-center gap-1.5 text-sm font-medium">
+            <OfficialBadge /> Official account
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            The badge vouches for this name, so it can&apos;t be changed here. The project owner manages it in the
+            database.
+          </p>
+        </section>
+      ) : (
+        <section className="mt-6 rounded-lg border border-border p-5">
+          <h2 className="text-sm font-medium">Change username</h2>
+          <p className="mt-1 mb-5 text-sm text-muted">Your calls move with you. The old name becomes free for others.</p>
+          <UsernameForm key={username} initial={username} current={username} submitLabel="Save username" onSaved={() => setSaved(true)} />
+          {saved && <p className="mt-3 text-xs text-up">Saved.</p>}
+        </section>
+      )}
 
       {confirmOut ? (
         <div className="mt-6 rounded-lg border border-down/40 p-4">

@@ -20,6 +20,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   and can rename itself.
 - **My calls**: every token you pasted, measured from *your* paste.
 - **Caller leaderboard**: callers ranked by their calls (2x hits, average x, best call), by username.
+- **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme, installable as a PWA.
@@ -114,7 +115,8 @@ How it works:
 - **Names**: every new account gets a default name from `sha256(user id)`: the first hex digit picks a
   word (`nonce`, `cipher`, `merkle`, `ledger`, `satoshi`, ...), the next 4 digits follow it (`@nonce_7f3a`;
   more digits if that one is taken). Renaming on `/account`: 3-20 letters, numbers or underscores, unique
-  ignoring case, a few names reserved. Calls follow the account, not the name. Profiles hold only the name:
+  ignoring case, a few names reserved (and look-alikes: anything starting with `rankr` or containing
+  `official`). Calls follow the account, not the name. Profiles hold only the name and the official flag:
   no email, no wallet.
 - **Guests** exist only in the browser that created them; clearing site data loses access (their calls
   stay on the board). Signing out without a key asks for confirmation first.
@@ -126,6 +128,7 @@ How it works:
   the user id stays, so the name and calls stay. Supabase stores only a bcrypt hash of the password and Rankr
   never stores the key; a lost key can't be recovered. Rankr tells keyed accounts apart by that email, not by
   Supabase's `is_anonymous` flag, so if you ever clean up old guests, only delete users with no email.
+- **Official accounts** (next section) show a check badge wherever the name appears.
 - Accounts made with an email link before keys count as guests: they stay signed in where they are and can
   save a key (which replaces the email). Their email is never sent to the browser.
 - `/api/track` checks the access token with Supabase Auth and refuses pastes without an account (401); the UI
@@ -133,6 +136,27 @@ How it works:
 - The caller board ranks callers by 2x hits, average x (3+ calls), best call and number of calls.
 - Without the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` vars (local dev), there are no accounts: pasting works
   for everyone and "My calls" is kept in the browser.
+
+### Official accounts
+
+An official account has a check badge next to its name on the caller board, in the header and on its
+account page. Only the project owner can give it, from the Supabase **SQL Editor**; there is no button for it
+in the app. To set up `@rankr`:
+
+1. In Rankr, continue as a guest and **save the key** on `/account` (without a key the account lives in one
+   browser only). Note its name, e.g. `@nonce_7f3a`.
+2. In the SQL Editor:
+   ```sql
+   select rankr_set_official('nonce_7f3a', p_rename => 'rankr');  -- badge on, renamed to @rankr
+   ```
+   Returns `{"ok": true, ...}`, or `{"ok": false, "error": "not_found" | "invalid" | "taken"}`. It shows up
+   within a minute. Without `p_rename` the account keeps its name. The new name may be a reserved one.
+
+To take the badge away: `select rankr_set_official('rankr', p_official => false);`
+
+An official account's name is locked (only `rankr_set_official` changes it), so the badge always vouches for
+the same name. Names starting with `rankr` or containing `official` are reserved for everyone else, so nobody
+can pass for the project without the badge. The function can't be called from the browser (service role only).
 
 `supabase/smoke-test.sql` checks the schema (sealed entry, atomic pastes, sorting, stats, privileges) and
 rolls everything back. Run it against a local or throwaway database:
@@ -179,6 +203,7 @@ src/lib/                     address parsing, DexScreener client, metrics, forma
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
 src/lib/accounts.ts          accounts (Supabase Auth: guests, keys), names and calls, server side
 src/lib/key.ts               sign-in keys: generate, parse, the key's email, the dot pattern
+src/lib/username.ts          username rules (reserved names, look-alikes), same as the SQL
 supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```
 

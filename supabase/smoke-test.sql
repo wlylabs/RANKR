@@ -189,11 +189,32 @@ begin
   assert public.rankr_ensure_profile(c) = public.rankr_default_username(c, 6), 'idempotent';
   assert public.rankr_ensure_profile(a) = 'alpha_caller', 'existing name kept';
 
+  -- Official accounts: the owner sets the badge (reserved names allowed), the name is then locked,
+  -- and look-alikes of the project are reserved for everyone else.
+  assert public.rankr_username_problem('Rankr_Team') = 'reserved';
+  assert public.rankr_username_problem('the_official') = 'reserved';
+  assert public.rankr_username_problem('ranker') is null, 'only the rankr prefix';
+  assert public.rankr_set_official('nobody_here')->>'error' = 'not_found';
+  assert public.rankr_set_official('bravo', p_rename => 'no spaces')->>'error' = 'invalid';
+  r := public.rankr_set_official('BRAVO', p_rename => 'rankr');
+  assert (r->>'ok')::boolean and r->>'username' = 'rankr' and (r->>'official')::boolean, r::text;
+  assert public.rankr_set_official('alpha_caller', p_rename => 'Rankr')->>'error' = 'taken';
+  assert public.rankr_set_username(b, 'bravo_again')->>'error' = 'locked', 'official names only change via rankr_set_official';
+  assert public.rankr_ensure_profile(b) = 'rankr';
+  r := public.rankr_callers('calls');
+  assert (select bool_and((x->>'official')::boolean = (x->>'username' = 'rankr')) from jsonb_array_elements(r->'callers') x),
+         'official flag on the board: ' || r::text;
+  assert not (public.rankr_set_official('rankr', p_official => false)->>'official')::boolean;
+  assert (public.rankr_set_username(b, 'bravo')->>'ok')::boolean, 'unlocked again';
+
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_set_username(uuid,text)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_ensure_profile(uuid)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_set_official(text,text,boolean)', 'execute');
+    assert not has_function_privilege('authenticated', 'public.rankr_set_official(text,text,boolean)', 'execute');
+    assert has_function_privilege('service_role', 'public.rankr_set_official(text,text,boolean)', 'execute');
     assert has_function_privilege('anon', 'public.rankr_callers(text,integer,integer,integer)', 'execute');
   end if;
 

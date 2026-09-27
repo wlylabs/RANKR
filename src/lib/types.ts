@@ -83,6 +83,8 @@ export type MyCallsResponse = { calls: CallView[] };
 export type CallerView = {
   userId: string;
   username: string;
+  /** An official account: shown with a check badge. */
+  official: boolean;
   calls: number;
   /** Calls at 2x or more right now. */
   hits: number;
@@ -118,7 +120,7 @@ export type TokenResponse = {
   preview: MarketSnapshot | null;
 };
 
-export type MeResponse = { account: { id: string; username: string | null; hasKey: boolean } };
+export type MeResponse = { account: { id: string; username: string | null; hasKey: boolean; official: boolean } };
 
 /** A new sign-in key, returned once. */
 export type KeyResponse = MeResponse & { key: string };

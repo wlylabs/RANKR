@@ -19,6 +19,8 @@ type AuthState = {
   username: string | null;
   /** The account has a sign-in key. Without one it is a guest that lives in this browser only. */
   hasKey: boolean;
+  /** An official account: check badge, name locked. */
+  official: boolean;
   /** Creates a guest account. */
   continueAsGuest: () => Promise<void>;
   /** Signs in with a key. A guest signed in here is left behind. */
@@ -39,6 +41,7 @@ const AuthContext = createContext<AuthState>({
   userId: null,
   username: null,
   hasKey: false,
+  official: false,
   continueAsGuest: unavailable,
   signInWithKey: unavailable,
   makeKey: unavailable,
@@ -126,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userId,
       username: account?.username ?? null,
       hasKey: !!account?.hasKey,
+      official: !!account?.official,
       continueAsGuest,
       signInWithKey,
       makeKey,

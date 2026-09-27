@@ -7,12 +7,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
+import { OfficialBadge } from "./OfficialBadge";
 
 const ITEM = "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
 
 /** Header: "Sign in" when signed out, the username with a menu when signed in. */
 export function AccountMenu() {
-  const { available, ready, userId, username, hasKey, signOut } = useAuth();
+  const { available, ready, userId, username, hasKey, official, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -70,6 +71,7 @@ export function AccountMenu() {
           {!hasKey && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-fg ring-2 ring-bg" />}
         </span>
         <span className="hidden max-w-32 truncate sm:inline">@{username}</span>
+        {official && <OfficialBadge className="hidden sm:inline-block" />}
       </button>
       {open && (
         <div
@@ -77,7 +79,10 @@ export function AccountMenu() {
           className="animate-fade-in absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-bg shadow-lg"
         >
           <div className="border-b border-border px-3 py-2.5">
-            <div className="truncate font-mono text-xs text-fg">@{username}</div>
+            <div className="flex items-center gap-1 font-mono text-xs text-fg">
+              <span className="truncate">@{username}</span>
+              {official && <OfficialBadge />}
+            </div>
             <div className="mt-0.5 truncate text-xs text-subtle">{hasKey ? "Key saved · sign in anywhere" : "Guest · this browser only"}</div>
           </div>
           {!hasKey && (

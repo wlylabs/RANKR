@@ -7,7 +7,7 @@ const OLD_EMAIL = { id: "00000000-0000-4000-8000-00000000000c", email: "caller@e
 
 describe("accounts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
-  let profile: { username: string }[];
+  let profile: { username: string; official?: boolean }[];
 
   beforeEach(() => {
     vi.resetModules();
@@ -31,6 +31,18 @@ describe("accounts", () => {
         if (init?.method !== "PUT") return new Response("method", { status: 405 });
         return new Response(JSON.stringify({ id: url.split("/").pop(), ...JSON.parse(String(init.body)) }));
       }
+      if (url.endsWith("/rest/v1/rpc/rankr_callers")) {
+        const caller = { calls: 1, hits: 0, wins: 0, avg_multiple: 1, best_multiple: 1, best_token: null };
+        return new Response(
+          JSON.stringify({
+            total: 2,
+            callers: [
+              { ...caller, user_id: "u1", username: "rankr", official: true },
+              { ...caller, user_id: "u2", username: "degen" },
+            ],
+          }),
+        );
+      }
       if (url.endsWith("/rest/v1/rpc/rankr_set_username")) {
         const { p_username } = JSON.parse(String(init?.body));
         if (p_username.toLowerCase() === "taken_name") return new Response(JSON.stringify({ ok: false, error: "taken" }));
@@ -53,7 +65,7 @@ describe("accounts", () => {
 
   it("verifies the token with Supabase Auth, reads the username and caches", async () => {
     const { accountFromRequest } = await import("./accounts");
-    expect(await accountFromRequest(req("good-token"))).toEqual({ id: USER.id, username: "alpha_caller", hasKey: true });
+    expect(await accountFromRequest(req("good-token"))).toEqual({ id: USER.id, username: "alpha_caller", hasKey: true, official: false });
     expect(await accountFromRequest(req("good-token"))).toMatchObject({ id: USER.id });
 
     expect(urls().filter((u) => u.endsWith("/auth/v1/user"))).toHaveLength(1);
@@ -67,7 +79,7 @@ describe("accounts", () => {
   it("gives a new account its default name, once", async () => {
     profile = [];
     const { accountFromRequest } = await import("./accounts");
-    expect(await accountFromRequest(req("guest-token"))).toEqual({ id: GUEST.id, username: "nonce_7f3a", hasKey: false });
+    expect(await accountFromRequest(req("guest-token"))).toEqual({ id: GUEST.id, username: "nonce_7f3a", hasKey: false, official: false });
     expect(urls().filter((u) => u.endsWith("rankr_ensure_profile"))).toHaveLength(1);
     // An existing profile is just read.
     await accountFromRequest(req("good-token"));
@@ -77,7 +89,7 @@ describe("accounts", () => {
   it("counts an account with a real email as keyless and never returns the email", async () => {
     const { accountFromRequest } = await import("./accounts");
     const account = await accountFromRequest(req("email-token"));
-    expect(account).toEqual({ id: OLD_EMAIL.id, username: "alpha_caller", hasKey: false });
+    expect(account).toEqual({ id: OLD_EMAIL.id, username: "alpha_caller", hasKey: false, official: false });
     expect(JSON.stringify(account)).not.toContain("@");
   });
 
@@ -115,6 +127,24 @@ describe("accounts", () => {
 
     expect(await setUsername(account, "bravo")).toEqual({ ok: true, username: "bravo" });
     expect(await accountFromRequest(req("good-token"))).toMatchObject({ username: "bravo" });
+  });
+
+  it("reads the official flag, and an official account keeps its name", async () => {
+    profile = [{ username: "rankr", official: true }];
+    const { accountFromRequest, setUsername } = await import("./accounts");
+    const account = (await accountFromRequest(req("good-token")))!;
+    expect(account).toMatchObject({ username: "rankr", official: true });
+    expect(await setUsername(account, "bravo")).toEqual({ ok: false, error: "locked" });
+    expect(urls().filter((u) => u.endsWith("rankr_set_username"))).toHaveLength(0);
+  });
+
+  it("marks official callers on the board", async () => {
+    const { callers } = await import("./accounts");
+    const out = await callers("hits", 50, 0);
+    expect(out.callers.map((c) => [c.username, c.official])).toEqual([
+      ["rankr", true],
+      ["degen", false],
+    ]);
   });
 
   it("is null without a token and rejects bad tokens", async () => {
