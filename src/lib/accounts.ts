@@ -3,18 +3,36 @@
 import { callerStats } from "./caller-stats";
 import { generateKey, isKeyEmail, keyEmail } from "./key";
 import { MIN_CALLS_RANKED, type CallerSort } from "./params";
+import { parsePostId, xCode, type ProfileFields } from "./profile";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
-import type { CallView, CallerView, FeedItem, TokenView } from "./types";
+import type { CallView, CallerAbout, CallerView, FeedItem, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
+import { readPost, type Post } from "./x-post";
 
 /**
  * A signed-in user. New accounts get a default name (e.g. nonce_7f3a) they can change. Every account starts
  * as a guest (anonymous sign-in) that lives in one browser; `hasKey` once it has a key to sign in anywhere.
  * `official` accounts (set by the project owner, see rankr_set_official) show a check badge and keep their name.
+ * `about`: bio and links (src/lib/profile.ts).
  */
-export type Account = { id: string; username: string | null; hasKey: boolean; official: boolean };
+export type Account = { id: string; username: string | null; hasKey: boolean; official: boolean; about: CallerAbout };
+
+type ProfileRow = {
+  user_id: string;
+  username: string;
+  official?: boolean;
+  bio?: string | null;
+  x_handle?: string | null;
+  x_verified_at?: string | null;
+  telegram?: string | null;
+};
+
+// Columns are read with select=*, so profiles work (without bio and links) before …_rankr_profile.sql has run.
+function aboutOf(row: Partial<ProfileRow> | undefined): CallerAbout {
+  return { bio: row?.bio ?? null, x: row?.x_handle ?? null, xVerified: !!row?.x_verified_at, telegram: row?.telegram ?? null };
+}
 
 export class AuthError extends Error {}
 
@@ -53,13 +71,17 @@ export async function accountFromRequest(req: Request): Promise<Account | null> 
   const user = await api.user<{ id: string; email?: string | null }>(token);
   if (!user?.id) throw new AuthError("Your session expired. Sign in again.");
 
-  const rows = await api.select<{ username: string; official?: boolean }[]>(
-    `profiles?select=username,official&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
-  );
+  const rows = await api.select<ProfileRow[]>(`profiles?select=*&user_id=eq.${encodeURIComponent(user.id)}&limit=1`);
   // First sight of this account: give it its default name.
   const username = rows[0]?.username ?? (await api.rpc<string>("rankr_ensure_profile", { p_user: user.id }));
   // Accounts from before keys may still carry a real email: they count as keyless and it is never sent out.
-  const account: Account = { id: user.id, username, hasKey: isKeyEmail(user.email), official: !!rows[0]?.official };
+  const account: Account = {
+    id: user.id,
+    username,
+    hasKey: isKeyEmail(user.email),
+    official: !!rows[0]?.official,
+    about: aboutOf(rows[0]),
+  };
   if (verified.size > 5_000) verified.clear();
   verified.set(token, { account, until: Date.now() + 60_000 });
   return account;
@@ -95,6 +117,49 @@ export async function setUsername(
   if (!out.ok) return { ok: false, error: out.error ?? "invalid" };
   forget(account.id);
   return { ok: true, username: out.username ?? name };
+}
+
+/** Saves the bio, X account and Telegram username (checked with checkProfile). A different X account starts unverified. */
+export async function setProfile(account: Account, profile: ProfileFields): Promise<CallerAbout | null> {
+  const api = rest();
+  if (!api) return null;
+  const out = await api.rpc<{ ok: boolean; bio?: string | null; x?: string | null; x_verified?: boolean; telegram?: string | null }>(
+    "rankr_set_profile",
+    { p_user: account.id, p_bio: profile.bio, p_x: profile.x, p_telegram: profile.telegram },
+  );
+  if (!out.ok) return null;
+  forget(account.id);
+  return { bio: out.bio ?? null, x: out.x ?? null, xVerified: !!out.x_verified, telegram: out.telegram ?? null };
+}
+
+/**
+ * Verifies the account's X account from a link to a public post: it must be from that X account and carry
+ * the account's code (xCode). Returns the updated profile, or why not with an HTTP status.
+ */
+export async function verifyX(
+  account: Account,
+  link: string,
+  read: (id: string) => Promise<Post | null> = readPost,
+): Promise<{ ok: true; about: CallerAbout } | { ok: false; error: string; status: number }> {
+  const api = rest();
+  const x = account.about.x;
+  if (!api || !x) return { ok: false, error: "Add your X username first.", status: 400 };
+  if (account.about.xVerified) return { ok: true, about: account.about };
+  const id = parsePostId(link);
+  if (!id) return { ok: false, error: "Paste the link to your post on X (x.com/…/status/…).", status: 400 };
+  const post = await read(id);
+  if (!post) return { ok: false, error: "Couldn't find that post. Check the link, and that your posts are public.", status: 404 };
+  if (post.author.toLowerCase() !== x.toLowerCase()) {
+    return { ok: false, error: `That post is from @${post.author}, not @${x}.`, status: 400 };
+  }
+  const code = xCode(account.id, x);
+  if (!post.text.toLowerCase().includes(code)) {
+    return { ok: false, error: `That post doesn't have your code (${code}). Post the text above as it is.`, status: 400 };
+  }
+  const out = await api.rpc<{ ok: boolean }>("rankr_verify_x", { p_user: account.id, p_x: x });
+  if (!out.ok) return { ok: false, error: "Your X username changed meanwhile. Reload and try again.", status: 409 };
+  forget(account.id);
+  return { ok: true, about: { ...account.about, xVerified: true } };
 }
 
 /** Why `name` can't be used (by `userId`, whose own current name is fine), or null if it can. */
@@ -273,20 +338,25 @@ export async function callers(sort: CallerSort, limit: number, offset: number): 
 }
 
 /**
- * A caller's public profile by username (any case): their board numbers and their calls. Null when no
- * account has that name. Usernames are letters, numbers and "_" (a LIKE wildcard, so it is escaped).
+ * A caller's public profile by username (any case): their board numbers, bio and links, and their calls.
+ * Null when no account has that name. Usernames are letters, numbers and "_" (a LIKE wildcard, so it is
+ * escaped). The X account is left out until it is verified.
  */
-export async function callerProfile(name: string): Promise<{ caller: CallerView; calls: CallView[] } | null> {
+export async function callerProfile(
+  name: string,
+): Promise<{ caller: CallerView; about: CallerAbout; calls: CallView[] } | null> {
   const api = rest();
   if (!api || !/^\w{1,32}$/.test(name)) return null;
-  const rows = await api.select<{ user_id: string; username: string; official?: boolean }[]>(
-    `profiles?select=user_id,username,official&username=ilike.${encodeURIComponent(name.replace(/_/g, "\\_"))}&limit=2`,
+  const rows = await api.select<ProfileRow[]>(
+    `profiles?select=*&username=ilike.${encodeURIComponent(name.replace(/_/g, "\\_"))}&limit=2`,
   );
   const row = rows.find((r) => r.username.toLowerCase() === name.toLowerCase());
   if (!row) return null;
   const calls = await callsOf(row.user_id);
+  const about = aboutOf(row);
   return {
     caller: { userId: row.user_id, username: row.username, official: !!row.official, ...callerStats(calls) },
+    about: about.xVerified ? about : { ...about, x: null },
     calls,
   };
 }

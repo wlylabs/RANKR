@@ -1,12 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronDown, Radio, X } from "lucide-react";
-import Link from "next/link";
+import { ChevronDown, Radio } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainMeta } from "@/lib/chains";
-import { setFeedScope, toggleFollow, useFeedScope, useFollowing } from "@/lib/following";
-import { callerHref } from "@/lib/format";
+import { setFeedScope, useFeedScope } from "@/lib/feed-scope";
 import { useFeedPages, useStats } from "@/lib/hooks";
 import { FEED_KINDS, FEED_SCOPES, parseFeedKind, type FeedKind, type FeedScope } from "@/lib/params";
 import { accountsAvailable } from "@/lib/supabase-browser";
@@ -17,7 +15,7 @@ import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton } from "./TokenList";
 
-const SCOPE_LABELS: Record<FeedScope, string> = { all: "Everyone", top: "Top callers", following: "Following" };
+const SCOPE_LABELS: Record<FeedScope, string> = { all: "Everyone", top: "Top callers" };
 const KIND_LABELS: Record<FeedKind, string> = { all: "All", call: "Calls", milestone: "Milestones" };
 
 function Row({ item }: { item: FeedItem }) {
@@ -54,7 +52,6 @@ export function Feed() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const following = useFollowing();
   const picked = useFeedScope();
   const scope = accountsAvailable ? picked : "all";
   const kind = parseFeedKind(params.get("kind"));
@@ -65,7 +62,6 @@ export function Feed() {
     scope,
     kind,
     chain: chain === "all" ? null : chain,
-    callers: following.map((f) => f.userId),
   });
 
   function setParam(key: string, value: string, fallback: string) {
@@ -75,8 +71,7 @@ export function Feed() {
     router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   }
 
-  const noFollows = scope === "following" && !following.length;
-  const loading = isLoading && !items.length && !noFollows;
+  const loading = isLoading && !items.length;
 
   return (
     <div className="pt-10 sm:pt-14">
@@ -94,9 +89,6 @@ export function Feed() {
           {FEED_SCOPES.map((s) => (
             <Tab key={s} active={scope === s} onClick={() => setFeedScope(s)}>
               {SCOPE_LABELS[s]}
-              {s === "following" && following.length > 0 && (
-                <span className="ml-1.5 font-mono text-[11px] text-subtle">{following.length}</span>
-              )}
             </Tab>
           ))}
         </div>
@@ -137,41 +129,8 @@ export function Feed() {
         </div>
       </div>
 
-      {scope === "following" && following.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {following.map((f) => (
-            <span key={f.userId} className="inline-flex h-7 items-center gap-1 rounded-full border border-border pr-1 pl-2.5 font-mono text-[11px]">
-              <Link href={callerHref(f.username)} className="hover:underline">
-                @{f.username}
-              </Link>
-              <button
-                type="button"
-                onClick={() => toggleFollow(f)}
-                className="grid size-5 place-items-center rounded-full text-subtle hover:bg-surface-2 hover:text-fg"
-                aria-label={`Unfollow @${f.username}`}
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
       <div className="mt-4">
-        {noFollows ? (
-          <Empty
-            title="You follow nobody yet"
-            body={
-              <>
-                Open a caller&apos;s profile and hit Follow, for example from the{" "}
-                <Link href="/leaderboard?view=callers" className="text-fg underline underline-offset-2">
-                  caller board
-                </Link>
-                . Follows are kept on this device.
-              </>
-            }
-          />
-        ) : loading ? (
+        {loading ? (
           <div className="rounded-lg border border-border">
             <ListSkeleton rows={8} />
           </div>

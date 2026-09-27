@@ -37,8 +37,8 @@ export const MIN_CALLS_RANKED = 5;
  */
 export const PASTE_LIMITS = { ipPerMinute: 20, guestPerDay: 30, keyedPerDay: 200 } as const;
 
-/** Feed filters. "top": callers on the first page of the caller board; "following": callers followed here. */
-export const FEED_SCOPES = ["all", "top", "following"] as const;
+/** Feed filters. "top": callers on the first page of the caller board. */
+export const FEED_SCOPES = ["all", "top"] as const;
 export type FeedScope = (typeof FEED_SCOPES)[number];
 
 export const FEED_KINDS = ["all", "call", "milestone"] as const;

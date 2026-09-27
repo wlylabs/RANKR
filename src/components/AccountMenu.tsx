@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { callerHref } from "@/lib/format";
 import { loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
+import { Avatar } from "./Avatar";
 import { OfficialBadge } from "./OfficialBadge";
 
 const ITEM = "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
@@ -65,8 +66,8 @@ export function AccountMenu() {
           open && "bg-surface-2",
         )}
       >
-        <span className="relative grid size-6 place-items-center rounded bg-surface-2 text-[11px] font-medium text-fg uppercase">
-          {username[0]}
+        <span className="relative">
+          <Avatar userId={userId} size={24} className="block" />
           {/* Until a key is saved: the account only lives in this browser. */}
           {!hasKey && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-fg ring-2 ring-bg" />}
         </span>

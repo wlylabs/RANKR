@@ -8,8 +8,9 @@ import { refreshBoards } from "@/lib/hooks";
 import { keyEmail, parseKey } from "@/lib/key";
 import { captchaToken } from "@/lib/captcha";
 import { authErrorMessage, LANDING } from "@/lib/login";
+import type { ProfileInput } from "@/lib/profile";
 import { accountsAvailable, apiFetch, authedFetcher, browserSupabase } from "@/lib/supabase-browser";
-import type { KeyResponse, MeResponse } from "@/lib/types";
+import type { CallerAbout, KeyResponse, MeResponse } from "@/lib/types";
 
 type AuthState = {
   /** Accounts are configured for this deployment. Without them, pasting works without an account. */
@@ -23,6 +24,8 @@ type AuthState = {
   hasKey: boolean;
   /** An official account: check badge, name locked. */
   official: boolean;
+  /** Bio and links; null until the account is read. */
+  about: CallerAbout | null;
   /** Signed out in this tab (and not signed in since): on the way to, or already on, the landing page. */
   justSignedOut: boolean;
   /** Creates a guest account. */
@@ -32,6 +35,10 @@ type AuthState = {
   /** Gives the account a new key and returns it, once. An older key stops working; other devices are signed out. */
   makeKey: () => Promise<string>;
   saveUsername: (username: string) => Promise<void>;
+  /** Saves the bio and links ("" clears one). A different X account starts unverified. */
+  saveProfile: (profile: ProfileInput) => Promise<void>;
+  /** Verifies the X account from a link to a post carrying the account's code (see xCode). */
+  verifyX: (url: string) => Promise<void>;
   /** Signs out of this browser and goes to the landing page. */
   signOut: () => Promise<void>;
 };
@@ -47,11 +54,14 @@ const AuthContext = createContext<AuthState>({
   username: null,
   hasKey: false,
   official: false,
+  about: null,
   justSignedOut: false,
   continueAsGuest: unavailable,
   signInWithKey: unavailable,
   makeKey: unavailable,
   saveUsername: unavailable,
+  saveProfile: unavailable,
+  verifyX: unavailable,
   signOut: async () => {},
 });
 
@@ -133,6 +143,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [mutate],
   );
 
+  // Profile changes: the account's own copy, then the boards and profiles that show it.
+  const postMe = useCallback(
+    async (url: string, payload: unknown, fallback: string) => {
+      const res = await apiFetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? fallback);
+      await mutate(body as MeResponse, { revalidate: false });
+      void refreshBoards();
+    },
+    [mutate],
+  );
+  const saveProfile = useCallback(
+    (profile: ProfileInput) => postMe("/api/me/profile", profile, "Could not save your profile."),
+    [postMe],
+  );
+  const verifyX = useCallback((url: string) => postMe("/api/me/x", { url }, "Could not verify your X account."), [postMe]);
+
   const signOut = useCallback(async () => {
     // Set first, so the page being left doesn't send people to /login on its way out.
     setJustSignedOut(true);
@@ -149,14 +180,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: account?.username ?? null,
       hasKey: !!account?.hasKey,
       official: !!account?.official,
+      about: account?.about ?? null,
       justSignedOut,
       continueAsGuest,
       signInWithKey,
       makeKey,
       saveUsername,
+      saveProfile,
+      verifyX,
       signOut,
     }),
-    [sessionRead, profileRead, userId, account, justSignedOut, continueAsGuest, signInWithKey, makeKey, saveUsername, signOut],
+    [
+      sessionRead,
+      profileRead,
+      userId,
+      account,
+      justSignedOut,
+      continueAsGuest,
+      signInWithKey,
+      makeKey,
+      saveUsername,
+      saveProfile,
+      verifyX,
+      signOut,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

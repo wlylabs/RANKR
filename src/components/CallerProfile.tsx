@@ -1,15 +1,17 @@
 "use client";
 
 import { UserRound } from "lucide-react";
+import Link from "next/link";
 import { useMemo } from "react";
 import { formatDay, formatMultiple } from "@/lib/format";
 import { useCallerProfile } from "@/lib/hooks";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
+import { Avatar } from "./Avatar";
 import { toneOf } from "./MultipleBadge";
-import { FollowButton } from "./FollowButton";
 import { CallsView, callRow } from "./MyCalls";
 import { OfficialBadge } from "./OfficialBadge";
+import { SocialLinks } from "./Social";
 
 function Message({ title, body }: { title: string; body: string }) {
   return (
@@ -21,25 +23,25 @@ function Message({ title, body }: { title: string; body: string }) {
   );
 }
 
-/** A caller's public page: who they are, how their calls did, and every call from their own entry. */
+/** A caller's public page: who they are, their bio and links, how their calls did, and every call from their own entry. */
 export function CallerProfile({ username }: { username: string }) {
   const { userId } = useAuth();
   const { data, error, isLoading } = useCallerProfile(username, accountsAvailable);
   const rows = useMemo(() => (data?.calls ?? []).map(callRow), [data]);
   const c = data?.caller;
+  const about = data?.about;
+  const mine = !!c && c.userId === userId;
   const since = rows.length ? Math.min(...rows.map((r) => r.calledAt)) : null;
 
   return (
     <div className="pt-10 sm:pt-14">
       <div className="flex items-center gap-4">
-        <span className="grid size-12 shrink-0 place-items-center rounded-full bg-surface-2 font-mono text-lg text-fg uppercase">
-          {(c?.username ?? username).charAt(0)}
-        </span>
+        <Avatar userId={c?.userId ?? null} size={56} />
         <div className="min-w-0">
           <h1 className="flex min-w-0 items-center gap-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
             <span className="truncate font-mono">@{c?.username ?? username}</span>
             {c?.official && <OfficialBadge className="size-5" />}
-            {c && c.userId === userId && (
+            {mine && (
               <span className="rounded border border-border px-1.5 font-mono text-[11px] font-normal text-muted">you</span>
             )}
           </h1>
@@ -55,10 +57,18 @@ export function CallerProfile({ username }: { username: string }) {
             )}
           </p>
         </div>
-        {c && c.userId !== userId && (
-          <FollowButton caller={{ userId: c.userId, username: c.username }} className="ml-auto shrink-0" />
+        {mine && (
+          <Link
+            href="/account"
+            className="ml-auto inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+          >
+            Edit profile
+          </Link>
         )}
       </div>
+
+      {about?.bio && <p className="mt-5 max-w-xl text-sm text-pretty break-words">{about.bio}</p>}
+      {about && <SocialLinks about={about} className={about.bio ? "mt-3" : "mt-5"} />}
 
       {!accountsAvailable ? (
         <Message title="No caller profiles here" body="This deployment runs without accounts, so calls have no names." />
