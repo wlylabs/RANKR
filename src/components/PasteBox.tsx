@@ -20,7 +20,7 @@ type Result = TrackResponse & { firstCallByYou: boolean };
 
 /**
  * The CA input. With accounts on, pasting needs a signed-in account with a username: a signed-out
- * paste goes through /login and comes back as `/?ca=...`, which the box with `resumeFromUrl` tracks.
+ * paste goes through /login and comes back as `/app?ca=...`, which the box with `resumeFromUrl` tracks.
  */
 export function PasteBox({
   autoFocus,

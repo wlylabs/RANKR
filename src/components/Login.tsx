@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { shortAddress } from "@/lib/format";
-import { safeNext } from "@/lib/login";
+import { APP_HOME, safeNext } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeySignInForm } from "./Key";
 import { LogoMark } from "./Logo";
@@ -55,7 +55,7 @@ export function Login() {
   if (!available) {
     return (
       <Shell title="Accounts are off" intro="This deployment has no Supabase Auth configured, so pasting works without an account.">
-        <Link href="/" className={PRIMARY}>
+        <Link href={APP_HOME} className={PRIMARY}>
           Back to Rankr
         </Link>
       </Shell>

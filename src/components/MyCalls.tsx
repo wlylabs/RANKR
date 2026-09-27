@@ -199,7 +199,7 @@ function Page({
           <p className="mt-3 font-medium">No calls yet</p>
           <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Paste a CA and it lands here, tracked from your entry.</p>
           <Link
-            href="/#paste"
+            href="/app#paste"
             className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
           >
             Paste a CA

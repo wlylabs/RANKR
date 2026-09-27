@@ -1,23 +1,24 @@
 "use client";
 
 import clsx from "clsx";
-import { House, Plus, Trophy, UserRound, X } from "lucide-react";
+import { Download, House, Plus, Trophy, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { APP_HOME } from "@/lib/login";
 import { AccountMenu } from "./AccountMenu";
 import { Logo, RANKR_SHA256 } from "./Logo";
 import { PasteBox } from "./PasteBox";
 import { ThemeToggle } from "./ThemeToggle";
 
 export const NAV = [
-  { href: "/", label: "Home", icon: House },
+  { href: APP_HOME, label: "Home", icon: House },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/me", label: "My calls", icon: UserRound },
 ];
 
 function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  return href === APP_HOME ? pathname === APP_HOME : pathname.startsWith(href);
 }
 
 export function Header() {
@@ -38,9 +39,9 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-border bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
-          <Link href="/" aria-label="Rankr home" className="shrink-0">
+          <Link href={APP_HOME} aria-label="Rankr home" className="shrink-0">
             <Logo size={24} />
           </Link>
           <nav className="hidden items-center gap-5 md:flex" aria-label="Main">
@@ -142,6 +143,15 @@ export function Footer() {
             sha256(&quot;rankr&quot;) = {RANKR_SHA256.slice(0, 16)}…{RANKR_SHA256.slice(-8)}
           </p>
         </div>
+        {/* The landing page is for the web; the installed app has no way back to it. */}
+        <nav aria-label="About" className="flex gap-4 text-xs text-muted standalone:hidden">
+          <Link href="/" className="hover:text-fg">
+            About Rankr
+          </Link>
+          <Link href="/#install" className="inline-flex items-center gap-1.5 hover:text-fg">
+            <Download className="size-3" /> Install the app
+          </Link>
+        </nav>
       </div>
     </footer>
   );

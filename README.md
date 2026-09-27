@@ -23,7 +23,11 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
-- Responsive (bottom nav on mobile, table on desktop), dark and light theme, installable as a PWA.
+- **Landing page** at `/`: what Rankr does, the board's #1 token live, how it works, features, install steps, FAQ.
+  The app itself (paste box + live board) is at **`/app`**.
+- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls), an
+  offline page and an "Install app" button (next section).
+- Responsive (bottom nav on mobile, table on desktop), dark and light theme.
 
 ## Design
 
@@ -40,6 +44,21 @@ hairline borders), "decrypted text" reveal effects, and hash visualisations such
   big multiple "decrypt" out of random hex on first load (skipped with reduced motion).
 - Colors live as CSS variables in `src/app/globals.css` (dark and light).
 
+## Install as an app (PWA)
+
+The web app manifest (`src/app/manifest.ts`) has `id` and `start_url` `/app` with `scope` `/`, so the installed
+app skips the landing page and every page of the site opens inside it. The app link is `https://your-domain/app`.
+
+- **Install button** (`src/components/Pwa.tsx`, `src/lib/pwa.ts`): Chrome, Edge and Android show the browser's own
+  install dialog (`beforeinstallprompt`); iPhone and iPad get the Share → Add to Home Screen steps; other browsers
+  get their menu steps. Once installed the button hides.
+- **Service worker** (`public/sw.js`, registered in production only): pages and API calls always go to the network
+  (prices are live), with navigation preload; when the network is gone it shows `public/offline.html` and reloads
+  once back online. It is served with `Cache-Control: no-cache` (`next.config.ts`) so updates reach installed apps.
+- iOS: `apple-mobile-web-app` meta and `apple-icon.png`; headers pad for the notch (`env(safe-area-inset-top)`).
+- Opened as the installed app, `/` forwards to `/app`, and the app's footer hides the landing links.
+- Installability needs HTTPS (localhost is fine for testing).
+
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · SWR. Market data from the public
@@ -49,7 +68,7 @@ Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · SWR. Mark
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000, live DexScreener data
+npm run dev          # http://localhost:3000 (landing) and /app (the app), live DexScreener data
 npm run dev:mock     # offline demo with synthetic prices (RANKR_MOCK=1)
 npm test             # unit tests
 npm run build && npm start
@@ -93,7 +112,7 @@ Pasting needs an account. Someone signed out who pastes a CA goes to `/login`:
 - **Continue as guest**: one click. A Supabase anonymous account that lives in that browser.
 - **Sign in with key**: paste a key saved earlier.
 
-Either way they land back on the home page and the CA they pasted is tracked. Browsing needs no account.
+Either way they land back in the app (`/app`) and the CA they pasted is tracked. Browsing needs no account.
 
 A guest saves a key on `/account` (the header avatar, the account menu, "My calls" and the paste result all
 point there until one is saved). The key is shown once, with copy and download, next to a 5x5 dot pattern from
@@ -190,7 +209,9 @@ rolls everything back. Run it against a local or throwaway database:
 ## Project layout
 
 ```
-src/app/                     pages, API routes, icons, social cards
+src/app/                     pages, API routes, icons, manifest, social cards
+  (site)/                    the landing page at / (own header and footer)
+  (app)/                     the app shell (header, bottom nav) and its pages: app (/app), leaderboard, me, t/...
   api/track                  POST { input } -> records a paste
   api/tokens                 GET a leaderboard page (sort, filter, paging)
   api/stats                  GET home page totals
@@ -198,12 +219,14 @@ src/app/                     pages, API routes, icons, social cards
   api/callers, api/me/*      caller board, your account, username and calls
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
-src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo...)
+src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, Pwa...)
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
 src/lib/accounts.ts          accounts (Supabase Auth: guests, keys), names and calls, server side
 src/lib/key.ts               sign-in keys: generate, parse, the key's email, the dot pattern
 src/lib/username.ts          username rules (reserved names, look-alikes), same as the SQL
+src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
+public/sw.js, offline.html   service worker and the offline page
 supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```
 
