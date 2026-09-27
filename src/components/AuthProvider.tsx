@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import useSWR from "swr";
 import { refreshBoards } from "@/lib/hooks";
 import { keyEmail, parseKey } from "@/lib/key";
+import { captchaToken } from "@/lib/captcha";
 import { authErrorMessage } from "@/lib/login";
 import { accountsAvailable, apiFetch, authedFetcher, browserSupabase } from "@/lib/supabase-browser";
 import type { KeyResponse, MeResponse } from "@/lib/types";
@@ -75,7 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const continueAsGuest = useCallback(async () => {
     const sb = browserSupabase();
     if (!sb) return unavailable();
-    const { error } = await sb.auth.signInAnonymously();
+    // With Turnstile set up (NEXT_PUBLIC_TURNSTILE_SITE_KEY + CAPTCHA on in Supabase), a fresh token each time.
+    const captcha = await captchaToken();
+    const { error } = await sb.auth.signInAnonymously(captcha ? { options: { captchaToken: captcha } } : undefined);
     if (error) throw new Error(authErrorMessage(error));
   }, []);
 
@@ -84,7 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sb) return unavailable();
     const key = parseKey(input);
     if (!key) throw new Error("That isn't a Rankr key. It looks like rk- and 20 letters and numbers.");
-    const { error } = await sb.auth.signInWithPassword({ email: await keyEmail(key), password: key });
+    const captcha = await captchaToken();
+    const { error } = await sb.auth.signInWithPassword({
+      email: await keyEmail(key),
+      password: key,
+      ...(captcha ? { options: { captchaToken: captcha } } : {}),
+    });
     if (error) throw new Error(authErrorMessage(error));
   }, []);
 

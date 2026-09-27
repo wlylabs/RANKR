@@ -98,7 +98,7 @@ export function Leaderboard() {
           <p className="mt-1.5 text-sm text-muted">
             {view === "tokens"
               ? "Every token ranked by how it moved since its first paste on Rankr."
-              : "Callers ranked by their calls, each measured from the caller's own entry."}
+              : "Callers ranked by how often their calls hit 2x, each from the caller's own entry."}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -150,7 +150,7 @@ export function Leaderboard() {
             role="tablist"
           >
             {CALLER_SORTS.map((key) => (
-              <Tab key={key} active={callerSort === key} onClick={() => setParam("by", key, "hits")}>
+              <Tab key={key} active={callerSort === key} onClick={() => setParam("by", key, "rate")}>
                 {CALLER_SORT_LABELS[key]}
               </Tab>
             ))}

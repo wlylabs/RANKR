@@ -35,6 +35,7 @@ describe("authErrorMessage", () => {
   it("explains the common Supabase Auth errors", () => {
     expect(authErrorMessage({ code: "invalid_credentials", message: "Invalid login credentials" })).toMatch(/No account has that key/);
     expect(authErrorMessage({ code: "over_request_rate_limit" })).toMatch(/Too many/);
+    expect(authErrorMessage({ code: "captcha_failed", message: "captcha protection: request disallowed" })).toMatch(/human/);
   });
 
   it("falls back to the server's message", () => {

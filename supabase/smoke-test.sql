@@ -221,4 +221,53 @@ begin
   raise notice 'rankr smoke test: accounts ok';
 end $$;
 
+-- Paste limits and the hit-rate caller board (needs all migrations).
+do $$
+declare
+  a uuid := '00000000-0000-4000-8000-00000000000a';
+  s uuid := '00000000-0000-4000-8000-00000000000e';
+  r jsonb;
+begin
+  -- Fixed window: up to p_max hits pass, the next one doesn't, a new window starts over.
+  r := public.rankr_rate_hit('test:bucket', 60, 2);
+  assert (r->>'ok')::boolean and (r->>'hits')::int = 1, r::text;
+  r := public.rankr_rate_hit('test:bucket', 60, 2);
+  assert (r->>'ok')::boolean and (r->>'hits')::int = 2;
+  r := public.rankr_rate_hit('test:bucket', 60, 2);
+  assert not (r->>'ok')::boolean and (r->>'hits')::int = 3, 'over the limit';
+  assert (r->>'reset_at')::timestamptz > now(), 'reset is ahead';
+  assert (public.rankr_rate_hit('test:other', 60, 2)->>'ok')::boolean, 'buckets are separate';
+  update public.rate_limits set window_start = window_start - interval '61 seconds' where bucket = 'test:bucket';
+  r := public.rankr_rate_hit('test:bucket', 60, 2);
+  assert (r->>'ok')::boolean and (r->>'hits')::int = 1, 'new window: ' || r::text;
+
+  -- A sprayer: 10 calls, 3 at 2x+. alpha_caller: 2 calls, both at 2x+ (from the blocks above).
+  insert into auth.users (id) values (s);
+  assert (public.rankr_set_username(s, 'sprayer')->>'ok')::boolean;
+  for i in 1..10 loop
+    perform public.rankr_record_paste(jsonb_build_object(
+      'id', 'solana:S' || i, 'chain_id', 'solana', 'address', 'S' || i, 'name', 'Spray ' || i, 'symbol', 'S' || i,
+      'entry_price_usd', 1, 'entry_market_cap', 1000, 'first_pasted_at', now(), 'last_pasted_at', now(),
+      'peak_price_usd', 1, 'peak_at', now(), 'low_price_usd', 1, 'low_at', now(),
+      'last_price_usd', case when i <= 3 then 3 else 0.5 end, 'market', '{}', 'last_checked_at', now()));
+    perform public.rankr_record_call(s, 'solana:S' || i, 1, 1000, now());
+  end loop;
+
+  r := public.rankr_callers('hits');
+  assert r->'callers'->0->>'username' = 'sprayer', 'by count, volume wins: ' || r::text;
+  r := public.rankr_callers('rate');
+  assert r->'callers'->0->>'username' = 'alpha_caller', 'by rate, judgment wins: ' || r::text;
+  r := public.rankr_callers('rate', p_min_calls => 5);
+  assert (r->>'total')::int = 1 and r->'callers'->0->>'username' = 'sprayer', 'min calls keeps flukes off';
+  assert (public.rankr_callers()->'callers'->0->>'username') = 'alpha_caller', 'rate is the default';
+
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    assert not has_function_privilege('anon', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
+    assert not has_function_privilege('authenticated', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
+    assert has_function_privilege('service_role', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
+  end if;
+
+  raise notice 'rankr smoke test: limits ok';
+end $$;
+
 rollback;

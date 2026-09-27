@@ -31,6 +31,8 @@ export function authErrorMessage(err: { code?: string; message?: string } | null
       return "Signing in with a key is turned off here.";
     case "signup_disabled":
       return "New accounts are closed right now.";
+    case "captcha_failed":
+      return "Couldn't verify you're human. Try again.";
   }
   return err?.message || "Something went wrong. Try again.";
 }

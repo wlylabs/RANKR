@@ -19,7 +19,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
   and can rename itself.
 - **My calls**: every token you pasted, measured from *your* paste.
-- **Caller leaderboard**: callers ranked by their calls (2x hits, average x, best call), by username. Each
+- **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Each
   caller has a public profile at `/u/<username>` with their numbers and every call.
 - **Watchlist**: star a token on its page to follow it under My calls → Watchlist (kept in the browser).
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
@@ -144,8 +144,41 @@ In the Supabase dashboard (no SMTP, email templates or redirect URLs needed):
 1. **Authentication → Sign In / Providers**: turn on **Allow anonymous sign-ins** (guests) and keep
    **Email** enabled with **Confirm email** on. Keys sign in through the Email provider; with confirmation on,
    nobody can make an account by signing up with an email directly.
-2. Optional, against guest spam: **Authentication → Attack Protection → CAPTCHA** (Supabase caps anonymous
-   sign-ins at 30 per hour per IP by default, adjustable under Rate Limits).
+2. Recommended, against bot accounts: CAPTCHA with Cloudflare Turnstile, set up as in **CAPTCHA** below
+   (the app has to send the token, so turn it on in that order). Supabase also caps anonymous sign-ins at 30
+   per hour per IP by default, adjustable under **Authentication → Rate Limits**.
+
+### CAPTCHA (Cloudflare Turnstile)
+
+"Continue as guest" and key sign-in send a Turnstile token when `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set
+(`src/lib/captcha.ts`). It is invisible for almost everyone: the widget only shows, at the bottom of the
+screen, when Cloudflare wants a click. Supabase Auth checks the token with the secret key. Pasting, browsing
+and everything else never see a captcha.
+
+1. **Cloudflare dashboard → Turnstile → Add widget** (free; a Cloudflare account is enough, the domain
+   doesn't have to be on Cloudflare). Name it "Rankr", add your hostname(s) (e.g. `rankr.example.com`, plus
+   `localhost` for testing), widget mode **Managed** (or **Invisible**), pre-clearance **No**. Copy the
+   **site key** and the **secret key**.
+2. **Vercel → Project → Settings → Environment Variables**: add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = the site
+   key (Production and Preview), then **redeploy** (a `NEXT_PUBLIC_` value is baked in at build time).
+3. **Supabase → Authentication → Attack Protection → Enable CAPTCHA protection**: provider **Turnstile by
+   Cloudflare**, paste the **secret key**, save.
+4. Test in a private window: Continue as guest, sign out, sign in with a key. Both should work without any
+   visible challenge. With a wrong secret, Rankr shows "Couldn't verify you're human".
+
+Order matters: with CAPTCHA on in Supabase but no site key in the app, every sign-in is rejected. To turn it
+off, do it the other way round (Supabase first, then remove the variable). For local testing, Cloudflare's
+test site key `1x00000000000000000000AA` always passes (its secret is `1x0000000000000000000000000000000AA`).
+
+### Limits
+
+- **Pastes**: 20 a minute per IP, and per account 30 a day for a guest or 200 with a saved key (official
+  accounts: none), in `PASTE_LIMITS` (`src/lib/params.ts`). Over the limit, `/api/track` answers 429 with a
+  `Retry-After` header; a guest is told that saving a key raises the limit. The counters live in Postgres
+  (`rate_limits` + `rankr_rate_hit`, fixed windows, shared by every server instance). Without Supabase, or
+  if that call fails, an in-memory counter takes over, so the limiter itself never blocks a paste.
+- **Caller board**: ranked by **hit rate** by default (the share of calls at 2x or more, among callers with
+  5+ calls). Counting 2x calls alone would reward pasting every new token; that count is still a tab.
 
 How it works:
 
@@ -172,7 +205,8 @@ How it works:
   save a key (which replaces the email). Their email is never sent to the browser.
 - `/api/track` checks the access token with Supabase Auth and refuses pastes without an account (401); the UI
   sends people to `/login` and back with their CA.
-- The caller board ranks callers by 2x hits, average x (3+ calls), best call and number of calls.
+- The caller board ranks callers by hit rate (share of calls at 2x+, 5+ calls, the default), average x
+  (5+ calls), 2x hits, best call and number of calls.
 - Without the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` vars (local dev), there are no accounts: pasting works
   for everyone and "My calls" is kept in the browser.
 

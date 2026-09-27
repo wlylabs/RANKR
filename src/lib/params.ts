@@ -17,12 +17,22 @@ export function parseRange(value: string | null | undefined): RangeKey {
 /** Max rows per request, and max ids in one `ids` lookup. */
 export const MAX_LIMIT = 100;
 
-export const CALLER_SORTS = ["hits", "avg", "best", "calls"] as const;
+/**
+ * Caller board sorts. "rate" (share of calls at 2x+) is the default: counting 2x calls alone rewards pasting
+ * everything, while a rate rewards picking well.
+ */
+export const CALLER_SORTS = ["rate", "avg", "hits", "best", "calls"] as const;
 export type CallerSort = (typeof CALLER_SORTS)[number];
 
 export function parseCallerSort(value: string | null | undefined): CallerSort {
-  return CALLER_SORTS.includes(value as CallerSort) ? (value as CallerSort) : "hits";
+  return CALLER_SORTS.includes(value as CallerSort) ? (value as CallerSort) : "rate";
 }
 
-/** Average x is only meaningful with a few calls behind it. */
-export const MIN_CALLS_FOR_AVG = 3;
+/** Hit rate and average x only count callers with this many calls, so one lucky call can't top the board. */
+export const MIN_CALLS_RANKED = 5;
+
+/**
+ * Paste limits: a burst limit per IP, and a daily one per account (a guest gets fewer than an account with a
+ * saved key; official accounts have none). Kept in Postgres when Supabase is set up (src/lib/rate-limit.ts).
+ */
+export const PASTE_LIMITS = { ipPerMinute: 20, guestPerDay: 30, keyedPerDay: 200 } as const;

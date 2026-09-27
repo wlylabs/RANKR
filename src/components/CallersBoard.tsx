@@ -4,7 +4,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import { callerHref, formatMultiple, tokenHref } from "@/lib/format";
 import { useCallerPages } from "@/lib/hooks";
-import { MIN_CALLS_FOR_AVG, type CallerSort } from "@/lib/params";
+import { MIN_CALLS_RANKED, type CallerSort } from "@/lib/params";
 import type { CallerView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { MultipleBadge } from "./MultipleBadge";
@@ -12,11 +12,17 @@ import { OfficialBadge } from "./OfficialBadge";
 import { ListSkeleton } from "./TokenList";
 
 export const CALLER_SORT_LABELS: Record<CallerSort, string> = {
-  hits: "2x hits",
+  rate: "Hit rate",
   avg: "Avg x",
+  hits: "2x hits",
   best: "Best call",
   calls: "Most calls",
 };
+
+/** Share of a caller's calls at 2x or more right now. */
+function hitRate(c: CallerView) {
+  return `${Math.round((c.hits / Math.max(c.calls, 1)) * 100)}%`;
+}
 
 const PAGE = 50;
 
@@ -52,8 +58,10 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
 
   return (
     <div className="mt-4">
-      {sort === "avg" && (
-        <p className="mb-3 font-mono text-[11px] text-subtle">avg x counts callers with {MIN_CALLS_FOR_AVG}+ calls</p>
+      {(sort === "avg" || sort === "rate") && (
+        <p className="mb-3 font-mono text-[11px] text-subtle">
+          {sort === "rate" ? "share of calls at 2x+ right now" : "average x"}, callers with {MIN_CALLS_RANKED}+ calls
+        </p>
       )}
       {loading ? (
         <div className="rounded-lg border border-border">
@@ -76,6 +84,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
                   <th className="py-2.5 font-normal">Caller</th>
                   <th className="py-2.5 text-right font-normal">Calls</th>
                   <th className="py-2.5 text-right font-normal">2x hits</th>
+                  <th className="py-2.5 text-right font-normal">Hit rate</th>
                   <th className="py-2.5 text-right font-normal">Win rate</th>
                   <th className="py-2.5 text-right font-normal">Avg x</th>
                   <th className="py-2.5 pr-4 text-right font-normal">Best call</th>
@@ -92,6 +101,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
                     </td>
                     <td className="tabular py-3 text-right text-muted">{c.calls}</td>
                     <td className={clsx("tabular py-3 text-right", c.hits ? "text-up" : "text-muted")}>{c.hits}</td>
+                    <td className={clsx("tabular py-3 text-right", sort === "rate" ? "text-fg" : "text-muted")}>{hitRate(c)}</td>
                     <td className="tabular py-3 text-right text-muted">{winRate(c)}</td>
                     <td className="py-3 text-right">
                       <MultipleBadge multiple={c.avgMultiple} />
@@ -118,7 +128,11 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
                     {c.bestToken && ` · best $${c.bestToken.symbol} ${formatMultiple(c.bestMultiple)}`}
                   </div>
                 </div>
-                <MultipleBadge multiple={sort === "best" ? c.bestMultiple : c.avgMultiple} />
+                {sort === "rate" ? (
+                  <span className="tabular font-mono text-[13px] font-medium">{hitRate(c)}</span>
+                ) : (
+                  <MultipleBadge multiple={sort === "best" ? c.bestMultiple : c.avgMultiple} />
+                )}
               </li>
             ))}
           </ul>
