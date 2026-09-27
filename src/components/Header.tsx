@@ -140,13 +140,6 @@ export function Footer() {
             sha256(&quot;rankr&quot;) = {RANKR_SHA256.slice(0, 16)}…{RANKR_SHA256.slice(-8)}
           </p>
         </div>
-        <p className="text-xs text-subtle sm:text-right">
-          Market data from{" "}
-          <a href="https://dexscreener.com" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-fg hover:underline">
-            DexScreener
-          </a>
-          .<br className="hidden sm:block" /> Not financial advice. Memecoins can go to zero.
-        </p>
       </div>
     </footer>
   );
