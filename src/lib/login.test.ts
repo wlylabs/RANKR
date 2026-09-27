@@ -4,12 +4,12 @@ import { authErrorMessage, loginHref, loginToPaste, safeNext } from "./login";
 describe("safeNext", () => {
   it("keeps same-site paths", () => {
     expect(safeNext("/me")).toBe("/me");
-    expect(safeNext("/?ca=abc")).toBe("/?ca=abc");
+    expect(safeNext("/app?ca=abc")).toBe("/app?ca=abc");
   });
 
   it("drops anything that could leave the site", () => {
     for (const bad of ["https://evil.example", "//evil.example", "/\\evil.example", "javascript:alert(1)", "", null, undefined]) {
-      expect(safeNext(bad)).toBe("/");
+      expect(safeNext(bad)).toBe("/app");
     }
   });
 });
@@ -18,6 +18,7 @@ describe("loginHref", () => {
   it("adds next only when it goes somewhere", () => {
     expect(loginHref()).toBe("/login");
     expect(loginHref("/")).toBe("/login");
+    expect(loginHref("/app")).toBe("/login");
     expect(loginHref("/me")).toBe("/login?next=%2Fme");
     expect(loginHref("//evil.example")).toBe("/login");
   });
@@ -25,7 +26,7 @@ describe("loginHref", () => {
   it("carries a pasted CA through sign-in", () => {
     const href = loginToPaste(" 7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr ");
     const next = new URL(href, "http://x").searchParams.get("next");
-    expect(next).toBe("/?ca=7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr");
+    expect(next).toBe("/app?ca=7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr");
     expect(new URL(next!, "http://x").searchParams.get("ca")).toBe("7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr");
   });
 });

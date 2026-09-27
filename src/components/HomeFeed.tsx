@@ -51,12 +51,46 @@ function Empty() {
   return <div className="px-4 py-12 text-center text-sm text-muted">Nothing here yet. Paste the first CA above.</div>;
 }
 
+/** Tracked / hit 2x+ / best run / in the red, for the whole board. */
+export function StatsGrid() {
+  const { stats } = useStats();
+  const best = stats?.best ?? null;
+  const pct = (n: number) => (stats?.total ? `${Math.round((n / stats.total) * 100)}% of all pastes` : "—");
+
+  return (
+    <div className="grid grid-cols-2 divide-border rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x">
+      <Stat label="Tracked" value={stats ? stats.total.toLocaleString("en-US") : "…"} hint="tokens since first paste" />
+      <Stat
+        label="Hit 2x+"
+        value={stats ? stats.doubled.toLocaleString("en-US") : "…"}
+        hint={stats ? pct(stats.doubled) : "—"}
+      />
+      <Stat
+        label="Best run"
+        value={
+          best ? (
+            <Link href={tokenHref(best)} className="text-up hover:underline">
+              {formatMultiple(best.peakMultiple)}
+            </Link>
+          ) : (
+            "—"
+          )
+        }
+        hint={best ? `$${best.symbol} peak since paste` : "no tokens yet"}
+      />
+      <Stat
+        label="In the red"
+        value={stats ? <span className={clsx(stats.inRed && "text-down")}>{stats.inRed.toLocaleString("en-US")}</span> : "…"}
+        hint="below entry right now"
+      />
+    </div>
+  );
+}
+
 export function HomeFeed() {
   const { stats, error } = useStats();
   const top = useTokens({ sort: "top", limit: 6 });
   const latest = useTokens({ sort: "new", limit: 6 });
-  const best = stats?.best ?? null;
-  const pct = (n: number) => (stats?.total ? `${Math.round((n / stats.total) * 100)}% of all pastes` : "—");
 
   return (
     <div className="space-y-6">
@@ -66,32 +100,7 @@ export function HomeFeed() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 divide-border rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x">
-        <Stat label="Tracked" value={stats ? stats.total.toLocaleString("en-US") : "…"} hint="tokens since first paste" />
-        <Stat
-          label="Hit 2x+"
-          value={stats ? stats.doubled.toLocaleString("en-US") : "…"}
-          hint={stats ? pct(stats.doubled) : "—"}
-        />
-        <Stat
-          label="Best run"
-          value={
-            best ? (
-              <Link href={tokenHref(best)} className="text-up hover:underline">
-                {formatMultiple(best.peakMultiple)}
-              </Link>
-            ) : (
-              "—"
-            )
-          }
-          hint={best ? `$${best.symbol} peak since paste` : "no tokens yet"}
-        />
-        <Stat
-          label="In the red"
-          value={stats ? <span className={clsx(stats.inRed && "text-down")}>{stats.inRed.toLocaleString("en-US")}</span> : "…"}
-          hint="below entry right now"
-        />
-      </div>
+      <StatsGrid />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Top runners" href="/leaderboard">

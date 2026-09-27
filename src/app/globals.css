@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+/* Running as the installed app (PWA). */
+@custom-variant standalone (@media (display-mode: standalone));
 
 /*
  * Monochrome system: the UI is black / white / greys, color is reserved for P&L.
@@ -58,6 +60,8 @@
 html {
   background: var(--bg);
   -webkit-tap-highlight-color: transparent;
+  /* Anchor links (#install, #paste) land below the sticky header. */
+  scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
 }
 
 body {

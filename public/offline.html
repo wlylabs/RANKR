@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>Offline · Rankr</title>
+    <style>
+      :root {
+        --bg: #0a0a0a;
+        --fg: #ededed;
+        --muted: #a1a1a1;
+        --subtle: #7a7a7a;
+        --border: #232323;
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #ffffff;
+          --fg: #0a0a0a;
+          --muted: #5e5e5e;
+          --subtle: #737373;
+          --border: #e6e6e6;
+          color-scheme: light;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 24px 16px;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        width: 100%;
+        max-width: 22rem;
+      }
+      svg {
+        display: block;
+        color: var(--fg);
+      }
+      h1 {
+        margin: 24px 0 0;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      button {
+        margin-top: 32px;
+        width: 100%;
+        height: 40px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--fg);
+        color: var(--bg);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      code {
+        display: block;
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        color: var(--subtle);
+        font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- The Rankr mark: the letter r on a 5x5 matrix, dots from SHA-256("rankr"). -->
+      <svg width="36" height="36" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="currentColor" />
+        <g fill="var(--bg)">
+          <rect x="10.8" y="19.6" width="7.2" height="7.2" rx="1.76" />
+          <rect x="10.8" y="28.4" width="7.2" height="7.2" rx="1.76" />
+          <rect x="10.8" y="37.2" width="7.2" height="7.2" rx="1.76" />
+          <rect x="10.8" y="46" width="7.2" height="7.2" rx="1.76" />
+          <rect x="19.6" y="28.4" width="7.2" height="7.2" rx="1.76" />
+          <rect x="28.4" y="19.6" width="7.2" height="7.2" rx="1.76" />
+          <rect x="37.2" y="19.6" width="7.2" height="7.2" rx="1.76" />
+          <g opacity="0.5">
+            <circle cx="14.4" cy="14.4" r="1.32" />
+            <circle cx="23.2" cy="14.4" r="1.32" />
+            <circle cx="23.2" cy="23.2" r="1.32" />
+            <circle cx="49.6" cy="23.2" r="1.32" />
+            <circle cx="32" cy="32" r="1.32" />
+            <circle cx="49.6" cy="32" r="1.32" />
+            <circle cx="40.8" cy="40.8" r="1.32" />
+          </g>
+        </g>
+      </svg>
+      <h1>You're offline</h1>
+      <p>Rankr tracks live prices, so it needs a connection. Your calls and every sealed entry are safe on the server.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+      <code>sha256("rankr") = fa7f36c04fef6ea1…acea4e3a</code>
+    </main>
+    <script>
+      // Back online: reload into the page that was asked for.
+      window.addEventListener("online", () => location.reload());
+    </script>
+  </body>
+</html>

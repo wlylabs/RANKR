@@ -3,7 +3,7 @@
 import { KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { loginHref } from "@/lib/login";
+import { APP_HOME, loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeyReveal, KeySignInForm } from "./Key";
 import { OfficialBadge } from "./OfficialBadge";
@@ -23,7 +23,7 @@ export function Account() {
   const [shownKey, setShownKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!available || (ready && (!userId || !username))) router.replace(available ? loginHref("/account") : "/");
+    if (!available || (ready && (!userId || !username))) router.replace(available ? loginHref("/account") : APP_HOME);
   }, [available, ready, userId, username, router]);
 
   if (!ready || !userId || !username) {
@@ -36,7 +36,7 @@ export function Account() {
 
   async function out() {
     await signOut();
-    router.replace("/");
+    router.replace(APP_HOME);
   }
 
   const keyProps = { username, shownKey, setShownKey };

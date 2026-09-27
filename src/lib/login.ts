@@ -1,18 +1,21 @@
 // Where to go after signing in. Only same-site paths, so /login?next=... can't bounce people elsewhere.
 
-export function safeNext(next: string | null | undefined, fallback = "/"): string {
+/** The app's home: the paste box and the live board. The landing page is at /. */
+export const APP_HOME = "/app";
+
+export function safeNext(next: string | null | undefined, fallback = APP_HOME): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
   return next;
 }
 
 export function loginHref(next?: string): string {
   const to = safeNext(next, "");
-  return to && to !== "/" ? `/login?next=${encodeURIComponent(to)}` : "/login";
+  return to && to !== "/" && to !== APP_HOME ? `/login?next=${encodeURIComponent(to)}` : "/login";
 }
 
-/** Sign in, then come back to the home page and track `ca`. */
+/** Sign in, then come back to the app and track `ca`. */
 export function loginToPaste(ca: string): string {
-  return loginHref(`/?ca=${encodeURIComponent(ca.trim())}`);
+  return loginHref(`${APP_HOME}?ca=${encodeURIComponent(ca.trim())}`);
 }
 
 /** A readable message for a Supabase Auth error. */
