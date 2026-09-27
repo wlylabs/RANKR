@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-2: #eef2f0;
+  --border: #e0e6e3;
+  --fg: #0a0f0d;
+  --muted: #5a6560;
+  --subtle: #8a948f;
+  --brand: #0a0f0d;
+  --brand-fg: #d9ff4a;
+  --ring: #19d98c;
+  --up: #0a9a55;
+  --up-soft: rgb(10 154 85 / 0.1);
+  --down: #d92d4a;
+  --down-soft: rgb(217 45 74 / 0.1);
+  --gold: #b7791f;
+  --gold-soft: rgb(234 170 38 / 0.14);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #07090b;
+  --surface: #0e1215;
+  --surface-2: #151b1f;
+  --border: #1e262b;
+  --fg: #eef3f0;
+  --muted: #93a09a;
+  --subtle: #5f6b66;
+  --brand: #d4ff3a;
+  --brand-fg: #07110a;
+  --ring: #d4ff3a;
+  --up: #2be48a;
+  --up-soft: rgb(43 228 138 / 0.12);
+  --down: #ff5470;
+  --down-soft: rgb(255 84 112 / 0.12);
+  --gold: #ffc53d;
+  --gold-soft: rgb(255 197 61 / 0.13);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+  --color-ring: var(--ring);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  background: var(--bg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Soft brand glow behind the hero */
+.hero-glow {
+  background:
+    radial-gradient(60% 55% at 50% 0%, rgb(212 255 58 / 0.14), transparent 70%),
+    radial-gradient(40% 40% at 80% 10%, rgb(25 217 140 / 0.1), transparent 70%);
+}
+
+:root:not(.dark) .hero-glow {
+  background:
+    radial-gradient(60% 55% at 50% 0%, rgb(25 217 140 / 0.16), transparent 70%),
+    radial-gradient(40% 40% at 80% 10%, rgb(212 255 58 / 0.25), transparent 70%);
+}
+
+.grid-lines {
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(70% 60% at 50% 0%, black, transparent 75%);
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
