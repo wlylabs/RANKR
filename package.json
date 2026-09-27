@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:bundle": "node scripts/bundle-sql.mjs"
   },
   "engines": {
     "node": ">=20.9.0"

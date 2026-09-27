@@ -64,8 +64,10 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
 ### Setup
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run the files in `supabase/migrations/` in order
-   (`…_rankr_tokens.sql`, then `…_rankr_callers.sql`). With the Supabase CLI: `supabase link`, `supabase db push`.
+2. Open **SQL Editor**, paste the whole of **`supabase/setup.sql`** and run it. It contains every migration in
+   the right order and is safe to run again. (With the Supabase CLI instead: `supabase link`, `supabase db push`.)
+   Running `…_rankr_callers.sql` on its own before `…_rankr_tokens.sql` fails with
+   `relation "public.tokens" does not exist`; nothing is changed in that case, just run `setup.sql`.
 3. Set the env vars on your host (Vercel etc.):
    ```
    SUPABASE_URL=https://YOUR-PROJECT.supabase.co
@@ -145,7 +147,7 @@ src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Lo
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
 src/lib/accounts.ts          wallet sessions (Supabase Auth) and calls, server side
-supabase/                    migration, smoke test, optional cron job
+supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```
 
 Not financial advice. Memecoins can and do go to zero.
