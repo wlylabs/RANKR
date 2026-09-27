@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { APP_HOME } from "@/lib/login";
 import { AccountMenu } from "./AccountMenu";
-import { Logo, RANKR_SHA256 } from "./Logo";
+import { Logo } from "./Logo";
 import { PasteBox } from "./PasteBox";
 import { SettingsMenu } from "./SettingsMenu";
 
@@ -131,20 +131,5 @@ export function BottomNav() {
         })}
       </div>
     </nav>
-  );
-}
-
-export function Footer() {
-  return (
-    <footer className="mt-20 border-t border-border pb-20 md:pb-0">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-        <div className="space-y-2">
-          <Logo size={20} />
-          <p className="max-w-full truncate font-mono text-[11px] text-subtle" title={`sha256("rankr") = ${RANKR_SHA256}`}>
-            sha256(&quot;rankr&quot;) = {RANKR_SHA256.slice(0, 16)}…{RANKR_SHA256.slice(-8)}
-          </p>
-        </div>
-      </div>
-    </footer>
   );
 }
