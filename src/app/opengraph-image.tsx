@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { OG, OG_SIZE, OgHashLine, OgLogo, ogFonts } from "@/lib/og";
+import { OG, OG_SIZE, OgLogo, ogFonts } from "@/lib/og";
 
 export const alt = "Rankr: paste a CA, watch it rank";
 export const size = OG_SIZE;
@@ -31,7 +31,6 @@ export default async function Image() {
             Entry sealed at the first paste. Every 2x, 10x, 100x tracked live.
           </div>
         </div>
-        <OgHashLine />
       </div>
     ),
     { ...size, fonts: await ogFonts() },

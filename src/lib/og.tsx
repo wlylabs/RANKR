@@ -1,7 +1,7 @@
 // Shared pieces for the generated social cards (rendered by next/og, so inline styles only).
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { markElements, RANKR_SHA256 } from "@/components/Logo";
+import { markElements } from "@/components/Logo";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
@@ -46,14 +46,6 @@ export function OgLogo({ size = 44 }: { size?: number }) {
         {markElements(OG.bg, OG.bg, 0.5)}
       </svg>
       <div style={{ fontSize: size * 0.8, fontWeight: 600, letterSpacing: "-0.04em", color: OG.fg }}>rankr</div>
-    </div>
-  );
-}
-
-export function OgHashLine() {
-  return (
-    <div style={{ fontFamily: "Geist Mono", fontSize: 20, color: OG.subtle }}>
-      {`sha256("rankr") = ${RANKR_SHA256.slice(0, 24)}…`}
     </div>
   );
 }
