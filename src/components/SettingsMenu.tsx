@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { AppWindow, Bell, Check, Download, Moon, Settings, Sun } from "lucide-react";
+import { AppWindow, Bell, Check, Download, Info, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -12,6 +12,38 @@ import { promptInstall, useInstallState } from "@/lib/pwa";
 import { CopyButton } from "./CopyButton";
 
 const ITEM = "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
+
+/**
+ * Switches the theme cinematically: the new theme opens as a circle from the toggle and washes over the
+ * page (View Transitions + a clip-path on the new snapshot; Material 3 emphasized decelerate, 700ms).
+ * Instant without View Transitions or with reduced motion. The class is set inside the transition because
+ * next-themes only applies it in an effect, after the new frame would already be captured.
+ */
+function switchTheme(next: "dark" | "light", setTheme: (theme: string) => void, from: DOMRect) {
+  const apply = () => {
+    const root = document.documentElement;
+    root.classList.remove("dark", "light");
+    root.classList.add(next);
+    root.style.colorScheme = next;
+    setTheme(next);
+  };
+  if (!document.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
+
+  const x = from.left + from.width / 2;
+  const y = from.top + from.height / 2;
+  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+  const transition = document.startViewTransition(apply);
+  transition.ready
+    .then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 700, easing: "cubic-bezier(0.05, 0.7, 0.1, 1)", pseudoElement: "::view-transition-new(root)" },
+      );
+    })
+    .catch(() => {
+      /* skipped (e.g. another transition started); the theme is applied either way */
+    });
+}
 
 /** The app's full link on this site, e.g. https://rankr.example/app (just the path while server rendering). */
 function useAppUrl() {
@@ -78,16 +110,25 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
         >
           <div className="flex items-center justify-between gap-3 px-3 py-2.5">
             <span className="text-sm text-muted">Theme</span>
-            <div className="flex rounded-md border border-border p-0.5">
+            <div className="relative grid grid-cols-2 rounded-md border border-border p-0.5">
+              {/* The selection slides to the picked theme. */}
+              <span
+                aria-hidden
+                className={clsx(
+                  "absolute inset-y-0.5 left-0.5 w-[calc(50%-0.125rem)] rounded bg-surface-2 transition-transform duration-300 ease-emphasized",
+                  resolvedTheme === "light" && "translate-x-full",
+                  !resolvedTheme && "opacity-0",
+                )}
+              />
               {(["dark", "light"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
-                  onClick={() => setTheme(t)}
+                  onClick={(e) => resolvedTheme !== t && switchTheme(t, setTheme, e.currentTarget.getBoundingClientRect())}
                   aria-pressed={resolvedTheme === t}
                   className={clsx(
-                    "inline-flex h-6 items-center gap-1.5 rounded px-2 text-xs capitalize transition-colors",
-                    resolvedTheme === t ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
+                    "relative inline-flex h-6 items-center justify-center gap-1.5 rounded px-2 text-xs capitalize transition-colors duration-300",
+                    resolvedTheme === t ? "text-fg" : "text-subtle hover:text-fg",
                   )}
                 >
                   {t === "dark" ? <Moon className="size-3" /> : <Sun className="size-3" />}
@@ -101,9 +142,14 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
 
           <div className="border-t border-border py-1">
             <div className="label px-3 pt-1.5 pb-1 text-subtle">App</div>
-            {openApp && (
+            {openApp ? (
               <Link href={APP_HOME} className={ITEM}>
                 <AppWindow className="size-3.5" /> Open app
+              </Link>
+            ) : (
+              // The landing page is for the web; the installed app has no way back to it.
+              <Link href="/" className={clsx(ITEM, "standalone:hidden")}>
+                <Info className="size-3.5" /> About Rankr
               </Link>
             )}
             {install === "installed" ? (

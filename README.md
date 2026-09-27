@@ -28,11 +28,11 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
-- **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" link, three steps and a
+- **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, three steps and a
   four-question FAQ. English only: Rankr is for DEX traders everywhere.
   The app itself (paste box + live board) is at **`/app`**.
-- **Settings menu** (the gear in the header): theme, and the app: open it, install it, copy its link. It is the
-  only place with app buttons, so pages stay clean.
+- **Settings menu** (the gear in the header): theme (switching cross-fades the page), milestone alerts, About
+  Rankr (the landing page) or Open app, Install app and the app link. It keeps pages free of app buttons.
 - **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
   offline page (next section).
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme.
@@ -50,6 +50,14 @@ hairline borders), "decrypted text" reveal effects, and hash visualizations such
 - **UI**: black / white / grays, color only for P&L (green up, red down). No token icons: tokens are shown as
   ticker + name. A multiple that moves on a live refresh flashes green or red. Geist Sans for text, Geist Mono for numbers, addresses and hashes. The hero headline and the
   big multiple "decrypt" out of random hex on first load (skipped with reduced motion).
+- **Motion** (cinematic, `src/app/globals.css` + `src/components/Cinema.tsx`), with Material 3 easing
+  (emphasized decelerate for arrivals) and everything off with reduced motion:
+  - the landing hero opens like a title sequence: a dot-matrix "hash field" (lit cells from `SHA-256("rankr")`,
+    breathing, framing the text), each line arriving out of a blur in turn, a light that follows the pointer,
+    faint film grain; scrolling away, the hero drifts up and dims (scroll-driven, Chromium);
+  - sections below arrive as they scroll into view;
+  - app pages settle in on every navigation (`(app)/template.tsx`);
+  - switching theme opens the new theme as a circle from the toggle (View Transitions).
 - Colors live as CSS variables in `src/app/globals.css` (dark and light).
 
 ## Install as an app (PWA)

@@ -7,7 +7,7 @@ import { APP_HOME } from "@/lib/login";
 /** The landing page's own shell: just the logo, the app link and settings. */
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <div className="grain">
       <StandaloneRedirect />
       <header className="sticky top-0 z-40 border-b border-border bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center px-4 sm:px-6">
@@ -32,6 +32,6 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           <p className="text-xs text-subtle">Not financial advice. Memecoins can go to zero.</p>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
