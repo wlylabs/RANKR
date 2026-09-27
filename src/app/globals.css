@@ -55,12 +55,14 @@
   --color-down-soft: var(--down-soft);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Material 3 "emphasized" easing: quick start, long gentle settle. Used for expand / collapse. */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 }
 
 html {
   background: var(--bg);
   -webkit-tap-highlight-color: transparent;
-  /* Anchor links (#install, #paste) land below the sticky header. */
+  /* Anchor links (e.g. /app#paste) land below the sticky header. */
   scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
 }
 
@@ -68,6 +70,22 @@ body {
   background: var(--bg);
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Installed on iOS, the status bar is drawn over the page with white text (black-translucent). The dark theme
+ * sits under it as is; the light theme keeps a dark strip there so the clock and battery stay readable.
+ * Everywhere else the top inset is 0 and this draws nothing.
+ */
+@media (display-mode: standalone) {
+  html:not(.dark) body::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 60;
+    height: env(safe-area-inset-top);
+    background: #0a0a0a;
+  }
 }
 
 ::selection {
@@ -90,6 +108,16 @@ body {
 .scrollbar-none {
   scrollbar-width: none;
 }
+
+/* A row that scrolls sideways fades out at its right edge, so a cut-off item reads as "more this way". */
+.fade-end {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+@media (min-width: 40rem) {
+  .fade-end {
+    mask-image: none;
+  }
+}
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
@@ -107,6 +135,30 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.18s ease-out;
+}
+
+/* Live ticks: a number that just moved gets a short wash in its direction's color. */
+@keyframes flash-up {
+  from {
+    background-color: color-mix(in srgb, var(--up) 28%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@keyframes flash-down {
+  from {
+    background-color: color-mix(in srgb, var(--down) 28%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.animate-flash-up {
+  animation: flash-up 1.2s ease-out;
+}
+.animate-flash-down {
+  animation: flash-down 1.2s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

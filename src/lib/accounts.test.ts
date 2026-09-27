@@ -162,3 +162,45 @@ describe("accounts", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("callerProfile", () => {
+  let urls: string[];
+  let rows: { user_id: string; username: string; official?: boolean }[];
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("SUPABASE_URL", "https://x.supabase.co");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
+    urls = [];
+    rows = [{ user_id: "u1", username: "nonce_7f3a" }];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        if (url.includes("/rest/v1/profiles?")) return new Response(JSON.stringify(rows));
+        if (url.endsWith("/rest/v1/rpc/rankr_my_calls")) return new Response("[]");
+        return new Response("not found", { status: 404 });
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("finds a caller by name in any case, matching underscores literally", async () => {
+    const { callerProfile } = await import("./accounts");
+    const out = await callerProfile("NONCE_7F3A");
+    expect(out?.caller).toMatchObject({ userId: "u1", username: "nonce_7f3a", calls: 0, bestToken: null });
+    expect(urls[0]).toContain("username=ilike.NONCE%5C_7F3A");
+  });
+
+  it("returns null for unknown or impossible names", async () => {
+    const { callerProfile } = await import("./accounts");
+    rows = [{ user_id: "u2", username: "nonceX7f3a" }]; // what an unescaped "_" would also match
+    expect(await callerProfile("nonce_7f3a")).toBeNull();
+    expect(await callerProfile("no spaces!")).toBeNull();
+    expect(urls).toHaveLength(1);
+  });
+});

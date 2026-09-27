@@ -97,6 +97,9 @@ export type CallerView = {
 
 export type CallersResponse = { enabled: boolean; total: number; callers: CallerView[]; updatedAt: number };
 
+/** A caller's public profile: board numbers and calls, newest first. */
+export type CallerProfileResponse = { caller: CallerView; calls: CallView[]; updatedAt: number };
+
 export type TokensResponse = {
   tokens: TokenView[];
   /** Matching tokens in total (for paging). */

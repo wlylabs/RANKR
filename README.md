@@ -19,28 +19,36 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
   and can rename itself.
 - **My calls**: every token you pasted, measured from *your* paste.
-- **Caller leaderboard**: callers ranked by their calls (2x hits, average x, best call), by username.
+- **Caller leaderboard**: callers ranked by their calls (2x hits, average x, best call), by username. Each
+  caller has a public profile at `/u/<username>` with their numbers and every call.
+- **Watchlist**: star a token on its page to follow it under My calls → Watchlist (kept in the browser).
+- **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
+  new milestone (2x, 3x, 5x, 10x...), while Rankr is open. A token already past a milestone when first seen
+  doesn't alert for it.
 - **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
-- **Landing page** at `/`: what Rankr does, the board's #1 token live, how it works, features, install steps, FAQ.
+- **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" link, three steps and a
+  four-question FAQ. English only: Rankr is for DEX traders everywhere.
   The app itself (paste box + live board) is at **`/app`**.
-- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls), an
-  offline page and an "Install app" button (next section).
+- **Settings menu** (the gear in the header): theme, and the app: open it, install it, copy its link. It is the
+  only place with app buttons, so pages stay clean.
+- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
+  offline page (next section).
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme.
 
 ## Design
 
-Minimal, monochrome, cryptography-flavoured. References: Vercel's Geist design system (monochrome, Swiss,
-hairline borders), "decrypted text" reveal effects, and hash visualisations such as identicons / SSH randomart.
+Minimal, monochrome, cryptography-flavored. References: Vercel's Geist design system (monochrome, Swiss,
+hairline borders), "decrypted text" reveal effects, and hash visualizations such as identicons / SSH randomart.
 
 - **Logo**: the letter "r" on a 5x5 matrix. The other 18 cells come from `SHA-256("rankr")`
   (`fa7f36c0…4e3a`): cell *i* gets a dot when bit pair *i* of the digest is `11`. The mark is literally the
   name's hash, so no other name produces it. `src/lib/logo.test.ts` recomputes the digest and checks the favicon.
 - **Entry seal**: every token gets `sha256(chain:address:entryPrice:firstPastedAt)`, shown on the token page and
   after a paste. Anyone can recompute it, so an edited entry would no longer match.
-- **UI**: black / white / greys, color only for P&L (green up, red down). No token icons: tokens are shown as
-  ticker + name. Geist Sans for text, Geist Mono for numbers, addresses and hashes. The hero headline and the
+- **UI**: black / white / grays, color only for P&L (green up, red down). No token icons: tokens are shown as
+  ticker + name. A multiple that moves on a live refresh flashes green or red. Geist Sans for text, Geist Mono for numbers, addresses and hashes. The hero headline and the
   big multiple "decrypt" out of random hex on first load (skipped with reduced motion).
 - Colors live as CSS variables in `src/app/globals.css` (dark and light).
 
@@ -49,13 +57,17 @@ hairline borders), "decrypted text" reveal effects, and hash visualisations such
 The web app manifest (`src/app/manifest.ts`) has `id` and `start_url` `/app` with `scope` `/`, so the installed
 app skips the landing page and every page of the site opens inside it. The app link is `https://your-domain/app`.
 
-- **Install button** (`src/components/Pwa.tsx`, `src/lib/pwa.ts`): Chrome, Edge and Android show the browser's own
-  install dialog (`beforeinstallprompt`); iPhone and iPad get the Share → Add to Home Screen steps; other browsers
-  get their menu steps. Once installed the button hides.
+- **Install app** in the settings menu (`src/components/SettingsMenu.tsx`, `src/lib/pwa.ts`): Chrome, Edge and
+  Android show the browser's own install dialog (`beforeinstallprompt`); iPhone and iPad get the Share → Add to
+  Home Screen step; other browsers get their menu step. Once installed it reads "Installed on this device".
 - **Service worker** (`public/sw.js`, registered in production only): pages and API calls always go to the network
   (prices are live), with navigation preload; when the network is gone it shows `public/offline.html` and reloads
   once back online. It is served with `Cache-Control: no-cache` (`next.config.ts`) so updates reach installed apps.
 - iOS: `apple-mobile-web-app` meta and `apple-icon.png`; headers pad for the notch (`env(safe-area-inset-top)`).
+  The status bar is `black-translucent` (white text over the page), so in the light theme the installed app keeps
+  a dark strip under it.
+- `theme-color` (status bar, app title bar, Safari toolbar) and the offline page follow the theme picked in
+  Rankr, not the system's light / dark setting.
 - Opened as the installed app, `/` forwards to `/app`, and the app's footer hides the landing links.
 - Installability needs HTTPS (localhost is fine for testing).
 
@@ -191,6 +203,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/stats` | totals for the home page |
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
 | `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
+| `GET /api/callers/:username` | a caller's profile: board numbers and calls |
 | `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET/DELETE /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
 | `GET /api/username?name=` | is a username free |
 
@@ -211,7 +224,7 @@ rolls everything back. Run it against a local or throwaway database:
 ```
 src/app/                     pages, API routes, icons, manifest, social cards
   (site)/                    the landing page at / (own header and footer)
-  (app)/                     the app shell (header, bottom nav) and its pages: app (/app), leaderboard, me, t/...
+  (app)/                     the app shell (header, bottom nav) and its pages: app (/app), leaderboard, me, t/..., u/...
   api/track                  POST { input } -> records a paste
   api/tokens                 GET a leaderboard page (sort, filter, paging)
   api/stats                  GET home page totals
@@ -219,13 +232,16 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/callers, api/me/*      caller board, your account, username and calls
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
-src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, Pwa...)
+src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, SettingsMenu...)
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
 src/lib/accounts.ts          accounts (Supabase Auth: guests, keys), names and calls, server side
 src/lib/key.ts               sign-in keys: generate, parse, the key's email, the dot pattern
 src/lib/username.ts          username rules (reserved names, look-alikes), same as the SQL
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
+src/lib/watchlist.ts         the watchlist (starred tokens, kept in the browser)
+src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
+src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board)
 public/sw.js, offline.html   service worker and the offline page
 supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```

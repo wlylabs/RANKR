@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowLeft, Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lucide-react";
+import { Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,8 +25,9 @@ import type { Link as TokenLink, MarketSnapshot, TokenResponse, TokenView } from
 import { useAuth } from "./AuthProvider";
 import { CopyButton } from "./CopyButton";
 import { DecryptText } from "./DecryptText";
-import { ChangeText, MultipleBadge } from "./MultipleBadge";
+import { ChangeText, Flash, MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
+import { WatchButton } from "./Watchlist";
 
 export function TokenDetail({ chain, address, initial }: { chain: string; address: string; initial: TokenResponse }) {
   const key = `/api/tokens/${chain}/${encodeURIComponent(address)}`;
@@ -39,8 +40,8 @@ export function TokenDetail({ chain, address, initial }: { chain: string; addres
 
   return (
     <div className="pt-6 sm:pt-10">
-      <Link href="/leaderboard" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
-        <ArrowLeft className="size-3.5" /> Leaderboard
+      <Link href="/leaderboard" className="text-sm text-muted hover:text-fg">
+        Back to leaderboard
       </Link>
       {token ? (
         <Tracked token={token} />
@@ -157,20 +158,25 @@ function Tracked({ token: t }: { token: TokenView }) {
               <div className="label text-subtle">Since first paste</div>
               <div
                 className={clsx(
-                  "tabular mt-3 font-mono text-6xl leading-none font-medium tracking-[-0.06em] sm:text-7xl",
+                  "tabular relative isolate mt-3 w-fit font-mono text-6xl leading-none font-medium tracking-[-0.06em] sm:text-7xl",
                   tone(t.multiple),
                 )}
               >
+                <Flash value={t.multiple} />
                 <DecryptText text={formatMultiple(t.multiple)} duration={700} />
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px]">
-                <ChangeText multiple={t.multiple} />
+                {/* A loss already reads as a percentage above; a gain gets its percentage here. */}
+                {t.multiple >= 1 && <ChangeText multiple={t.multiple} />}
                 <span className="tabular text-muted">
-                  {formatUsd(t.entryMarketCap)} → <span className="text-fg">{formatUsd(t.marketCap)}</span> mc
+                  entry {formatUsd(t.entryMarketCap)} · now <span className="text-fg">{formatUsd(t.marketCap)}</span>
                 </span>
               </div>
             </div>
-            <ShareButton token={t} />
+            <div className="flex items-center gap-2">
+              <WatchButton id={t.id} symbol={t.symbol} />
+              <ShareButton token={t} />
+            </div>
           </div>
           <dl className="grid gap-x-6 gap-y-2 border-t border-border px-5 py-4 font-mono text-[11px] sm:grid-cols-[auto_1fr] sm:px-6">
             <dt className="text-subtle">first paste</dt>
@@ -185,7 +191,7 @@ function Tracked({ token: t }: { token: TokenView }) {
               <span className="truncate" title={`sha256(${t.chainId}:${t.address}:${t.entryPriceUsd}:${t.firstPastedAt})`}>
                 sha256 {t.seal}
               </span>
-              <CopyButton value={t.seal} />
+              <CopyButton value={t.seal} what="seal" />
             </dd>
             {t.stale && (
               <>
@@ -198,8 +204,11 @@ function Tracked({ token: t }: { token: TokenView }) {
           </dl>
         </section>
 
+        {/* Chart: right under the multiple on a phone, like every DEX screener. */}
+        {m && <Chart market={m} className="lg:col-span-2" />}
+
         {/* Side column */}
-        <div className="space-y-6 lg:row-span-2">
+        <div className="space-y-6 lg:col-start-3 lg:row-span-2 lg:row-start-1">
           {myCall && (
             <Section title="Your call">
               <div className="flex items-center justify-between gap-3">
@@ -243,9 +252,6 @@ function Tracked({ token: t }: { token: TokenView }) {
             </dl>
           </Section>
         </div>
-
-        {/* Chart */}
-        {m && <Chart market={m} className="lg:col-span-2" />}
       </div>
     </>
   );
@@ -350,7 +356,7 @@ function ShareButton({ token: t }: { token: TokenView }) {
         await navigator.share({ title: `$${t.symbol} on Rankr`, text, url });
         return;
       } catch {
-        /* cancelled, fall through to copy */
+        /* canceled, fall through to copy */
       }
     }
     try {

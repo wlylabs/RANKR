@@ -5,7 +5,7 @@ import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import type { CallerSort, RangeKey, SortKey } from "./params";
 import { authedFetcher } from "./supabase-browser";
-import type { CallersResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
+import type { CallerProfileResponse, CallersResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -59,7 +59,9 @@ export function useTokenPages(params: Omit<TokensParams, "limit" | "offset" | "i
     (i, prev: TokensResponse | null) =>
       prev && prev.tokens.length < pageSize ? null : tokensKey({ ...params, limit: pageSize, offset: i * pageSize }),
     fetcher,
-    { ...LIVE, revalidateFirstPage: false },
+    // revalidateAll: every loaded page refreshes on the live interval. (revalidateFirstPage: false, used
+    // before, stopped the interval from fetching anything, so the board never moved on its own.)
+    { ...LIVE, revalidateAll: true },
   );
   const tokens = data?.flatMap((p) => p.tokens) ?? [];
   return {
@@ -74,13 +76,24 @@ export function useTokenPages(params: Omit<TokensParams, "limit" | "offset" | "i
   };
 }
 
+/** A caller's public profile, refreshed like the boards. */
+export function useCallerProfile(username: string, enabled = true) {
+  return useSWR<CallerProfileResponse>(
+    enabled ? `/api/callers/${encodeURIComponent(username)}` : null,
+    fetcher,
+    { ...LIVE, keepPreviousData: false },
+  );
+}
+
 /** Caller leaderboard in pages of `pageSize`. */
 export function useCallerPages(sort: CallerSort, pageSize = 50) {
   const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite<CallersResponse>(
     (i, prev: CallersResponse | null) =>
       prev && prev.callers.length < pageSize ? null : `/api/callers?sort=${sort}&limit=${pageSize}&offset=${i * pageSize}`,
     fetcher,
-    { ...LIVE, revalidateFirstPage: false },
+    // revalidateAll: every loaded page refreshes on the live interval. (revalidateFirstPage: false, used
+    // before, stopped the interval from fetching anything, so the board never moved on its own.)
+    { ...LIVE, revalidateAll: true },
   );
   return {
     callers: data?.flatMap((p) => p.callers) ?? [],

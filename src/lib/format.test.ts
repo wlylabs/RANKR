@@ -50,5 +50,7 @@ describe("timeAgo", () => {
     expect(timeAgo(now - 5 * 60_000, now)).toBe("5m ago");
     expect(timeAgo(now - 3 * 3_600_000, now)).toBe("3h ago");
     expect(timeAgo(now - 2 * 86_400_000, now)).toBe("2d ago");
+    expect(timeAgo(now - 10_000, now, true)).toBe("now");
+    expect(timeAgo(now - 5 * 60_000, now, true)).toBe("5m");
   });
 });

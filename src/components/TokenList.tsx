@@ -14,7 +14,7 @@ function Rank({ rank }: { rank: number }) {
   );
 }
 
-/** Ticker + name, the only identity a token gets. */
+/** Ticker + name, the only identity a token gets (no logos). */
 export function TokenName({ symbol, name, className }: { symbol: string; name: string; className?: string }) {
   return (
     <span className={clsx("flex min-w-0 items-baseline gap-2", className)}>
@@ -24,7 +24,10 @@ export function TokenName({ symbol, name, className }: { symbol: string; name: s
   );
 }
 
-/** Compact row used on the home page and on mobile leaderboards. */
+/**
+ * Compact row used on the home page and on mobile leaderboards. The meta line stays short enough for a
+ * phone: chain, market cap now, and age (or peak); the entry is on the token page.
+ */
 export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView; rank?: number; meta?: "pasted" | "peak" }) {
   return (
     <Link href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
@@ -32,8 +35,8 @@ export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView
       <div className="min-w-0 flex-1">
         <TokenName symbol={t.symbol} name={t.name} />
         <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
-          <ChainTag chainId={t.chainId} /> · {formatUsd(t.entryMarketCap)} → {formatUsd(t.marketCap)} ·{" "}
-          {meta === "peak" ? `peak ${formatMultiple(t.peakMultiple)}` : <TimeAgo at={t.firstPastedAt} />}
+          <ChainTag chainId={t.chainId} /> · mc {formatUsd(t.marketCap)} ·{" "}
+          {meta === "peak" ? `peak ${formatMultiple(t.peakMultiple)}` : <TimeAgo at={t.firstPastedAt} compact />}
         </div>
       </div>
       <MultipleBadge multiple={t.multiple} />

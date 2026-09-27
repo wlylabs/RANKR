@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import { formatMultiple, tokenHref } from "@/lib/format";
+import { callerHref, formatMultiple, tokenHref } from "@/lib/format";
 import { useCallerPages } from "@/lib/hooks";
 import { MIN_CALLS_FOR_AVG, type CallerSort } from "@/lib/params";
 import type { CallerView } from "@/lib/types";
@@ -27,10 +27,10 @@ function winRate(c: CallerView) {
 function Caller({ c, me }: { c: CallerView; me: boolean }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <span className="flex min-w-0 items-center gap-1">
+      <Link href={callerHref(c.username)} className="flex min-w-0 items-center gap-1 hover:underline">
         <span className="truncate font-mono text-[13px]">@{c.username}</span>
         {c.official && <OfficialBadge />}
-      </span>
+      </Link>
       {me && <span className="rounded border border-border px-1 font-mono text-[10px] text-muted">you</span>}
     </span>
   );

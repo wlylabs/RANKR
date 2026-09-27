@@ -1,9 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import { RefreshCw, Search } from "lucide-react";
+import { ChevronDown, RefreshCw, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { chainMeta } from "@/lib/chains";
 import { useNow, useStats, useTokenPages } from "@/lib/hooks";
 import {
@@ -31,8 +31,14 @@ const SORT_LABELS: Record<SortKey, string> = {
 const PAGE = 50;
 
 function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  // On a phone the row scrolls: keep the selected tab in view (e.g. opened on "Most pasted").
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
   return (
     <button
+      ref={ref}
       type="button"
       role="tab"
       onClick={onClick}
@@ -140,7 +146,7 @@ export function Leaderboard() {
       {view === "callers" ? (
         <>
           <div
-            className="scrollbar-none -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
+            className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
             role="tablist"
           >
             {CALLER_SORTS.map((key) => (
@@ -154,7 +160,7 @@ export function Leaderboard() {
       ) : (
         <>
           <div
-            className="scrollbar-none -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
+            className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
             role="tablist"
           >
             {SORT_KEYS.map((key) => (
@@ -191,19 +197,23 @@ export function Leaderboard() {
                   </button>
                 ))}
               </div>
-              <select
-                value={chain}
-                onChange={(e) => setParam("chain", e.target.value, "all")}
-                aria-label="Chain"
-                className="h-9 min-w-0 flex-1 rounded-md border border-border bg-bg px-2.5 text-sm outline-none sm:flex-none"
-              >
-                <option value="all">All chains</option>
-                {chains.map((c) => (
-                  <option key={c} value={c}>
-                    {chainMeta(c).name}
-                  </option>
-                ))}
-              </select>
+              {/* The native picker (best on phones), styled like the other controls. */}
+              <div className="relative min-w-0 flex-1 sm:flex-none">
+                <select
+                  value={chain}
+                  onChange={(e) => setParam("chain", e.target.value, "all")}
+                  aria-label="Chain"
+                  className="h-9 w-full cursor-pointer appearance-none rounded-md border border-border bg-bg pr-8 pl-3 text-sm text-fg outline-none transition-colors hover:bg-surface-2 focus-visible:border-border-strong sm:w-auto"
+                >
+                  <option value="all">All chains</option>
+                  {chains.map((c) => (
+                    <option key={c} value={c}>
+                      {chainMeta(c).name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-subtle" />
+              </div>
             </div>
           </div>
 
