@@ -2,7 +2,7 @@
 // per-user calls. Server only.
 import { callerStats } from "./caller-stats";
 import { generateKey, isKeyEmail, keyEmail } from "./key";
-import { MIN_CALLS_FOR_AVG, type CallerSort } from "./params";
+import { MIN_CALLS_RANKED, type CallerSort } from "./params";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
@@ -180,7 +180,7 @@ export async function callers(sort: CallerSort, limit: number, offset: number): 
   if (!api) return { total: 0, callers: [] };
   const out = await api.rpc<{ total: number; callers: CallerRow[] }>("rankr_callers", {
     p_sort: sort,
-    p_min_calls: sort === "avg" ? MIN_CALLS_FOR_AVG : 1,
+    p_min_calls: sort === "avg" || sort === "rate" ? MIN_CALLS_RANKED : 1,
     p_limit: limit,
     p_offset: offset,
   });
