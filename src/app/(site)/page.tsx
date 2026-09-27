@@ -1,9 +1,9 @@
-import { Globe, KeyRound, Lock, Plus, TrendingUp, Trophy, UsersRound } from "lucide-react";
+import { Globe, KeyRound, Lock, TrendingUp, Trophy, UsersRound } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DecryptText } from "@/components/DecryptText";
 import { LiveStatus, StatsGrid } from "@/components/HomeFeed";
-import { LiveCall } from "@/components/Landing";
+import { Faq, LiveCall } from "@/components/Landing";
 import { chainMeta, FEATURED_CHAINS } from "@/lib/chains";
 
 export const metadata: Metadata = {
@@ -204,16 +204,8 @@ export default function LandingPage() {
       {/* FAQ */}
       <section aria-labelledby="faq" className="mt-24">
         <SectionHead id="faq" label="FAQ" title="Questions, answered." />
-        <div className="mt-8 border-b border-border">
-          {FAQ.map(({ q, a }) => (
-            <details key={q} className="group border-t border-border">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-medium [&::-webkit-details-marker]:hidden">
-                {q}
-                <Plus className="size-4 shrink-0 text-subtle transition-transform group-open:rotate-45" />
-              </summary>
-              <p className="max-w-2xl pb-5 text-sm text-pretty text-muted">{a}</p>
-            </details>
-          ))}
+        <div className="mt-8">
+          <Faq items={FAQ} />
         </div>
       </section>
     </>

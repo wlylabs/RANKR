@@ -55,6 +55,8 @@
   --color-down-soft: var(--down-soft);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Material 3 "emphasized" easing: quick start, long gentle settle. Used for expand / collapse. */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 }
 
 html {
