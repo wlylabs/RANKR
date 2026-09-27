@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import useSWR from "swr";
-import type { TokenView, TokensResponse } from "./types";
+import useSWR, { mutate } from "swr";
+import useSWRInfinite from "swr/infinite";
+import type { CallerSort, RangeKey, SortKey } from "./params";
+import type { CallersResponse, StatsResponse, TokenView, TokensResponse } from "./types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -11,14 +13,96 @@ export async function fetcher<T>(url: string): Promise<T> {
   return body as T;
 }
 
-export const TOKENS_KEY = "/api/tokens";
+export type TokensParams = {
+  sort?: SortKey;
+  range?: RangeKey;
+  chain?: string | null;
+  q?: string | null;
+  ids?: string[];
+  limit?: number;
+  offset?: number;
+};
 
-export function useTokens() {
-  const { data, error, isLoading, mutate } = useSWR<TokensResponse>(TOKENS_KEY, fetcher, {
-    refreshInterval: 20_000,
-    keepPreviousData: true,
-  });
-  return { tokens: data?.tokens ?? [], updatedAt: data?.updatedAt ?? null, error, isLoading, mutate };
+/** SWR key for a token query, or null when there is nothing to ask for. */
+export function tokensKey(p: TokensParams): string | null {
+  if (p.ids && !p.ids.length) return null;
+  const qs = new URLSearchParams();
+  if (p.sort) qs.set("sort", p.sort);
+  if (p.range && p.range !== "all") qs.set("range", p.range);
+  if (p.chain) qs.set("chain", p.chain);
+  if (p.q) qs.set("q", p.q);
+  if (p.ids) qs.set("ids", p.ids.join(","));
+  if (p.limit) qs.set("limit", String(p.limit));
+  if (p.offset) qs.set("offset", String(p.offset));
+  return `/api/tokens?${qs}`;
+}
+
+const LIVE = { refreshInterval: 20_000, keepPreviousData: true } as const;
+
+export function useTokens(params: TokensParams) {
+  const { data, error, isLoading, isValidating, mutate } = useSWR<TokensResponse>(tokensKey(params), fetcher, LIVE);
+  return {
+    tokens: data?.tokens ?? [],
+    total: data?.total ?? 0,
+    updatedAt: data?.updatedAt ?? null,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  };
+}
+
+/** A leaderboard read in pages of `pageSize`; `loadMore` fetches the next one. */
+export function useTokenPages(params: Omit<TokensParams, "limit" | "offset" | "ids">, pageSize = 50) {
+  const { data, error, isLoading, isValidating, size, setSize, mutate } = useSWRInfinite<TokensResponse>(
+    (i, prev: TokensResponse | null) =>
+      prev && prev.tokens.length < pageSize ? null : tokensKey({ ...params, limit: pageSize, offset: i * pageSize }),
+    fetcher,
+    { ...LIVE, revalidateFirstPage: false },
+  );
+  const tokens = data?.flatMap((p) => p.tokens) ?? [];
+  return {
+    tokens,
+    total: data?.[0]?.total ?? 0,
+    updatedAt: data?.[0]?.updatedAt ?? null,
+    error,
+    isLoading,
+    isValidating,
+    loadMore: () => setSize(size + 1),
+    mutate,
+  };
+}
+
+/** Caller leaderboard in pages of `pageSize`. */
+export function useCallerPages(sort: CallerSort, pageSize = 50) {
+  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite<CallersResponse>(
+    (i, prev: CallersResponse | null) =>
+      prev && prev.callers.length < pageSize ? null : `/api/callers?sort=${sort}&limit=${pageSize}&offset=${i * pageSize}`,
+    fetcher,
+    { ...LIVE, revalidateFirstPage: false },
+  );
+  return {
+    callers: data?.flatMap((p) => p.callers) ?? [],
+    total: data?.[0]?.total ?? 0,
+    enabled: data?.[0]?.enabled ?? true,
+    error,
+    isLoading,
+    isValidating,
+    loadMore: () => setSize(size + 1),
+  };
+}
+
+export function useStats() {
+  const { data, error, isLoading } = useSWR<StatsResponse>("/api/stats", fetcher, LIVE);
+  return { stats: data ?? null, error, isLoading };
+}
+
+/** Revalidates every board and stat on the page, e.g. after a paste. */
+export function refreshBoards() {
+  // `includes` also matches the "$inf$..." keys of paged boards.
+  return mutate(
+    (key) => typeof key === "string" && ["/api/tokens", "/api/stats", "/api/me/calls", "/api/callers"].some((p) => key.includes(p)),
+  );
 }
 
 /** Re-renders every `ms` so relative times stay current. */

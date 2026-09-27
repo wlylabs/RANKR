@@ -5,6 +5,7 @@ import { House, Plus, Trophy, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { AccountButton } from "./Account";
 import { Logo, RANKR_SHA256 } from "./Logo";
 import { PasteBox } from "./PasteBox";
 import { ThemeToggle } from "./ThemeToggle";
@@ -59,6 +60,7 @@ export function Header() {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            <AccountButton />
             <button
               type="button"
               onClick={openDialog}
@@ -140,13 +142,6 @@ export function Footer() {
             sha256(&quot;rankr&quot;) = {RANKR_SHA256.slice(0, 16)}…{RANKR_SHA256.slice(-8)}
           </p>
         </div>
-        <p className="text-xs text-subtle sm:text-right">
-          Market data from{" "}
-          <a href="https://dexscreener.com" target="_blank" rel="noreferrer" className="underline-offset-2 hover:text-fg hover:underline">
-            DexScreener
-          </a>
-          .<br className="hidden sm:block" /> Not financial advice. Memecoins can go to zero.
-        </p>
       </div>
     </footer>
   );
