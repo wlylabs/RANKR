@@ -14,7 +14,6 @@ import { useAuth } from "./AuthProvider";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
-import { TokenIcon } from "./TokenIcon";
 import { TokenName } from "./TokenList";
 
 type Result = TrackResponse & { firstCallByYou: boolean };
@@ -256,7 +255,6 @@ function TrackResult({ result, keepAs, onClose }: { result: Result; keepAs: stri
   return (
     <div role="status" className="animate-fade-in mt-3 overflow-hidden rounded-lg border border-border bg-surface text-left">
       <Link href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
-        <TokenIcon src={t.imageUrl} symbol={t.symbol} size={32} />
         <div className="min-w-0 flex-1">
           <TokenName symbol={t.symbol} name={t.name} />
           <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">

@@ -27,7 +27,6 @@ import { CopyButton } from "./CopyButton";
 import { DecryptText } from "./DecryptText";
 import { ChangeText, Flash, MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
-import { TokenIcon } from "./TokenIcon";
 import { WatchButton } from "./Watchlist";
 
 export function TokenDetail({ chain, address, initial }: { chain: string; address: string; initial: TokenResponse }) {
@@ -77,13 +76,10 @@ function Header({ market, fallback }: { market: MarketSnapshot | null; fallback:
   return (
     <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-3">
-          <TokenIcon src={market?.imageUrl ?? fallback.imageUrl} symbol={src.symbol} size={44} />
-          <h1 className="flex min-w-0 items-baseline gap-3">
-            <span className="text-3xl font-semibold tracking-tight sm:text-4xl">${src.symbol}</span>
-            <span className="truncate text-lg text-muted">{src.name}</span>
-          </h1>
-        </div>
+        <h1 className="flex min-w-0 items-baseline gap-3">
+          <span className="text-3xl font-semibold tracking-tight sm:text-4xl">${src.symbol}</span>
+          <span className="truncate text-lg text-muted">{src.name}</span>
+        </h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs text-subtle">
           <span>{chainMeta(src.chainId).name.toLowerCase()}</span>
           {market?.dexId && (

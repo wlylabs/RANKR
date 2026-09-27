@@ -16,7 +16,6 @@ import { OfficialBadge } from "./OfficialBadge";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
-import { TokenIcon } from "./TokenIcon";
 import { Watchlist } from "./Watchlist";
 import { useWatchlist } from "@/lib/watchlist";
 import { ListSkeleton, TokenName } from "./TokenList";
@@ -27,7 +26,6 @@ export type Row = {
   address: string;
   symbol: string;
   name: string;
-  imageUrl: string | null;
   entryMarketCap: number | null;
   calledAt: number;
   multiple: number;
@@ -49,7 +47,6 @@ function deviceRow(call: MyCall, token: TokenView | undefined): Row {
     address: call.address,
     symbol: call.symbol,
     name: call.name,
-    imageUrl: token?.imageUrl ?? call.imageUrl,
     entryMarketCap: call.entryMarketCap,
     calledAt: call.pastedAt,
     multiple: price ? ratio(price, call.entryPriceUsd) : 1,
@@ -67,7 +64,6 @@ export function callRow(c: CallView): Row {
     address: t.address,
     symbol: t.symbol,
     name: t.name,
-    imageUrl: t.imageUrl,
     entryMarketCap: c.entryMarketCap,
     calledAt: c.calledAt,
     multiple: c.multiple,
@@ -313,7 +309,6 @@ export function CallsView({
         {rows.map((row) => (
           <li key={row.id} className="group flex items-center gap-2 pr-2 transition-colors hover:bg-surface-2">
             <Link href={tokenHref(row)} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
-              <TokenIcon src={row.imageUrl} symbol={row.symbol} size={32} />
               <div className="min-w-0 flex-1">
                 <TokenName symbol={row.symbol} name={row.name} className="min-w-0" />
                 <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">

@@ -5,7 +5,6 @@ import type { TokenView } from "@/lib/types";
 import { ChainTag } from "./Chain";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
-import { TokenIcon } from "./TokenIcon";
 
 function Rank({ rank }: { rank: number }) {
   return (
@@ -15,7 +14,7 @@ function Rank({ rank }: { rank: number }) {
   );
 }
 
-/** Ticker + name. */
+/** Ticker + name, the only identity a token gets (no logos). */
 export function TokenName({ symbol, name, className }: { symbol: string; name: string; className?: string }) {
   return (
     <span className={clsx("flex min-w-0 items-baseline gap-2", className)}>
@@ -33,7 +32,6 @@ export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView
   return (
     <Link href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
       {rank !== undefined && <Rank rank={rank} />}
-      <TokenIcon src={t.imageUrl} symbol={t.symbol} size={32} />
       <div className="min-w-0 flex-1">
         <TokenName symbol={t.symbol} name={t.name} />
         <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
@@ -71,8 +69,7 @@ export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; sta
                 <Rank rank={startRank + i} />
               </td>
               <td className="max-w-[18rem] py-3 font-sans">
-                <Link href={tokenHref(t)} className="flex items-center gap-2.5 after:absolute after:inset-0">
-                  <TokenIcon src={t.imageUrl} symbol={t.symbol} size={22} />
+                <Link href={tokenHref(t)} className="block after:absolute after:inset-0">
                   <TokenName symbol={t.symbol} name={t.name} />
                 </Link>
               </td>
@@ -102,7 +99,6 @@ export function ListSkeleton({ rows = 5 }: { rows?: number }) {
     <div aria-hidden>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex animate-pulse items-center gap-3 px-4 py-3.5">
-          <div className="size-8 shrink-0 rounded-full bg-surface-2" />
           <div className="flex-1 space-y-2">
             <div className="h-3 w-40 rounded bg-surface-2" />
             <div className="h-2.5 w-28 rounded bg-surface-2" />

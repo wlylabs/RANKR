@@ -47,8 +47,8 @@ hairline borders), "decrypted text" reveal effects, and hash visualizations such
   name's hash, so no other name produces it. `src/lib/logo.test.ts` recomputes the digest and checks the favicon.
 - **Entry seal**: every token gets `sha256(chain:address:entryPrice:firstPastedAt)`, shown on the token page and
   after a paste. Anyone can recompute it, so an edited entry would no longer match.
-- **UI**: black / white / grays, color only for P&L (green up, red down). Tokens show their DexScreener logo
-  (or their first letter) with ticker + name. A multiple that moves on a live refresh flashes green or red. Geist Sans for text, Geist Mono for numbers, addresses and hashes. The hero headline and the
+- **UI**: black / white / grays, color only for P&L (green up, red down). No token icons: tokens are shown as
+  ticker + name. A multiple that moves on a live refresh flashes green or red. Geist Sans for text, Geist Mono for numbers, addresses and hashes. The hero headline and the
   big multiple "decrypt" out of random hex on first load (skipped with reduced motion).
 - Colors live as CSS variables in `src/app/globals.css` (dark and light).
 
