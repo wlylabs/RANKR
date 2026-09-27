@@ -9,6 +9,8 @@ export type TokenQuery = {
   /** Ticker / name substring, or an exact address. */
   q?: string | null;
   ids?: string[] | null;
+  /** Leave out dead tokens (see DEAD_MULTIPLE): the boards. */
+  hideDead?: boolean;
   limit: number;
   offset: number;
 };
@@ -37,7 +39,7 @@ export interface Store {
   /** Market refresh. Peak / low only move outward. */
   applyMarket(updates: MarketUpdate[]): Promise<void>;
   query(q: TokenQuery): Promise<RecordPage>;
-  /** Tokens last checked before `checkedBefore`, oldest first. */
-  stale(checkedBefore: number, limit: number): Promise<TokenRecord[]>;
+  /** Tokens last checked before `checkedBefore` (dead ones: before `deadBefore`), oldest first. */
+  stale(checkedBefore: number, limit: number, deadBefore?: number): Promise<TokenRecord[]>;
   stats(): Promise<StoreStats>;
 }

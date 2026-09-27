@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteCall, myCalls } from "@/lib/accounts";
+import { myCalls } from "@/lib/accounts";
 import { requireAccount } from "@/lib/api-auth";
 import type { MyCallsResponse } from "@/lib/types";
 
@@ -17,16 +17,3 @@ export async function GET(req: Request) {
   }
 }
 
-/** DELETE /api/me/calls?token=<token id> removes one of your calls. */
-export async function DELETE(req: Request) {
-  const account = await requireAccount(req);
-  if (account instanceof NextResponse) return account;
-  const token = new URL(req.url).searchParams.get("token");
-  if (!token) return NextResponse.json({ error: "Missing token." }, { status: 400 });
-  try {
-    return NextResponse.json({ deleted: await deleteCall(account, token) });
-  } catch (err) {
-    console.error("[rankr] delete call failed", err);
-    return NextResponse.json({ error: "Could not remove the call." }, { status: 500 });
-  }
-}

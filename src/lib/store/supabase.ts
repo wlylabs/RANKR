@@ -1,4 +1,5 @@
-import { SupabaseRest } from "../supabase-rest";
+import { DEAD_MULTIPLE } from "../params";
+import { SupabaseError, SupabaseRest } from "../supabase-rest";
 import type { MarketSnapshot, TokenRecord } from "../types";
 import type { MarketUpdate, RecordPage, Store, StoreStats, TokenQuery } from "./types";
 
@@ -119,7 +120,7 @@ export class SupabaseStore implements Store {
   }
 
   async query(q: TokenQuery): Promise<RecordPage> {
-    const out = await this.rpc<{ total: number; records: TokenRow[] }>("rankr_query", {
+    const args: Record<string, unknown> = {
       p_sort: q.sort,
       p_chain: q.chain ?? null,
       p_since: q.since != null ? iso(q.since) : null,
@@ -127,13 +128,25 @@ export class SupabaseStore implements Store {
       p_ids: q.ids ?? null,
       p_limit: q.limit,
       p_offset: q.offset,
-    });
+    };
+    let out: { total: number; records: TokenRow[] };
+    try {
+      out = await this.rpc("rankr_query", q.hideDead ? { ...args, p_hide_dead: true } : args);
+    } catch (err) {
+      // Until …_rankr_dead_tokens.sql has run, rankr_query has no p_hide_dead: show the board with dead tokens.
+      if (!(q.hideDead && err instanceof SupabaseError && err.status === 404)) throw err;
+      console.warn("[rankr] rankr_query without p_hide_dead: run supabase/setup.sql");
+      out = await this.rpc("rankr_query", args);
+    }
     return { total: out.total, records: out.records.map(fromRow) };
   }
 
-  async stale(checkedBefore: number, limit: number) {
+  async stale(checkedBefore: number, limit: number, deadBefore = checkedBefore) {
+    const before = encodeURIComponent(iso(checkedBefore));
+    // Alive tokens checked before `checkedBefore`, dead ones (see DEAD_MULTIPLE) before `deadBefore`.
+    const dead = `or=(multiple.gt.${DEAD_MULTIPLE},last_checked_at.lt.${encodeURIComponent(iso(Math.min(checkedBefore, deadBefore)))})`;
     const rows = await this.request<TokenRow[]>(
-      `/tokens?select=*&last_checked_at=lt.${encodeURIComponent(iso(checkedBefore))}&order=last_checked_at.asc&limit=${limit}`,
+      `/tokens?select=*&last_checked_at=lt.${before}&${dead}&order=last_checked_at.asc&limit=${limit}`,
     );
     return rows.map(fromRow);
   }

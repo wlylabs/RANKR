@@ -348,3 +348,44 @@ describe("callerProfile", () => {
     expect(urls).toHaveLength(1);
   });
 });
+
+describe("lastSeason", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("reads the last month that ended, with callers by the names they have now", async () => {
+    vi.resetModules();
+    vi.stubEnv("SUPABASE_URL", "https://x.supabase.co");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
+    const urls: string[] = [];
+    const caller = { user_id: "u1", username: "old_name", official: false, calls: 8, hits: 5, wins: 6, avg_multiple: 3, best_multiple: 12, best_token: null };
+    const token = { id: "solana:ZZZ", chain_id: "solana", address: "ZZZ", symbol: "ZED", name: "Zed", entry_market_cap: 1000, peak_multiple: 40, multiple: 2, first_caller: "u1" };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        if (url.includes("/rest/v1/seasons?")) {
+          return new Response(
+            JSON.stringify([
+              { month: "2026-09-01", ended_at: "2026-10-01T00:00:00+00:00", counts: { tokens: 120, calls: 300, callers: 40 }, callers: [caller], tokens: [token] },
+            ]),
+          );
+        }
+        if (url.includes("/rest/v1/profiles?")) return new Response(JSON.stringify([{ user_id: "u1", username: "new_name", official: true }]));
+        return new Response("not found", { status: 404 });
+      }),
+    );
+    const { lastSeason } = await import("./accounts");
+    expect(await lastSeason()).toEqual({
+      month: "2026-09-01",
+      endedAt: Date.parse("2026-10-01T00:00:00Z"),
+      counts: { tokens: 120, calls: 300, callers: 40 },
+      callers: [{ userId: "u1", username: "new_name", official: true, calls: 8, hits: 5, avgMultiple: 3, bestMultiple: 12 }],
+      tokens: [{ id: "solana:ZZZ", chainId: "solana", address: "ZZZ", symbol: "ZED", name: "Zed", entryMarketCap: 1000, peakMultiple: 40, firstCaller: "new_name" }],
+    });
+    expect(urls[0]).toContain("seasons?select=*&order=ended_at.desc&limit=1");
+    expect(urls[1]).toContain("user_id=in.(u1)");
+  });
+});

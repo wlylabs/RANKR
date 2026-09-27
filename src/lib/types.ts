@@ -156,6 +156,38 @@ export type StatsResponse = {
   updatedAt: number;
 };
 
+/** A month that ended: its top 10 callers and tokens, kept when the boards reset (public.seasons). */
+export type Season = {
+  /** The month's first day, "2026-09-01". */
+  month: string;
+  endedAt: number;
+  counts: { tokens: number; calls: number; callers: number };
+  /** By hit rate, callers with 5+ calls, as on the caller board then. Names as they are now. */
+  callers: { userId: string; username: string; official: boolean; calls: number; hits: number; avgMultiple: number; bestMultiple: number }[];
+  /** By peak x since the first paste. `firstCaller`: who called it first, by today's name. */
+  tokens: {
+    id: string;
+    chainId: string;
+    address: string;
+    symbol: string;
+    name: string;
+    entryMarketCap: number | null;
+    peakMultiple: number;
+    firstCaller: string | null;
+  }[];
+};
+
+export type SeasonResponse = { last: Season | null };
+
+/** A paste looked up before it's called or watched: live data, and Rankr's record if it tracks the token. */
+export type LookupResponse = { preview: MarketSnapshot; token: TokenView | null };
+
+/** Live data for watched tokens: Rankr's record when it tracks one, else straight from the DEX. */
+export type WatchlistResponse = {
+  items: { id: string; token: TokenView | null; market: MarketSnapshot | null }[];
+  updatedAt: number;
+};
+
 export type TokenResponse = {
   token: TokenView | null;
   /** Live data for a token Rankr has not recorded yet. */

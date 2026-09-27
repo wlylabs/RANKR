@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callerStats } from "./caller-stats";
+import { callSpread, callerStats, recentForm } from "./caller-stats";
 import type { CallView, TokenView } from "./types";
 
 function call(symbol: string, multiple: number): CallView {
@@ -20,5 +20,34 @@ describe("callerStats", () => {
 
   it("has neutral numbers without calls", () => {
     expect(callerStats([])).toEqual({ calls: 0, hits: 0, wins: 0, avgMultiple: 1, bestMultiple: 1, bestToken: null });
+  });
+});
+
+describe("callSpread", () => {
+  it("buckets calls by where they are now", () => {
+    const spread = callSpread([0.1, 0.99, 1, 1.99, 2, 4.9, 5, 12, 99.9, 100, 2500, Number.NaN]);
+    expect(Object.fromEntries(spread.map((b) => [b.label, b.count]))).toEqual({
+      loss: 2,
+      "1-2x": 2,
+      "2-5x": 2,
+      "5-10x": 1,
+      "10-100x": 2,
+      "100x+": 2,
+    });
+    expect(spread.map((b) => b.tone)).toEqual(["down", "mid", "up", "up", "up", "up"]);
+  });
+});
+
+describe("recentForm", () => {
+  const c = (calledAt: number, multiple: number) => ({ calledAt, multiple });
+
+  it("takes the newest calls and counts the streak above entry from the newest", () => {
+    const form = recentForm([c(1, 3), c(5, 1.5), c(4, 2.2), c(3, 0.4), c(2, 1.2), c(6, 1.001)], 5);
+    expect(form.recent.map((r) => r.calledAt)).toEqual([6, 5, 4, 3, 2]);
+    expect(form.up).toBe(3); // 1.5, 2.2, 1.2
+    expect(form.hits).toBe(1);
+    expect(form.streak).toBe(0); // the newest is flat
+    expect(recentForm([c(3, 2), c(2, 1.1), c(1, 0.5)]).streak).toBe(2);
+    expect(recentForm([])).toEqual({ recent: [], up: 0, hits: 0, streak: 0 });
   });
 });

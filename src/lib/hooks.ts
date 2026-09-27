@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
-import type { CallerSort, FeedKind, FeedScope, RangeKey, SortKey } from "./params";
+import { MAX_LIMIT, type CallerSort, type FeedKind, type FeedScope, type RangeKey, type SortKey } from "./params";
 import { authedFetcher } from "./supabase-browser";
-import type { CallerProfileResponse, CallersResponse, FeedResponse, MyCallsResponse, StatsResponse, TokenView, TokensResponse } from "./types";
+import type {
+  CallerProfileResponse,
+  CallersResponse,
+  FeedResponse,
+  MarketSnapshot,
+  MyCallsResponse,
+  SeasonResponse,
+  StatsResponse,
+  TokenView,
+  TokensResponse,
+  WatchlistResponse,
+} from "./types";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -74,6 +85,25 @@ export function useTokenPages(params: Omit<TokensParams, "limit" | "offset" | "i
     loadMore: () => setSize(size + 1),
     mutate,
   };
+}
+
+/** Live data for watched tokens (ids from tokenId), by id: Rankr's record when it tracks one, else the DEX's. */
+export function useWatchlistMarkets(ids: string[]) {
+  const key = ids.length ? `/api/watchlist?ids=${ids.slice(0, MAX_LIMIT).map(encodeURIComponent).join(",")}` : null;
+  const { data, error, isLoading } = useSWR<WatchlistResponse>(key, fetcher, LIVE);
+  const items = useMemo(() => new Map((data?.items ?? []).map((i) => [i.id, i])), [data]);
+  return { items, error, isLoading };
+}
+
+/** The live market of a watched token, whichever way it came. */
+export function marketOf(item: WatchlistResponse["items"][number] | undefined): MarketSnapshot | null {
+  return item?.token?.market ?? item?.market ?? null;
+}
+
+/** The last month that ended, with its top 10s. It changes once a month. */
+export function useLastSeason(enabled = true) {
+  const { data, isLoading } = useSWR<SeasonResponse>(enabled ? "/api/season" : null, fetcher, { revalidateOnFocus: false });
+  return { season: data?.last ?? null, isLoading };
 }
 
 /** A caller's public profile, refreshed like the boards. */
@@ -256,10 +286,6 @@ export function addMyCall(token: TokenView, now = Date.now()): boolean {
     ...calls,
   ]);
   return true;
-}
-
-export function removeMyCall(id: string) {
-  writeCalls(readCalls().filter((c) => c.id !== id));
 }
 
 export function useMyCalls(): MyCall[] {

@@ -2,9 +2,10 @@ import { createHash } from "node:crypto";
 import { parseInput, tokenId } from "./address";
 import { UpstreamError, fetchSnapshots, findToken } from "./dexscreener";
 import { applySnapshot, newRecord, toView as statsOf } from "./metrics";
+import { DEAD_REFRESH_MS } from "./params";
 import { store, type MarketUpdate, type TokenQuery } from "./store";
 import { compareRecords } from "./store/memory";
-import type { TokenRecord, TokenResponse, TokenView, TrackResponse } from "./types";
+import type { LookupResponse, MarketSnapshot, TokenRecord, TokenResponse, TokenView, TrackResponse, WatchlistResponse } from "./types";
 
 /** Records younger than this are served as-is. */
 const FRESH_MS = 15_000;
@@ -61,6 +62,45 @@ export async function trackToken(input: string, chainId?: string): Promise<Track
   return { status: created ? "created" : "existing", token: toView(record, now) };
 }
 
+/**
+ * What a paste points at, before it's called or watched: live market data, and Rankr's record of the token
+ * if it has one (with the live numbers). Nothing is written.
+ */
+export async function lookupToken(input: string): Promise<LookupResponse> {
+  const parsed = parseInput(input);
+  if (!parsed) throw new RankrError("That doesn't look like a token address or token link.", 400);
+  const snap = await lookup(parsed.address, parsed.chainHint ?? null);
+  if (!snap || !(snap.priceUsd > 0)) {
+    throw new RankrError("No DEX pair with a price found for this address yet.", 404);
+  }
+  const now = Date.now();
+  const record = await store.get(tokenId(snap.chainId, snap.address));
+  return { preview: snap, token: record ? toView(applySnapshot(record, snap, now), now) : null };
+}
+
+// Live data for watched tokens Rankr doesn't track, kept briefly so many watchers cost one DEX request.
+const liveCache = new Map<string, { snapshot: MarketSnapshot; until: number }>();
+
+/**
+ * Live data for watched tokens (ids from tokenId): Rankr's record, refreshed like the boards, for the ones it
+ * tracks; DexScreener for the rest.
+ */
+export async function watchlistOf(ids: string[]): Promise<WatchlistResponse["items"]> {
+  if (!ids.length) return [];
+  const { tokens } = await queryTokens({ sort: "new", ids, limit: ids.length, offset: 0 });
+  const tracked = new Map(tokens.map((t) => [t.id, t]));
+  const now = Date.now();
+  const missing = ids.filter((id) => !tracked.has(id) && !((liveCache.get(id)?.until ?? 0) > now));
+  if (missing.length) {
+    const snaps = await fetchSnapshots(
+      missing.map((id) => ({ chainId: id.slice(0, id.indexOf(":")), address: id.slice(id.indexOf(":") + 1) })),
+    );
+    if (liveCache.size > 5_000) liveCache.clear();
+    for (const [id, snapshot] of snaps) liveCache.set(id, { snapshot, until: now + FRESH_MS });
+  }
+  return ids.map((id) => ({ id, token: tracked.get(id) ?? null, market: tracked.has(id) ? null : (liveCache.get(id)?.snapshot ?? null) }));
+}
+
 // Tokens currently being fetched, so overlapping requests don't refetch them.
 const inflight = new Set<string>();
 
@@ -109,9 +149,10 @@ export async function getStats() {
   return { total: s.total, doubled: s.doubled, inRed: s.inRed, best: s.best ? toView(s.best) : null, chains: s.chains };
 }
 
-/** Background refresh (cron): the stalest tokens first. Returns how many were checked. */
+/** Background refresh (cron): the stalest tokens first, dead ones hourly. Returns how many were checked. */
 export async function refreshStale(limit = MAX_REFRESH): Promise<number> {
-  const records = await store.stale(Date.now() - FRESH_MS, limit);
+  const now = Date.now();
+  const records = await store.stale(now - FRESH_MS, limit, now - DEAD_REFRESH_MS);
   await refresh(records);
   return records.length;
 }

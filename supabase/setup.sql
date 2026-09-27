@@ -1109,3 +1109,166 @@ begin
     grant execute on function public.rankr_verify_x(uuid, text) to service_role;
   end if;
 end $$;
+
+-- ===== 20260928000000_rankr_dead_tokens.sql =====
+
+-- Dead tokens: at 0.3x or below (−70% or worse from the first paste, DEAD_MULTIPLE in src/lib/params.ts) a
+-- token leaves the token boards, and comes back if it recovers. Nothing is deleted: calls on it stay and
+-- still count on the caller board. rankr_query gets p_hide_dead (the boards pass true; searches and id
+-- lookups don't). The background refresh checks dead tokens hourly (src/lib/store/supabase.ts, no SQL).
+
+do $$
+begin
+  if to_regclass('public.tokens') is null then
+    raise exception 'rankr: run the earlier migrations first (or use supabase/setup.sql, which runs everything in order)';
+  end if;
+end $$;
+
+-- A second signature next to the old one would make calls without p_hide_dead ambiguous.
+drop function if exists public.rankr_query(text, text, timestamptz, text, text[], integer, integer);
+
+create or replace function public.rankr_query(
+  p_sort      text default 'top',
+  p_chain     text default null,
+  p_since     timestamptz default null,
+  p_q         text default null,
+  p_ids       text[] default null,
+  p_limit     integer default 50,
+  p_offset    integer default 0,
+  p_hide_dead boolean default false
+) returns jsonb
+language sql stable as $$
+  with f as (
+    select t.* from public.tokens t
+    where (p_chain is null or t.chain_id = p_chain)
+      and (p_since is null or t.first_pasted_at >= p_since)
+      and (p_ids is null or t.id = any (p_ids))
+      and (not coalesce(p_hide_dead, false) or t.multiple > 0.3)
+      and (
+        p_q is null
+        or t.symbol ilike '%' || replace(replace(replace(p_q, '\', '\\'), '%', '\%'), '_', '\_') || '%'
+        or t.name   ilike '%' || replace(replace(replace(p_q, '\', '\\'), '%', '\%'), '_', '\_') || '%'
+        or lower(t.address) = lower(p_q)
+      )
+  ),
+  ranked as (
+    select f.*, row_number() over (
+      order by
+        case when p_sort = 'top'    then f.multiple end desc nulls last,
+        case when p_sort = 'peak'   then f.peak_multiple end desc nulls last,
+        case when p_sort = 'losers' then f.multiple end asc nulls last,
+        case when p_sort = 'hot'    then f.paste_count end desc nulls last,
+        case when p_sort = 'hot'    then f.last_pasted_at end desc nulls last,
+        f.first_pasted_at desc,
+        f.id
+    ) as rn
+    from f
+  )
+  select jsonb_build_object(
+    'total', (select count(*) from f),
+    'records', coalesce(
+      (select jsonb_agg(to_jsonb(r) - 'rn' order by r.rn)
+         from ranked r
+        where r.rn > greatest(p_offset, 0) and r.rn <= greatest(p_offset, 0) + least(greatest(p_limit, 1), 200)),
+      '[]'::jsonb)
+  );
+$$;
+
+-- ===== 20260928010000_rankr_monthly_reset.sql =====
+
+-- Monthly reset: on the 1st of every month at 00:00 UTC every token goes, and with it every call and
+-- milestone (on delete cascade), so the boards start from zero. Accounts stay: names, keys, bios, links,
+-- verified X accounts. Before the wipe, the month's top 10 callers (by hit rate, as on the caller board)
+-- and top 10 tokens (by peak x since the first paste) are kept in public.seasons, shown as "Last month".
+--
+-- Calls can no longer be removed one by one (rankr_delete_call is dropped): they all go with the reset, and
+-- a caller removing their losing calls would dress up their hit rate.
+--
+-- Scheduled with pg_cron when it is enabled (Dashboard -> Database -> Extensions); see supabase/cron.sql.
+-- By hand:   select rankr_end_month();
+-- Stop it:   select cron.unschedule('rankr-monthly-reset');
+
+do $$
+begin
+  if to_regprocedure('public.rankr_callers(text, integer, integer, integer)') is null then
+    raise exception 'rankr: run the earlier migrations first (or use supabase/setup.sql, which runs everything in order)';
+  end if;
+end $$;
+
+drop function if exists public.rankr_delete_call(uuid, text);
+
+create table if not exists public.seasons (
+  id       bigint generated always as identity primary key,
+  month    date not null,                     -- the month that ended, e.g. 2026-09-01
+  ended_at timestamptz not null default now(),
+  callers  jsonb not null default '[]',       -- top 10 by hit rate, callers with 5+ calls
+  tokens   jsonb not null default '[]',       -- top 10 by peak x since the first paste
+  counts   jsonb not null default '{}'        -- {tokens, calls, callers} when it ended
+);
+
+create index if not exists seasons_ended_at_idx on public.seasons (ended_at desc);
+
+alter table public.seasons enable row level security;
+drop policy if exists "seasons are public" on public.seasons;
+create policy "seasons are public" on public.seasons for select to anon, authenticated using (true);
+
+-- Ends the month: keeps its top 10s, then deletes every token (calls and milestones go with them). The
+-- month is the one that just ended when run in the first hours of the 1st, else the current one. Nothing
+-- to keep (no tokens): nothing is written. Returns {ok, month, tokens, calls, callers} or {ok, skipped}.
+create or replace function public.rankr_end_month(p_at timestamptz default now()) returns jsonb
+language plpgsql as $$
+declare
+  v_month  date := date_trunc('month', p_at - interval '12 hours')::date;
+  v_counts jsonb;
+  v_tokens jsonb;
+begin
+  select jsonb_build_object(
+    'tokens',  (select count(*) from public.tokens),
+    'calls',   (select count(*) from public.calls),
+    'callers', (select count(distinct user_id) from public.calls)
+  ) into v_counts;
+  if (v_counts->>'tokens')::int = 0 then
+    return jsonb_build_object('ok', true, 'skipped', true);
+  end if;
+
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.peak_multiple desc, x.first_pasted_at), '[]'::jsonb) into v_tokens
+  from (
+    select t.id, t.chain_id, t.address, t.symbol, t.name, t.entry_market_cap, t.first_pasted_at,
+           t.peak_multiple, t.multiple, first_call.user_id as first_caller
+    from public.tokens t
+    left join lateral (
+      select c.user_id from public.calls c where c.token_id = t.id order by c.called_at, c.user_id limit 1
+    ) first_call on true
+    order by t.peak_multiple desc nulls last, t.first_pasted_at
+    limit 10
+  ) x;
+
+  insert into public.seasons (month, ended_at, callers, tokens, counts)
+  values (v_month, p_at, coalesce(public.rankr_callers('rate', 5, 10, 0)->'callers', '[]'::jsonb), v_tokens, v_counts);
+
+  -- "where true": Supabase's safeupdate refuses a delete without a where clause.
+  delete from public.tokens where true;
+
+  return jsonb_build_object('ok', true, 'month', v_month) || v_counts;
+end $$;
+
+revoke all on function public.rankr_end_month(timestamptz) from public;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on function public.rankr_end_month(timestamptz) from anon, authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.rankr_end_month(timestamptz) to service_role;
+  end if;
+end $$;
+
+-- 00:00 UTC on the 1st (pg_cron runs in UTC). Re-running replaces the job with the same name.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('rankr-monthly-reset', '0 0 1 * *', 'select public.rankr_end_month()');
+  else
+    raise notice 'rankr: pg_cron is not enabled, so the monthly reset is not scheduled yet (see supabase/cron.sql)';
+  end if;
+end $$;

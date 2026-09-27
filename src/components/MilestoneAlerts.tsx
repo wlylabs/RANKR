@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { milestoneAlerts, notify, readSeen, useAlertsOn, writeSeen, type AlertItem } from "@/lib/alerts";
 import { tokenHref } from "@/lib/format";
-import { useAccountCalls, useMyCalls, useTokens } from "@/lib/hooks";
+import { marketOf, useAccountCalls, useMyCalls, useTokens, useWatchlistMarkets } from "@/lib/hooks";
 import { ratio } from "@/lib/metrics";
 import { MAX_LIMIT } from "@/lib/params";
 import { useWatchlist } from "@/lib/watchlist";
@@ -19,15 +19,13 @@ export function MilestoneAlerts() {
 function Watcher() {
   const { available, userId } = useAuth();
   const watch = useWatchlist();
+  const watched = useWatchlistMarkets(watch.map((w) => w.id)).items;
   const device = useMyCalls();
   const accountCalls = useAccountCalls(available ? userId : null).data?.calls;
   // With accounts, your calls come from the server; without, from this browser.
   const deviceCalls = useMemo(() => (available ? NONE : device), [available, device]);
 
-  const ids = useMemo(
-    () => [...new Set([...watch, ...deviceCalls.map((c) => c.id)])].slice(0, MAX_LIMIT),
-    [watch, deviceCalls],
-  );
+  const ids = useMemo(() => deviceCalls.map((c) => c.id).slice(0, MAX_LIMIT), [deviceCalls]);
   const { tokens } = useTokens({ ids, limit: MAX_LIMIT });
 
   useEffect(() => {
@@ -40,15 +38,17 @@ function Watcher() {
       const price = byId.get(c.id)?.market?.priceUsd;
       if (price) items.push({ key: `call:${c.id}`, symbol: c.symbol, multiple: ratio(price, c.entryPriceUsd), href: tokenHref(c), kind: "call" });
     }
-    for (const id of watch) {
-      const t = byId.get(id);
-      if (t) items.push({ key: `watch:${id}`, symbol: t.symbol, multiple: t.multiple, href: tokenHref(t), kind: "watch" });
+    for (const w of watch) {
+      const market = marketOf(watched.get(w.id));
+      if (market && w.priceUsd) {
+        items.push({ key: `watch:${w.id}`, symbol: w.symbol || market.symbol, multiple: ratio(market.priceUsd, w.priceUsd), href: tokenHref(w), kind: "watch" });
+      }
     }
     if (!items.length) return;
     const { alerts, seen } = milestoneAlerts(items, readSeen());
     writeSeen(seen);
     for (const a of alerts) void notify(a).catch(() => {});
-  }, [tokens, accountCalls, deviceCalls, watch]);
+  }, [tokens, accountCalls, deviceCalls, watch, watched]);
 
   return null;
 }

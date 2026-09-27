@@ -2,7 +2,7 @@
 
 import { addMyCall, refreshBoards } from "./hooks";
 import { accountsAvailable, apiFetch } from "./supabase-browser";
-import type { TrackResponse } from "./types";
+import type { LookupResponse, TrackResponse } from "./types";
 
 /** A paste that failed. `code` says when the fix is to sign in or pick a username first. */
 export class PasteError extends Error {
@@ -31,6 +31,14 @@ export async function trackPaste(input: string, chain?: string): Promise<TrackRe
   const firstCallByYou = accountsAvailable ? !!result.call?.created : addMyCall(result.token);
   void refreshBoards();
   return { ...result, firstCallByYou };
+}
+
+/** Looks a paste up (live data, and Rankr's record if it has one) before it's called or watched. */
+export async function lookupPaste(input: string): Promise<LookupResponse> {
+  const res = await fetch(`/api/lookup?input=${encodeURIComponent(input)}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error ?? "Something went wrong. Try again.");
+  return body as LookupResponse;
 }
 
 // A paste that had to go through sign-in first. Kept in localStorage so that coming back to /?ca=...

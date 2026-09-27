@@ -16,8 +16,10 @@ import {
   type RangeKey,
   type SortKey,
 } from "@/lib/params";
+import { nextResetAt, resetDay, untilLabel } from "@/lib/season";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { CALLER_SORT_LABELS, CallersBoard } from "./CallersBoard";
+import { LastMonth } from "./LastMonth";
 import { ListSkeleton, TokenRow, TokenTable } from "./TokenList";
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -29,6 +31,9 @@ const SORT_LABELS: Record<SortKey, string> = {
 };
 
 const PAGE = 50;
+
+const VIEWS = { tokens: "Tokens", callers: "Callers", last: "Last month" } as const;
+type View = keyof typeof VIEWS;
 
 export function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -61,7 +66,9 @@ export function Leaderboard() {
   const pathname = usePathname();
   const now = useNow(15_000);
 
-  const view = accountsAvailable && params.get("view") === "callers" ? "callers" : "tokens";
+  const picked = params.get("view");
+  const view: View = accountsAvailable && (picked === "callers" || picked === "last") ? picked : "tokens";
+  const resetsAt = nextResetAt(now);
   const sort = parseSort(params.get("sort"));
   const callerSort = parseCallerSort(params.get("by"));
   const range = parseRange(params.get("range"));
@@ -98,8 +105,16 @@ export function Leaderboard() {
           <p className="mt-1.5 text-sm text-muted">
             {view === "tokens"
               ? "Every token ranked by how it moved since its first paste on Rankr."
-              : "Callers ranked by how often their calls hit 2x, each from the caller's own entry."}
+              : view === "callers"
+                ? "Callers ranked by how often their calls hit 2x, each from the caller's own entry."
+                : "The top 10 callers and tokens of the last month, kept when the boards reset."}
           </p>
+          {/* Resets run in Supabase (rankr_end_month), so only where accounts are on. */}
+          {accountsAvailable && view !== "last" && (
+            <p className="mt-1 font-mono text-[11px] text-subtle">
+              boards reset {resetDay(resetsAt)}, 00:00 UTC · in {untilLabel(resetsAt, now)}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {accountsAvailable && (
@@ -108,7 +123,7 @@ export function Leaderboard() {
               role="tablist"
               aria-label="Board"
             >
-              {(["tokens", "callers"] as const).map((v) => (
+              {(Object.keys(VIEWS) as View[]).map((v) => (
                 <button
                   key={v}
                   type="button"
@@ -116,15 +131,15 @@ export function Leaderboard() {
                   aria-selected={view === v}
                   onClick={() => {
                     const next = new URLSearchParams();
-                    if (v === "callers") next.set("view", "callers");
+                    if (v !== "tokens") next.set("view", v);
                     router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
                   }}
                   className={clsx(
-                    "h-full rounded px-3 text-xs capitalize transition-colors",
+                    "h-full rounded px-3 text-xs whitespace-nowrap transition-colors",
                     view === v ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
                   )}
                 >
-                  {v}
+                  {VIEWS[v]}
                 </button>
               ))}
             </div>
@@ -143,7 +158,9 @@ export function Leaderboard() {
         </div>
       </div>
 
-      {view === "callers" ? (
+      {view === "last" ? (
+        <LastMonth />
+      ) : view === "callers" ? (
         <>
           <div
             className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
@@ -252,6 +269,11 @@ export function Leaderboard() {
                   </button>
                 )}
               </>
+            )}
+            {!q && (
+              <p className="mt-3 font-mono text-[11px] text-subtle">
+                tokens down 70%+ from their first paste are left off the board · search still finds them
+              </p>
             )}
           </div>
         </>

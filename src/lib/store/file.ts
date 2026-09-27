@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { applySnapshot } from "../metrics";
 import type { TokenRecord } from "../types";
-import { queryRecords, repaste, statsOfRecords } from "./memory";
+import { queryRecords, repaste, staleRecords, statsOfRecords } from "./memory";
 import type { MarketUpdate, Store, TokenQuery } from "./types";
 
 /**
@@ -79,11 +79,8 @@ export class FileStore implements Store {
     return queryRecords((await this.load()).values(), q);
   }
 
-  async stale(checkedBefore: number, limit: number) {
-    return [...(await this.load()).values()]
-      .filter((r) => r.lastCheckedAt < checkedBefore)
-      .sort((a, b) => a.lastCheckedAt - b.lastCheckedAt)
-      .slice(0, limit);
+  async stale(checkedBefore: number, limit: number, deadBefore?: number) {
+    return staleRecords((await this.load()).values(), checkedBefore, limit, deadBefore);
   }
 
   async stats() {

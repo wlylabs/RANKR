@@ -14,6 +14,14 @@ export function parseRange(value: string | null | undefined): RangeKey {
   return value && value in RANGES ? (value as RangeKey) : "all";
 }
 
+/**
+ * A token at this multiple or below (−70% or worse from its first paste) is dead: it leaves the token boards
+ * (it's back if it recovers) and the background refresh checks it hourly instead of every minute. Calls on it
+ * stay and still count on the caller board, and it still shows in searches, watchlists and callers' calls.
+ */
+export const DEAD_MULTIPLE = 0.3;
+export const DEAD_REFRESH_MS = 3_600_000;
+
 /** Max rows per request, and max ids in one `ids` lookup. */
 export const MAX_LIMIT = 100;
 

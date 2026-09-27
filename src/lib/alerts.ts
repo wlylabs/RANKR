@@ -90,7 +90,7 @@ export function writeSeen(seen: Record<string, number>) {
 export async function notify({ item, milestone }: Alert) {
   const title = `$${item.symbol} hit ${milestone}x`;
   const options: NotificationOptions = {
-    body: item.kind === "call" ? "Your call, measured from your entry." : "On your watchlist, since its first paste.",
+    body: item.kind === "call" ? "Your call, measured from your entry." : "On your watchlist, since you saved it.",
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     tag: `${item.key}:${milestone}`,

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { newRecord } from "../metrics";
 import type { MarketSnapshot, TokenRecord } from "../types";
 import { FileStore } from "./file";
-import { queryRecords, statsOfRecords } from "./memory";
+import { queryRecords, staleRecords, statsOfRecords } from "./memory";
 import { SupabaseStore, fromRow, toRow } from "./supabase";
 
 const T0 = Date.parse("2026-09-27T05:42:00.123Z");
@@ -69,6 +69,21 @@ describe("in-memory query", () => {
     const page = queryRecords(DATA, { sort: "top", limit: 1, offset: 1 });
     expect(page.total).toBe(3);
     expect(page.records.map((r) => r.id)).toEqual(["solana:AAA"]);
+  });
+
+  it("leaves dead tokens (0.3x or below) off the boards, and back once they recover", () => {
+    expect(ids("losers", { hideDead: true })).toEqual(["solana:AAA", "base:0xbbb"]);
+    const revived = rec("solana:CCC", 2, 0.61, T0 + 3 * H);
+    expect(queryRecords([revived], { sort: "top", limit: 50, offset: 0, hideDead: true }).total).toBe(1);
+    const edge = rec("solana:CCC", 2, 0.6, T0 + 3 * H);
+    expect(queryRecords([edge], { sort: "top", limit: 50, offset: 0, hideDead: true }).total).toBe(0);
+  });
+
+  it("refreshes dead tokens less often", () => {
+    const checked = (r: TokenRecord, at: number) => ({ ...r, lastCheckedAt: at });
+    const records = [checked(DATA[0], T0), checked(DATA[2], T0)]; // AAA alive, CCC dead
+    expect(staleRecords(records, T0 + 60_000, 10, T0 - H).map((r) => r.id)).toEqual(["solana:AAA"]);
+    expect(staleRecords(records, T0 + 2 * H, 10, T0 + H).map((r) => r.id)).toEqual(["solana:AAA", "solana:CCC"]);
   });
 
   it("computes stats", () => {
@@ -155,6 +170,35 @@ describe("SupabaseStore", () => {
       p_limit: 10,
       p_offset: 20,
     });
+  });
+
+  it("asks for boards without dead tokens, and falls back before the migration has run", async () => {
+    const f = mockFetch({ total: 0, records: [] });
+    await new SupabaseStore("https://x.supabase.co", "k", f).query({ sort: "top", hideDead: true, limit: 10, offset: 0 });
+    expect(JSON.parse(String(f.mock.calls[0][1]?.body))).toMatchObject({ p_hide_dead: true });
+
+    let calls = 0;
+    const g = vi.fn(async (_url: string | URL | Request, init?: RequestInit) =>
+      ++calls === 1 && JSON.parse(String(init?.body)).p_hide_dead
+        ? new Response(JSON.stringify({ code: "PGRST202", message: "Could not find the function" }), { status: 404 })
+        : new Response(JSON.stringify({ total: 0, records: [] })),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await new SupabaseStore("https://x.supabase.co", "k", g).query({ sort: "top", hideDead: true, limit: 10, offset: 0 })).toEqual({
+      total: 0,
+      records: [],
+    });
+    expect(JSON.parse(String(g.mock.calls[1][1]?.body))).not.toHaveProperty("p_hide_dead");
+    warn.mockRestore();
+  });
+
+  it("asks for stale tokens, dead ones by their own cutoff", async () => {
+    const f = mockFetch([]);
+    await new SupabaseStore("https://x.supabase.co", "k", f).stale(T0, 50, T0 - H);
+    const url = decodeURIComponent(String(f.mock.calls[0][0]));
+    expect(url).toContain("last_checked_at=lt.2026-09-27T05:42:00.123Z");
+    expect(url).toContain("or=(multiple.gt.0.3,last_checked_at.lt.2026-09-27T04:42:00.123Z)");
+    expect(url).toContain("order=last_checked_at.asc&limit=50");
   });
 
   it("surfaces PostgREST errors", async () => {
