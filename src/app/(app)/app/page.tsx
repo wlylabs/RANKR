@@ -4,21 +4,6 @@ import { HomeFeed, LiveStatus } from "@/components/HomeFeed";
 import { PasteBox } from "@/components/PasteBox";
 import { chainMeta, FEATURED_CHAINS } from "@/lib/chains";
 
-const STEPS = [
-  {
-    title: "Paste a CA",
-    body: "Any memecoin contract address, or a pump.fun / DexScreener / GMGN link. The chain is detected for you.",
-  },
-  {
-    title: "Entry gets sealed",
-    body: "Price and market cap are locked at the first paste and fingerprinted with SHA-256. No backdating.",
-  },
-  {
-    title: "Watch it rank",
-    body: "Every token is tracked live against its entry: 2x, 10x, 100x, or the drawdown. The board ranks them all.",
-  },
-];
-
 export default function HomePage() {
   return (
     <>
@@ -48,21 +33,6 @@ export default function HomePage() {
       </section>
 
       <HomeFeed />
-
-      <section className="mt-20" aria-labelledby="how">
-        <h2 id="how" className="label text-subtle">
-          How it works
-        </h2>
-        <ol className="mt-4 grid gap-8 border-t border-border pt-6 sm:grid-cols-3">
-          {STEPS.map(({ title, body }, i) => (
-            <li key={title}>
-              <span className="font-mono text-xs text-subtle">0{i + 1}</span>
-              <h3 className="mt-2 font-medium">{title}</h3>
-              <p className="mt-1 text-sm text-muted">{body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
     </>
   );
 }

@@ -62,7 +62,7 @@
 html {
   background: var(--bg);
   -webkit-tap-highlight-color: transparent;
-  /* Anchor links (#install, #paste) land below the sticky header. */
+  /* Anchor links (e.g. /app#paste) land below the sticky header. */
   scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
 }
 

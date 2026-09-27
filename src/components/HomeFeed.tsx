@@ -52,7 +52,7 @@ function Empty() {
 }
 
 /** Tracked / hit 2x+ / best run / in the red, for the whole board. */
-export function StatsGrid() {
+function StatsGrid() {
   const { stats } = useStats();
   const best = stats?.best ?? null;
   const pct = (n: number) => (stats?.total ? `${Math.round((n / stats.total) * 100)}% of all pastes` : "—");
