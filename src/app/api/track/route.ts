@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
   try {
     const chainId = typeof chain === "string" && /^[a-z0-9-]{2,32}$/.test(chain) ? chain : undefined;
-    // A signed-in paste is also that wallet's call. An expired session still tracks the token.
+    // A paste with a session is also that caller's call. An expired session still tracks the token.
     const account = await accountFromRequest(req).catch((err) => {
       if (err instanceof AuthError) return null;
       throw err;

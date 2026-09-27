@@ -11,7 +11,6 @@ import { MAX_LIMIT } from "@/lib/params";
 import { ratio, tierOf } from "@/lib/metrics";
 import { apiFetch, authedFetcher } from "@/lib/supabase-browser";
 import type { CallView, MyCallsResponse, TokenView } from "@/lib/types";
-import { shortWallet } from "@/lib/wallet";
 import { useAuth } from "./AuthProvider";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
@@ -74,7 +73,7 @@ function accountRow(c: CallView): Row {
 }
 
 export function MyCalls() {
-  const { userId, wallet, available } = useAuth();
+  const { userId, handle, available } = useAuth();
   const deviceCalls = useMyCalls();
   // Live data for the calls on this device (the newest MAX_LIMIT of them).
   const { tokens, isLoading } = useTokens({ ids: deviceCalls.slice(0, MAX_LIMIT).map((c) => c.id), limit: MAX_LIMIT });
@@ -111,13 +110,12 @@ export function MyCalls() {
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My calls</h1>
       <p className="mt-1.5 text-sm text-muted">
         Measured from the moment <em>you</em> pasted.{" "}
-        {wallet ? (
+        {handle ? (
           <span className="text-subtle">
-            Synced to <span className="font-mono">{shortWallet(wallet.address)}</span>. Calls made while connected count on the
-            caller board.
+            Recorded on Rankr as <span className="font-mono">{handle}</span> and counted on the caller board.
           </span>
         ) : available ? (
-          <span className="text-subtle">Saved on this device. Connect a wallet to sync them and join the caller board.</span>
+          <span className="text-subtle">Your first paste gets you an anonymous id on the caller board. No sign-up.</span>
         ) : (
           <span className="text-subtle">Saved on this device.</span>
         )}
@@ -185,10 +183,10 @@ export function MyCalls() {
                   <div className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-2">
                       <TokenName symbol={row.symbol} name={row.name} className="min-w-0" />
-                      {wallet && row.source === "device" && (
+                      {handle && row.source === "device" && (
                         <span
                           className="shrink-0 rounded border border-border px-1 font-mono text-[10px] text-subtle"
-                          title="Pasted before connecting. Kept on this device, not on the caller board."
+                          title="Pasted before you had an id. Kept on this device, not on the caller board."
                         >
                           device
                         </span>

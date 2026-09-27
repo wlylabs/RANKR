@@ -119,7 +119,7 @@ begin
   raise notice 'rankr smoke test: tokens ok';
 end $$;
 
--- Callers (needs the 20260927010000_rankr_callers migration).
+-- Anonymous callers (needs all migrations).
 do $$
 declare
   a uuid := '00000000-0000-4000-8000-00000000000a';
@@ -128,8 +128,9 @@ declare
   failed boolean;
 begin
   insert into auth.users (id) values (a), (b);
-  perform public.rankr_upsert_profile(a, 'solana', 'WalletA111');
-  perform public.rankr_upsert_profile(b, 'ethereum', '0xwalletb');
+  assert public.rankr_upsert_profile(a) = public.rankr_handle(a);
+  assert public.rankr_upsert_profile(a) ~ '^anon-[0-9a-f]{6}$', 'handle format';
+  perform public.rankr_upsert_profile(b);
 
   -- AAA's price is now 0.000006, BRAVO 11, CHAR 0.2 (from the block above).
   r := public.rankr_record_call(a, 'base:0xbbb', 1, 1000000, now());
@@ -152,7 +153,8 @@ begin
 
   r := public.rankr_callers('avg');
   assert (r->>'total')::int = 2;
-  assert r->'callers'->0->>'wallet' = 'WalletA111', 'A leads on avg: ' || r::text;
+  assert r->'callers'->0->>'handle' = public.rankr_handle(a), 'A leads on avg: ' || r::text;
+  assert not (r->'callers'->0 ? 'wallet'), 'no wallet in the public board';
   assert (r->'callers'->0->>'calls')::int = 2 and (r->'callers'->0->>'hits')::int = 2;
   assert r->'callers'->0->'best_token'->>'symbol' = 'BRAVO';
   assert (r->'callers'->0->>'best_multiple')::float8 = 11;
@@ -160,7 +162,7 @@ begin
   r := public.rankr_callers('calls', p_min_calls => 3);
   assert (r->>'total')::int = 0, 'min calls filter';
   r := public.rankr_callers('avg', p_limit => 1, p_offset => 1);
-  assert r->'callers'->0->>'wallet' = '0xwalletb';
+  assert r->'callers'->0->>'handle' = public.rankr_handle(b);
 
   assert public.rankr_delete_call(b, 'solana:AAA');
   assert not public.rankr_delete_call(b, 'solana:AAA');
@@ -168,6 +170,7 @@ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_record_call(uuid,text,double precision,double precision,timestamptz)', 'execute');
     assert not has_function_privilege('anon', 'public.rankr_my_calls(uuid)', 'execute');
+    assert not has_function_privilege('anon', 'public.rankr_upsert_profile(uuid)', 'execute');
     assert has_function_privilege('anon', 'public.rankr_callers(text,integer,integer,integer)', 'execute');
   end if;
 

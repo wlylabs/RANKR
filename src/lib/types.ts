@@ -63,11 +63,11 @@ export type TokenView = TokenRecord & {
 export type TrackResponse = {
   status: "created" | "existing";
   token: TokenView;
-  /** Present when the paste came from a signed-in wallet: that user's call on the token. */
+  /** Present when the paste came with an (anonymous) session: that caller's call on the token. */
   call?: { created: boolean; entryPriceUsd: number; calledAt: number } | null;
 };
 
-/** A signed-in user's call: their own entry on a token. */
+/** A caller's call: their own entry on a token. */
 export type CallView = {
   tokenId: string;
   entryPriceUsd: number;
@@ -82,8 +82,8 @@ export type MyCallsResponse = { calls: CallView[] };
 
 export type CallerView = {
   userId: string;
-  chain: string;
-  wallet: string;
+  /** Public anonymous handle, e.g. "anon-a3f9c1". */
+  handle: string;
   calls: number;
   /** Calls at 2x or more right now. */
   hits: number;

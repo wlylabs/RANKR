@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const USER = {
-  id: "00000000-0000-4000-8000-00000000000a",
-  identities: [{ provider: "web3", provider_id: "web3:solana:WalletA111" }],
-};
+const USER = { id: "00000000-0000-4000-8000-00000000000a", is_anonymous: true };
 
 describe("accountFromRequest", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -19,7 +16,7 @@ describe("accountFromRequest", () => {
           ? new Response(JSON.stringify(USER))
           : new Response(JSON.stringify({ msg: "invalid JWT" }), { status: 401 });
       }
-      if (url.endsWith("/rest/v1/rpc/rankr_upsert_profile")) return new Response("");
+      if (url.endsWith("/rest/v1/rpc/rankr_upsert_profile")) return new Response(JSON.stringify("anon-4c5d6e"));
       return new Response("not found", { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -35,10 +32,7 @@ describe("accountFromRequest", () => {
 
   it("verifies the token with Supabase Auth, upserts the profile once and caches", async () => {
     const { accountFromRequest } = await import("./accounts");
-    expect(await accountFromRequest(req("good-token"))).toEqual({
-      id: USER.id,
-      wallet: { chain: "solana", address: "WalletA111" },
-    });
+    expect(await accountFromRequest(req("good-token"))).toEqual({ id: USER.id, handle: "anon-4c5d6e" });
     expect(await accountFromRequest(req("good-token"))).toMatchObject({ id: USER.id });
 
     const calls = fetchMock.mock.calls.map(([url]) => String(url));

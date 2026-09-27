@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/** Wallet sign-in is offered only when the public Supabase URL and key are configured. */
+/** Anonymous accounts are on only when the public Supabase URL and key are configured. */
 export const accountsAvailable = Boolean(URL && KEY);
 
 let client: SupabaseClient | null = null;
@@ -26,7 +26,31 @@ export async function accessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-/** fetch() that carries the signed-in wallet's session to our API. */
+let starting: Promise<string | null> | null = null;
+
+/**
+ * The caller's access token, creating an anonymous account on first use. Called on paste, so
+ * people who only browse never get an account. Null if accounts are off or sign-in failed.
+ */
+export function ensureSession(): Promise<string | null> {
+  starting ??= (async () => {
+    const sb = browserSupabase();
+    if (!sb) return null;
+    const existing = await accessToken();
+    if (existing) return existing;
+    const { data, error } = await sb.auth.signInAnonymously();
+    if (error) {
+      console.warn("[rankr] anonymous sign-in failed, pasting without an id:", error.message);
+      return null;
+    }
+    return data.session?.access_token ?? null;
+  })().finally(() => {
+    starting = null;
+  });
+  return starting;
+}
+
+/** fetch() that carries the caller's session (if any) to our API. */
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const token = await accessToken();
   const headers = new Headers(init.headers);

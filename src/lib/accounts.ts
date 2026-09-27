@@ -1,12 +1,12 @@
-// Wallet accounts (Supabase Auth, Sign in with Web3) and per-user calls. Server only.
+// Anonymous accounts (Supabase Auth anonymous sign-ins) and per-user calls. Server only.
 import { MIN_CALLS_FOR_AVG, type CallerSort } from "./params";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
 import type { CallView, CallerView, TokenView } from "./types";
-import { walletOf, type AuthUserLike, type Wallet } from "./wallet";
 
-export type Account = { id: string; wallet: Wallet };
+/** A caller. Anonymous: nothing but an id and the public handle derived from it. */
+export type Account = { id: string; handle: string };
 
 export class AuthError extends Error {}
 
@@ -25,11 +25,11 @@ export function accountsEnabled(): boolean {
 
 // Verified tokens for a minute, so every request doesn't round-trip to Supabase Auth.
 const verified = new Map<string, { account: Account; until: number }>();
-const profiled = new Set<string>();
+const profiled = new Map<string, string>(); // user id -> handle, once the profile exists
 
 /**
- * The signed-in wallet behind `Authorization: Bearer <supabase access token>`, or null when the
- * request has no token. Throws AuthError when a token is sent but isn't valid.
+ * The caller behind `Authorization: Bearer <supabase access token>`, or null when the request has
+ * no token. Throws AuthError when a token is sent but isn't valid.
  */
 export async function accountFromRequest(req: Request): Promise<Account | null> {
   const api = rest();
@@ -39,15 +39,15 @@ export async function accountFromRequest(req: Request): Promise<Account | null> 
   const hit = verified.get(token);
   if (hit && hit.until > Date.now()) return hit.account;
 
-  const user = await api.user<AuthUserLike>(token);
-  const wallet = walletOf(user);
-  if (!user || !wallet) throw new AuthError("Sign in again with your wallet.");
-  const account = { id: user.id, wallet };
+  const user = await api.user<{ id: string }>(token);
+  if (!user?.id) throw new AuthError("Your session expired. Paste again to continue.");
 
-  if (!profiled.has(account.id)) {
-    await api.rpc("rankr_upsert_profile", { p_user: account.id, p_chain: wallet.chain, p_wallet: wallet.address });
-    profiled.add(account.id);
+  let handle = profiled.get(user.id);
+  if (!handle) {
+    handle = await api.rpc<string>("rankr_upsert_profile", { p_user: user.id });
+    profiled.set(user.id, handle);
   }
+  const account = { id: user.id, handle };
   if (verified.size > 5_000) verified.clear();
   verified.set(token, { account, until: Date.now() + 60_000 });
   return account;
@@ -107,8 +107,7 @@ export async function deleteCall(account: Account, tokenId: string): Promise<boo
 
 type CallerRow = {
   user_id: string;
-  chain: string;
-  wallet: string;
+  handle: string;
   calls: number;
   hits: number;
   wins: number;
@@ -130,8 +129,7 @@ export async function callers(sort: CallerSort, limit: number, offset: number): 
     total: out.total,
     callers: out.callers.map((c) => ({
       userId: c.user_id,
-      chain: c.chain,
-      wallet: c.wallet,
+      handle: c.handle,
       calls: c.calls,
       hits: c.hits,
       wins: c.wins,
