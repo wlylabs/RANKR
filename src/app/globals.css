@@ -72,6 +72,22 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Installed on iOS, the status bar is drawn over the page with white text (black-translucent). The dark theme
+ * sits under it as is; the light theme keeps a dark strip there so the clock and battery stay readable.
+ * Everywhere else the top inset is 0 and this draws nothing.
+ */
+@media (display-mode: standalone) {
+  html:not(.dark) body::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 60;
+    height: env(safe-area-inset-top);
+    background: #0a0a0a;
+  }
+}
+
 ::selection {
   background: var(--fg);
   color: var(--bg);

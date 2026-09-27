@@ -58,6 +58,10 @@ app skips the landing page and every page of the site opens inside it. The app l
   (prices are live), with navigation preload; when the network is gone it shows `public/offline.html` and reloads
   once back online. It is served with `Cache-Control: no-cache` (`next.config.ts`) so updates reach installed apps.
 - iOS: `apple-mobile-web-app` meta and `apple-icon.png`; headers pad for the notch (`env(safe-area-inset-top)`).
+  The status bar is `black-translucent` (white text over the page), so in the light theme the installed app keeps
+  a dark strip under it.
+- `theme-color` (status bar, app title bar, Safari toolbar) and the offline page follow the theme picked in
+  Rankr, not the system's light / dark setting.
 - Opened as the installed app, `/` forwards to `/app`, and the app's footer hides the landing links.
 - Installability needs HTTPS (localhost is fine for testing).
 

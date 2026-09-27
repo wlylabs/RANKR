@@ -5,7 +5,7 @@ import { AppWindow, Check, Download, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { APP_HOME } from "@/lib/login";
 import { promptInstall, useInstallState } from "@/lib/pwa";
 import { CopyButton } from "./CopyButton";
@@ -26,6 +26,8 @@ function useAppUrl() {
 export function SettingsMenu({ openApp }: { openApp?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
   const install = useInstallState();
@@ -34,7 +36,11 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
+    };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", esc);
     return () => {
@@ -48,10 +54,11 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-haspopup="menu"
+        aria-controls={panelId}
         aria-label="Settings"
         title="Settings"
         className={clsx(
@@ -63,7 +70,8 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
       </button>
       {open && (
         <div
-          role="menu"
+          id={panelId}
+          role="group"
           aria-label="Settings"
           className="animate-fade-in fixed inset-x-4 top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-50 overflow-hidden rounded-lg border border-border bg-bg shadow-lg sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-72"
         >
@@ -91,7 +99,7 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
           <div className="border-t border-border py-1">
             <div className="label px-3 pt-1.5 pb-1 text-subtle">App</div>
             {openApp && (
-              <Link href={APP_HOME} role="menuitem" className={ITEM}>
+              <Link href={APP_HOME} className={ITEM}>
                 <AppWindow className="size-3.5" /> Open app
               </Link>
             )}
@@ -100,7 +108,7 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
                 <Check className="size-3.5 text-up" /> Installed on this device
               </div>
             ) : install === "prompt" ? (
-              <button type="button" role="menuitem" onClick={() => void promptInstall()} className={ITEM}>
+              <button type="button" onClick={() => void promptInstall()} className={ITEM}>
                 <Download className="size-3.5" /> Install app
               </button>
             ) : (
@@ -122,7 +130,7 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
           <div className="flex items-center gap-3 border-t border-border px-3 py-2.5">
             <span className="label shrink-0 text-subtle">Link</span>
             <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{appUrl.replace(/^https?:\/\//, "")}</span>
-            <CopyButton value={appUrl} className="shrink-0" />
+            <CopyButton value={appUrl} what="app link" className="shrink-0" />
           </div>
         </div>
       )}

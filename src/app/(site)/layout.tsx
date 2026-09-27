@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StandaloneRedirect } from "@/components/Landing";
 import { Logo, RANKR_SHA256 } from "@/components/Logo";
 import { SettingsMenu } from "@/components/SettingsMenu";
+import { APP_HOME } from "@/lib/login";
 
 const SECTIONS = [
   { href: "#how", label: "How it works" },
@@ -31,7 +32,10 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
               </a>
             ))}
           </nav>
-          <div className="ml-auto flex items-center">
+          <div className="ml-auto flex items-center gap-3">
+            <Link href={APP_HOME} className="text-sm text-muted transition-colors hover:text-fg">
+              App
+            </Link>
             <SettingsMenu openApp />
           </div>
         </div>

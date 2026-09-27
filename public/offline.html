@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0a0a" />
     <title>Offline · Rankr</title>
+    <script>
+      // Same theme as the app: next-themes keeps the choice under "theme"; dark is the default.
+      try {
+        if (localStorage.getItem("theme") === "light") {
+          document.documentElement.className = "light";
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#ffffff");
+        }
+      } catch {}
+    </script>
     <style>
       :root {
         --bg: #0a0a0a;
@@ -14,15 +23,13 @@
         --border: #232323;
         color-scheme: dark;
       }
-      @media (prefers-color-scheme: light) {
-        :root {
-          --bg: #ffffff;
-          --fg: #0a0a0a;
-          --muted: #5e5e5e;
-          --subtle: #737373;
-          --border: #e6e6e6;
-          color-scheme: light;
-        }
+      :root.light {
+        --bg: #ffffff;
+        --fg: #0a0a0a;
+        --muted: #5e5e5e;
+        --subtle: #737373;
+        --border: #e6e6e6;
+        color-scheme: light;
       }
       * {
         box-sizing: border-box;

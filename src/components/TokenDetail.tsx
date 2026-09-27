@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowLeft, Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lucide-react";
+import { Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,8 +39,8 @@ export function TokenDetail({ chain, address, initial }: { chain: string; addres
 
   return (
     <div className="pt-6 sm:pt-10">
-      <Link href="/leaderboard" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
-        <ArrowLeft className="size-3.5" /> Leaderboard
+      <Link href="/leaderboard" className="text-sm text-muted hover:text-fg">
+        Back to leaderboard
       </Link>
       {token ? (
         <Tracked token={token} />
@@ -185,7 +185,7 @@ function Tracked({ token: t }: { token: TokenView }) {
               <span className="truncate" title={`sha256(${t.chainId}:${t.address}:${t.entryPriceUsd}:${t.firstPastedAt})`}>
                 sha256 {t.seal}
               </span>
-              <CopyButton value={t.seal} />
+              <CopyButton value={t.seal} what="seal" />
             </dd>
             {t.stale && (
               <>
