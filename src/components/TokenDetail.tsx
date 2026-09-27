@@ -174,7 +174,7 @@ function Tracked({ token: t }: { token: TokenView }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <WatchButton id={t.id} symbol={t.symbol} />
+              <WatchButton token={t} />
               <ShareButton token={t} />
             </div>
           </div>
@@ -422,20 +422,24 @@ function Untracked({ preview: p, onTracked }: { preview: MarketSnapshot; onTrack
         <div>
           <p className="font-medium">Not on Rankr yet</p>
           <p className="mt-1 text-sm text-muted">
-            Track it now and the entry is sealed at <span className="tabular font-mono text-fg">{formatUsd(mc)}</span> mc (
-            {formatPrice(p.priceUsd)}).
+            Post it as your call and the entry is sealed at{" "}
+            <span className="tabular font-mono text-fg">{formatUsd(mc)}</span> mc ({formatPrice(p.priceUsd)}). Or watch it
+            privately, without a call.
           </p>
           {error && <p className="mt-2 text-sm text-down">{error}</p>}
         </div>
-        <button
-          type="button"
-          onClick={track}
-          disabled={loading}
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85 disabled:opacity-60"
-        >
-          {loading ? <LoaderCircle className="size-4 animate-spin" /> : <Lock className="size-3.5" />}
-          Track and seal entry
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <WatchButton token={p} />
+          <button
+            type="button"
+            onClick={track}
+            disabled={loading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85 disabled:opacity-60"
+          >
+            {loading ? <LoaderCircle className="size-4 animate-spin" /> : <Lock className="size-3.5" />}
+            Post call
+          </button>
+        </div>
       </section>
       <div className="mt-6">
         <Chart market={p} />

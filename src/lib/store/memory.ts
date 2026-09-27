@@ -1,12 +1,13 @@
 // In-memory query semantics. The file store uses these directly; the Supabase SQL
 // (supabase/migrations) implements the same rules, and the tests pin both down.
 import { applySnapshot, ratio } from "../metrics";
-import type { SortKey } from "../params";
+import { DEAD_MULTIPLE, type SortKey } from "../params";
 import type { TokenRecord } from "../types";
 import type { RecordPage, StoreStats, TokenQuery } from "./types";
 
 export const multipleOf = (r: TokenRecord) => ratio(r.market?.priceUsd || r.entryPriceUsd, r.entryPriceUsd);
 export const peakMultipleOf = (r: TokenRecord) => ratio(r.peakPriceUsd, r.entryPriceUsd);
+export const isDead = (r: TokenRecord) => multipleOf(r) <= DEAD_MULTIPLE;
 
 const BY: Record<SortKey, (a: TokenRecord, b: TokenRecord) => number> = {
   top: (a, b) => multipleOf(b) - multipleOf(a),
@@ -26,6 +27,7 @@ export function matchesQuery(r: TokenRecord, q: TokenQuery): boolean {
   if (q.chain && r.chainId !== q.chain) return false;
   if (q.since != null && r.firstPastedAt < q.since) return false;
   if (q.ids && !q.ids.includes(r.id)) return false;
+  if (q.hideDead && isDead(r)) return false;
   if (q.q) {
     const needle = q.q.toLowerCase();
     const hit =
@@ -57,6 +59,14 @@ export function statsOfRecords(records: Iterable<TokenRecord>): StoreStats {
     chains.add(r.chainId);
   }
   return { total, doubled, inRed, best, chains: [...chains].sort() };
+}
+
+/** Tokens due for a refresh, oldest check first: last checked before `checkedBefore`, dead ones before `deadBefore`. */
+export function staleRecords(records: Iterable<TokenRecord>, checkedBefore: number, limit: number, deadBefore = checkedBefore) {
+  return [...records]
+    .filter((r) => r.lastCheckedAt < (isDead(r) ? Math.min(checkedBefore, deadBefore) : checkedBefore))
+    .sort((a, b) => a.lastCheckedAt - b.lastCheckedAt)
+    .slice(0, limit);
 }
 
 /** What a repeat paste does to a known token. */

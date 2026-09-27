@@ -99,6 +99,12 @@ begin
   assert (q->>'total')::int = 3 and jsonb_array_length(q->'records') = 1 and q->'records'->0->>'id' = 'solana:AAA';
   q := public.rankr_query('top', p_chain => 'nochain');
   assert (q->>'total')::int = 0 and q->'records' = '[]'::jsonb;
+  -- Dead tokens (0.3x or below) leave the boards; a search or an id lookup still finds them.
+  q := public.rankr_query('losers', p_hide_dead => true);
+  assert (q->>'total')::int = 2 and q->'records'->0->>'id' = 'solana:AAA', 'CHAR at 0.1x is off the board: ' || (q->'records')::text;
+  assert (public.rankr_query('top', p_q => 'char', p_hide_dead => false)->>'total')::int = 1;
+  assert (public.rankr_query('top', p_ids => array['solana:CCC'])->>'total')::int = 1;
+  assert to_regprocedure('public.rankr_query(text,text,timestamptz,text,text[],integer,integer)') is null, 'no 7-argument leftover';
 
   -- 6. Stats.
   s := public.rankr_stats();
@@ -113,7 +119,7 @@ begin
     assert not has_function_privilege('anon', 'public.rankr_record_paste(jsonb)', 'execute'), 'anon cannot write';
     assert not has_function_privilege('anon', 'public.rankr_apply_market(jsonb)', 'execute'), 'anon cannot write';
     assert has_function_privilege('service_role', 'public.rankr_record_paste(jsonb)', 'execute');
-    assert has_function_privilege('anon', 'public.rankr_query(text,text,timestamptz,text,text[],integer,integer)', 'execute');
+    assert has_function_privilege('anon', 'public.rankr_query(text,text,timestamptz,text,text[],integer,integer,boolean)', 'execute');
   end if;
 
   raise notice 'rankr smoke test: tokens ok';

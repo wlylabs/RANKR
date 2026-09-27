@@ -253,6 +253,11 @@ export function Leaderboard() {
                 )}
               </>
             )}
+            {!q && (
+              <p className="mt-3 font-mono text-[11px] text-subtle">
+                tokens down 70%+ from their first paste are left off the board · search still finds them
+              </p>
+            )}
           </div>
         </>
       )}

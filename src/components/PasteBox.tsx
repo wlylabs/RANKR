@@ -1,15 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { ClipboardPaste, KeyRound, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
+import { ClipboardPaste, KeyRound, LoaderCircle, Lock, Star, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { parseInput } from "@/lib/address";
 import { formatDate, formatUsd, tokenHref } from "@/lib/format";
 import { loginHref, loginToPaste } from "@/lib/login";
-import { PasteError, rememberPendingPaste, takePendingPaste, trackPaste } from "@/lib/track";
-import type { TrackResponse } from "@/lib/types";
+import { PasteError, lookupPaste, rememberPendingPaste, takePendingPaste, trackPaste } from "@/lib/track";
+import type { LookupResponse, TrackResponse } from "@/lib/types";
+import { useWatchlist, watch, watchedFrom, type Watched } from "@/lib/watchlist";
 import { useAuth } from "./AuthProvider";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
@@ -17,10 +18,13 @@ import { ChainTag } from "./Chain";
 import { TokenName } from "./TokenList";
 
 type Result = TrackResponse & { firstCallByYou: boolean };
+/** A looked-up paste waiting on a choice: post it as a call, or save it to the watchlist. */
+type Choice = LookupResponse & { input: string };
 
 /**
- * The CA input. With accounts on, pasting needs a signed-in account with a username: a signed-out
- * paste goes through /login and comes back as `/app?ca=...`, which the box with `resumeFromUrl` tracks.
+ * The CA input. A paste is looked up first, then either posted as a call (sealed, public, needs a signed-in
+ * account with a username) or saved to the watchlist (private, on this device, not a call). A signed-out
+ * call goes through /login and comes back as `/app?ca=...`, which the box with `resumeFromUrl` posts.
  */
 export function PasteBox({
   autoFocus,
@@ -37,9 +41,11 @@ export function PasteBox({
   const needsAccount = available && ready && (!userId || !username);
   const resumed = useRef(false);
   const [value, setValue] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"lookup" | "call" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [choice, setChoice] = useState<Choice | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [saved, setSaved] = useState<Watched | null>(null);
   const [canReadClipboard, setCanReadClipboard] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -48,7 +54,7 @@ export function PasteBox({
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
 
-  // Back from signing in with a CA to track. Only a paste made here is sent; any other ?ca= just fills the box.
+  // Back from signing in with a call to post. Only a call chosen here is sent; any other ?ca= just fills the box.
   useEffect(() => {
     if (!resumeFromUrl || resumed.current || !ready || needsAccount) return;
     const url = new URL(window.location.href);
@@ -58,7 +64,7 @@ export function PasteBox({
     url.searchParams.delete("ca");
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
     setValue(ca);
-    if (takePendingPaste(ca)) void submit(ca);
+    if (takePendingPaste(ca)) void post(ca);
     else inputRef.current?.focus();
   }, [resumeFromUrl, ready, needsAccount]);
 
@@ -67,27 +73,55 @@ export function PasteBox({
     router.push(loginToPaste(input));
   }
 
-  async function submit(raw: string) {
+  function clearOutcome() {
+    setError(null);
+    setChoice(null);
+    setResult(null);
+    setSaved(null);
+  }
+
+  /** Looks the paste up, then offers the choice. */
+  async function find(raw: string) {
     const input = raw.trim();
     if (!input || loading) return;
+    clearOutcome();
     if (!parseInput(input)) {
-      setResult(null);
       setError("That doesn't look like a contract address. Paste a CA or a pump.fun / DexScreener link.");
       return;
     }
-    if (needsAccount) return signInToPaste(input);
-    setLoading(true);
-    setError(null);
-    setResult(null);
+    setLoading("lookup");
     try {
-      setResult(await trackPaste(input));
+      setChoice({ ...(await lookupPaste(input)), input });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  /** Posts the paste as your call: the entry is sealed. `chain` pins the chain the lookup found. */
+  async function post(input: string, chain?: string) {
+    if (loading) return;
+    if (needsAccount) return signInToPaste(input);
+    clearOutcome();
+    setLoading("call");
+    try {
+      setResult(await trackPaste(input, chain));
       setValue("");
     } catch (err) {
       if (err instanceof PasteError && err.code) return signInToPaste(input);
       setError((err as Error).message);
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
+  }
+
+  function save(c: Choice) {
+    const entry = watchedFrom(c.token ?? c.preview);
+    watch(entry);
+    clearOutcome();
+    setSaved(entry);
+    setValue("");
   }
 
   async function pasteFromClipboard() {
@@ -95,7 +129,7 @@ export function PasteBox({
       const text = (await navigator.clipboard.readText()).trim();
       if (!text) return;
       setValue(text);
-      void submit(text);
+      void find(text);
     } catch {
       inputRef.current?.focus();
     }
@@ -109,7 +143,7 @@ export function PasteBox({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void submit(value);
+          void find(value);
         }}
         className="flex items-center gap-1.5 rounded-lg border border-border bg-surface p-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors focus-within:border-border-strong"
       >
@@ -119,14 +153,15 @@ export function PasteBox({
           onChange={(e) => {
             setValue(e.target.value);
             if (error) setError(null);
+            if (choice) setChoice(null);
           }}
           onPaste={(e) => {
-            // Pasting a valid CA tracks it right away, no extra click.
+            // Pasting a valid CA looks it up right away, no extra click.
             const text = e.clipboardData.getData("text").trim();
             if (parseInput(text)) {
               e.preventDefault();
               setValue(text);
-              void submit(text);
+              void find(text);
             }
           }}
           placeholder="Paste a contract address or link"
@@ -144,7 +179,7 @@ export function PasteBox({
             type="button"
             onClick={() => {
               setValue("");
-              setError(null);
+              clearOutcome();
               inputRef.current?.focus();
             }}
             className="grid size-8 shrink-0 place-items-center rounded-md text-subtle hover:bg-surface-2 hover:text-fg"
@@ -166,7 +201,7 @@ export function PasteBox({
         <button
           type={value ? "submit" : "button"}
           onClick={value ? undefined : pasteMode ? pasteFromClipboard : () => inputRef.current?.focus()}
-          disabled={loading}
+          disabled={!!loading}
           className={clsx(
             "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-fg font-medium text-bg transition-opacity hover:opacity-85 disabled:opacity-60",
             lg ? "h-10 px-4 text-sm" : "h-9 px-3.5 text-sm",
@@ -175,21 +210,21 @@ export function PasteBox({
           {loading ? (
             <>
               <LoaderCircle className="size-4 animate-spin" />
-              <span className="hidden sm:inline">Sealing</span>
+              <span className="hidden sm:inline">{loading === "call" ? "Sealing" : "Checking"}</span>
             </>
           ) : pasteMode ? (
             <>
               <ClipboardPaste className="size-4 sm:hidden" />
               <span className="sm:hidden">Paste</span>
-              <span className="hidden sm:inline">Track</span>
+              <span className="hidden sm:inline">Check</span>
             </>
           ) : (
-            "Track"
+            "Check"
           )}
         </button>
       </form>
 
-      {needsAccount && !error && (
+      {needsAccount && !error && !choice && (
         <p className={clsx("mt-2.5 flex items-center gap-1.5 text-xs text-subtle", lg && "justify-center")}>
           <Lock className="size-3 shrink-0" />
           {userId ? (
@@ -197,11 +232,11 @@ export function PasteBox({
               <Link href={loginHref()} className="text-fg underline-offset-4 hover:underline">
                 Pick a username
               </Link>{" "}
-              to start pasting.
+              to post calls.
             </span>
           ) : (
             <span>
-              Pasting needs an account.{" "}
+              Posting a call needs an account.{" "}
               <button
                 type="button"
                 disabled={joining}
@@ -237,6 +272,19 @@ export function PasteBox({
         </p>
       )}
 
+      {choice && (
+        <ChoiceCard
+          choice={choice}
+          as={available && userId && username ? username : null}
+          busy={loading === "call"}
+          onCall={() => void post(choice.input, choice.preview.chainId)}
+          onWatch={() => save(choice)}
+          onClose={() => setChoice(null)}
+        />
+      )}
+
+      {saved && <WatchSaved entry={saved} onClose={() => setSaved(null)} />}
+
       {result && (
         <TrackResult
           result={result}
@@ -244,6 +292,103 @@ export function PasteBox({
           onClose={() => setResult(null)}
         />
       )}
+    </div>
+  );
+}
+
+/** The looked-up token and the two ways to keep it: a call (public, sealed) or the watchlist (private). */
+function ChoiceCard({
+  choice: c,
+  as,
+  busy,
+  onCall,
+  onWatch,
+  onClose,
+}: {
+  choice: Choice;
+  as: string | null;
+  busy: boolean;
+  onCall: () => void;
+  onWatch: () => void;
+  onClose: () => void;
+}) {
+  const p = c.preview;
+  const t = c.token;
+  const onWatchlist = useWatchlist().some((w) => w.id === watchedFrom(t ?? p).id);
+  return (
+    <div role="group" aria-label={`$${p.symbol}: post a call or watch`} className="animate-fade-in mt-3 overflow-hidden rounded-lg border border-border-strong bg-surface text-left">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <TokenName symbol={p.symbol} name={p.name} />
+          <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
+            <ChainTag chainId={p.chainId} /> · mc {formatUsd(p.marketCap ?? p.fdv)} · liq {formatUsd(p.liquidityUsd)}
+            {t && (
+              <>
+                {" "}
+                · on Rankr since <TimeAgo at={t.firstPastedAt} compact />
+              </>
+            )}
+          </div>
+        </div>
+        {t && <MultipleBadge multiple={t.multiple} />}
+        <button
+          type="button"
+          onClick={onClose}
+          className="-mr-1.5 grid size-7 shrink-0 place-items-center rounded text-subtle hover:bg-surface-2 hover:text-fg"
+          aria-label="Cancel"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3">
+        <button
+          type="button"
+          onClick={onCall}
+          disabled={busy}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-fg px-3 text-sm font-medium whitespace-nowrap text-bg transition-opacity hover:opacity-85 disabled:opacity-60"
+        >
+          {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Lock className="size-3.5 shrink-0" />}
+          Post call
+        </button>
+        <button
+          type="button"
+          onClick={onWatch}
+          disabled={onWatchlist}
+          aria-label={onWatchlist ? "On your watchlist" : "Save to watchlist"}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium whitespace-nowrap transition-colors hover:bg-surface-2 disabled:text-muted disabled:hover:bg-transparent"
+        >
+          <Star className={clsx("size-3.5 shrink-0", onWatchlist && "fill-current")} />
+          {/* Short on a phone, so both choices fit on one line. */}
+          <span className="sm:hidden">{onWatchlist ? "Watching" : "Watchlist"}</span>
+          <span className="hidden sm:inline">{onWatchlist ? "On your watchlist" : "Save to watchlist"}</span>
+        </button>
+        <p className="col-span-2 text-xs text-subtle">
+          A call is public and sealed{as ? <> under <span className="font-mono text-muted">@{as}</span></> : null}, from the
+          price right now. The watchlist is private, on this device, and not a call.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function WatchSaved({ entry, onClose }: { entry: Watched; onClose: () => void }) {
+  return (
+    <div role="status" className="animate-fade-in mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-left text-sm">
+      <Star className="size-3.5 shrink-0 fill-current" />
+      <span className="min-w-0 flex-1 truncate text-muted">
+        <span className="font-medium text-fg">${entry.symbol}</span> saved to your watchlist at {formatUsd(entry.marketCap)} mc.
+      </span>
+      <Link href="/me#watchlist" className="shrink-0 text-xs text-fg underline-offset-4 hover:underline">
+        Open
+      </Link>
+      <button
+        type="button"
+        onClick={onClose}
+        className="-mr-1 grid size-6 shrink-0 place-items-center rounded text-subtle hover:bg-surface-2 hover:text-fg"
+        aria-label="Dismiss"
+      >
+        <X className="size-3.5" />
+      </button>
     </div>
   );
 }

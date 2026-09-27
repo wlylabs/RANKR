@@ -156,6 +156,15 @@ export type StatsResponse = {
   updatedAt: number;
 };
 
+/** A paste looked up before it's called or watched: live data, and Rankr's record if it tracks the token. */
+export type LookupResponse = { preview: MarketSnapshot; token: TokenView | null };
+
+/** Live data for watched tokens: Rankr's record when it tracks one, else straight from the DEX. */
+export type WatchlistResponse = {
+  items: { id: string; token: TokenView | null; market: MarketSnapshot | null }[];
+  updatedAt: number;
+};
+
 export type TokenResponse = {
   token: TokenView | null;
   /** Live data for a token Rankr has not recorded yet. */

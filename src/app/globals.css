@@ -21,6 +21,11 @@
   --up-soft: rgb(26 127 55 / 0.08);
   --down: #cf222e;
   --down-soft: rgb(207 34 46 / 0.08);
+  /* Chart marks: down / neither / up, stepped for colorblind separation against this surface (checked with a
+     CVD validator); text keeps --up and --down. */
+  --chart-down: #e5534b;
+  --chart-mid: #8f8f8f;
+  --chart-up: #116329;
   color-scheme: light;
 }
 
@@ -37,6 +42,9 @@
   --up-soft: rgb(63 185 80 / 0.1);
   --down: #f85149;
   --down-soft: rgb(248 81 73 / 0.1);
+  --chart-down: #f85149;
+  --chart-mid: #8a8a8a;
+  --chart-up: #2ea043;
   color-scheme: dark;
 }
 
@@ -53,6 +61,9 @@
   --color-up-soft: var(--up-soft);
   --color-down: var(--down);
   --color-down-soft: var(--down-soft);
+  --color-chart-down: var(--chart-down);
+  --color-chart-mid: var(--chart-mid);
+  --color-chart-up: var(--chart-up);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   /* Material 3 motion. "emphasized": quick start, long gentle settle (expand / collapse, the theme slide).

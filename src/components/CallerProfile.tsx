@@ -8,6 +8,7 @@ import { useCallerProfile } from "@/lib/hooks";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { CallSpread, RecentForm } from "./CallerCharts";
 import { toneOf } from "./MultipleBadge";
 import { CallsView, callRow } from "./MyCalls";
 import { OfficialBadge } from "./OfficialBadge";
@@ -77,7 +78,15 @@ export function CallerProfile({ username }: { username: string }) {
       ) : !isLoading && data && !rows.length ? (
         <Message title="No calls yet" body={`@${data.caller.username} hasn't pasted a CA yet.`} />
       ) : (
-        <CallsView rows={rows} loading={isLoading} />
+        <>
+          {rows.length > 0 && (
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <CallSpread rows={rows} />
+              <RecentForm rows={rows} />
+            </div>
+          )}
+          <CallsView rows={rows} loading={isLoading} />
+        </>
       )}
     </div>
   );

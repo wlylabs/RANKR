@@ -8,12 +8,17 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 
 ## Features
 
-- **Paste to track**: auto-detects the chain and picks the most liquid DEX pair via the DexScreener API.
-  Pasting a valid CA tracks it instantly, no extra click.
+- **Paste, then choose**: auto-detects the chain and picks the most liquid DEX pair via the DexScreener API.
+  Pasting a valid CA looks it up right away and offers two choices: **Post call** (public, sealed at the price
+  right now, under your name; needs an account) or **Save to watchlist** (private, on this device, not a call and
+  not on the boards; no account needed).
 - **Entry locked at the first paste**: later pastes of the same token keep the original entry and bump a paste counter.
 - **Live multiple**: current price / entry price, shown as `3.42x` for gains and `-37.2%` for losses.
   Peak and lowest point since the paste are recorded too.
 - **Leaderboard**: top gainers, peak x, biggest dumps, newest, most pasted. Filter by 24h / 7d / 30d, chain, and search.
+  **Dead tokens** (down 70% or more from their first paste) are left off the boards so junk doesn't pile up; they're
+  back if they recover, a search still finds them, and nothing is deleted: calls on them still count as losses on
+  the caller board. The background refresh checks them hourly instead of every minute.
 - **Accounts**: pasting needs an account, so every call on Rankr has a name behind it. Continue as a
   **guest** in one click; save a **key** (`rk-7F3A-K9QX-2MPD-W8HT-ZC4N`) any time to sign in on any device.
   No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
@@ -24,12 +29,14 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Caller profiles**: an avatar drawn from the account (a mirrored 5x5 matrix from `sha256(user id)`, in the style
   of the logo, nothing to upload), a short bio, Telegram and website links, and an **X account, shown only once
   verified**: the caller posts a code from that X account and pastes the link (next sections). Edited on
-  `/account`.
+  `/account`. Two small charts: where the calls are now (below entry, 1-2x, 2-5x, 5-10x, 10-100x, 100x+) and the
+  last 10 calls (each up or down from its entry, how many are up, and the streak in profit up to the newest).
 - **Feed** (`/feed`, and a live ticker under the header): every call as it lands ("@userx called $SHIB at
   $1.2B mc") and every call that reaches a milestone ("$PEPE hit 10x from @userx's call"), each from the caller's
   own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone or top callers (the top 25 of
   the caller board), by calls or milestones, and by chain. The ticker shows the filter picked on the feed page.
-- **Watchlist**: star a token on its page to follow it under My calls → Watchlist (kept in the browser).
+- **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
+  under My calls → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
   new milestone (2x, 3x, 5x, 10x...), while Rankr is open. A token already past a milestone when first seen
   doesn't alert for it.
@@ -267,7 +274,9 @@ rolls everything back. Run it against a local or throwaway database:
 | Route | What |
 | --- | --- |
 | `POST /api/track` `{input}` | paste a CA / link (needs an account when accounts are on) |
-| `GET /api/tokens?sort=top\|peak\|losers\|new\|hot&range=24h\|7d\|30d\|all&chain=&q=&ids=&limit=&offset=` | leaderboard page |
+| `GET /api/tokens?sort=top\|peak\|losers\|new\|hot&range=24h\|7d\|30d\|all&chain=&q=&ids=&limit=&offset=` | leaderboard page (without dead tokens, unless `q` or `ids`) |
+| `GET /api/lookup?input=` | what a paste points at, before choosing: live data, and Rankr's record if any (writes nothing) |
+| `GET /api/watchlist?ids=<chain>:<address>,...` | live data for watched tokens, tracked or not |
 | `GET /api/tokens/:chain/:address` | one token (or a preview if untracked) |
 | `GET /api/stats` | totals for the home page |
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
@@ -315,10 +324,10 @@ src/lib/x-post.ts            reads a public post on X (embed endpoint, or the X 
 src/lib/avatar.ts            a caller's avatar: a mirrored 5x5 matrix from sha256 of the user id
 src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and server)
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
-src/lib/watchlist.ts         the watchlist (starred tokens, kept in the browser)
+src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone or top callers (kept in the browser)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
-src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board)
+src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 public/sw.js, offline.html   service worker and the offline page
 supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
 ```
