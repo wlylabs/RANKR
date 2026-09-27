@@ -3,10 +3,10 @@
 import clsx from "clsx";
 import { Globe, KeyRound, LogOut, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { callerHref } from "@/lib/format";
-import { LANDING, loginHref } from "@/lib/login";
+import { loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { OfficialBadge } from "./OfficialBadge";
 
@@ -16,7 +16,6 @@ const ITEM = "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-mu
 export function AccountMenu() {
   const { available, ready, userId, username, hasKey, official, signOut } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -110,10 +109,9 @@ export function AccountMenu() {
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"
-                  onClick={async () => {
+                  onClick={() => {
                     setOpen(false);
-                    await signOut();
-                    router.push(LANDING);
+                    void signOut();
                   }}
                   className="h-7 rounded-md border border-border px-2.5 text-xs text-down hover:bg-surface-2"
                 >

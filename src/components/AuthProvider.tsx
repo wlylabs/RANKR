@@ -1,12 +1,13 @@
 "use client";
 
 import type { Session } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { refreshBoards } from "@/lib/hooks";
 import { keyEmail, parseKey } from "@/lib/key";
 import { captchaToken } from "@/lib/captcha";
-import { authErrorMessage } from "@/lib/login";
+import { authErrorMessage, LANDING } from "@/lib/login";
 import { accountsAvailable, apiFetch, authedFetcher, browserSupabase } from "@/lib/supabase-browser";
 import type { KeyResponse, MeResponse } from "@/lib/types";
 
@@ -22,6 +23,8 @@ type AuthState = {
   hasKey: boolean;
   /** An official account: check badge, name locked. */
   official: boolean;
+  /** Signed out in this tab (and not signed in since): on the way to, or already on, the landing page. */
+  justSignedOut: boolean;
   /** Creates a guest account. */
   continueAsGuest: () => Promise<void>;
   /** Signs in with a key. A guest signed in here is left behind. */
@@ -29,6 +32,7 @@ type AuthState = {
   /** Gives the account a new key and returns it, once. An older key stops working; other devices are signed out. */
   makeKey: () => Promise<string>;
   saveUsername: (username: string) => Promise<void>;
+  /** Signs out of this browser and goes to the landing page. */
   signOut: () => Promise<void>;
 };
 
@@ -43,6 +47,7 @@ const AuthContext = createContext<AuthState>({
   username: null,
   hasKey: false,
   official: false,
+  justSignedOut: false,
   continueAsGuest: unavailable,
   signInWithKey: unavailable,
   makeKey: unavailable,
@@ -51,8 +56,10 @@ const AuthContext = createContext<AuthState>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [sessionRead, setSessionRead] = useState(!accountsAvailable);
+  const [justSignedOut, setJustSignedOut] = useState(false);
   const userId = session?.user.id ?? null;
 
   useEffect(() => {
@@ -64,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const { data } = sb.auth.onAuthStateChange((_event, next) => {
       setSession(next);
+      if (next) setJustSignedOut(false);
       void refreshBoards();
     });
     return () => data.subscription.unsubscribe();
@@ -126,8 +134,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    // Set first, so the page being left doesn't send people to /login on its way out.
+    setJustSignedOut(true);
     await browserSupabase()?.auth.signOut({ scope: "local" });
-  }, []);
+    router.replace(LANDING);
+  }, [router]);
 
   const account = me.data?.account?.id === userId ? me.data?.account : undefined;
   const value = useMemo<AuthState>(
@@ -138,13 +149,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: account?.username ?? null,
       hasKey: !!account?.hasKey,
       official: !!account?.official,
+      justSignedOut,
       continueAsGuest,
       signInWithKey,
       makeKey,
       saveUsername,
       signOut,
     }),
-    [sessionRead, profileRead, userId, account, continueAsGuest, signInWithKey, makeKey, saveUsername, signOut],
+    [sessionRead, profileRead, userId, account, justSignedOut, continueAsGuest, signInWithKey, makeKey, saveUsername, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

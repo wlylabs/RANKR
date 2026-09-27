@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { shortAddress } from "@/lib/format";
-import { APP_HOME, LANDING, safeNext } from "@/lib/login";
+import { APP_HOME, safeNext } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeySignInForm } from "./Key";
 import { LogoMark } from "./Logo";
@@ -75,10 +75,7 @@ export function Login() {
       <Shell title="Pick a username" intro="This is how you show up on the caller board.">
         <UsernameForm submitLabel="Continue" />
         <p className="mt-6 text-xs text-subtle">
-          <button type="button" onClick={async () => {
-              await signOut();
-              router.replace(LANDING);
-            }} className={LINK}>
+          <button type="button" onClick={() => void signOut()} className={LINK}>
             Sign out
           </button>
         </p>
