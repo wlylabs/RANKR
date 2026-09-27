@@ -1,25 +1,20 @@
-import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { StandaloneRedirect } from "@/components/Landing";
 import { Logo, RANKR_SHA256 } from "@/components/Logo";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { APP_HOME } from "@/lib/login";
+import { SettingsMenu } from "@/components/SettingsMenu";
 
 const SECTIONS = [
   { href: "#how", label: "How it works" },
   { href: "#features", label: "Features" },
-  { href: "#install", label: "Install" },
   { href: "#faq", label: "FAQ" },
 ];
 
 const FOOTER = [
-  { href: APP_HOME, label: "Open the app" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/me", label: "My calls" },
-  { href: "#install", label: "Install" },
 ];
 
-/** The landing page's own shell: section links and "Open app" instead of the app's nav. */
+/** The landing page's own shell: section links instead of the app's nav; the app is in the settings menu. */
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -36,15 +31,8 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
               </a>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
-            <Link
-              href={APP_HOME}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-fg px-3 text-sm font-medium text-bg transition-opacity hover:opacity-85"
-            >
-              Open app
-              <ArrowRight className="size-3.5" strokeWidth={2.5} />
-            </Link>
+          <div className="ml-auto flex items-center">
+            <SettingsMenu openApp />
           </div>
         </div>
       </header>

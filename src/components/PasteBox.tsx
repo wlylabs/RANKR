@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ClipboardPaste, KeyRound, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
+import { ClipboardPaste, KeyRound, LoaderCircle, Lock, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -184,10 +184,7 @@ export function PasteBox({
               <span className="hidden sm:inline">Track</span>
             </>
           ) : (
-            <>
-              Track
-              <ArrowRight className="size-4" />
-            </>
+            "Track"
           )}
         </button>
       </form>
@@ -298,7 +295,6 @@ function TrackResult({ result, keepAs, onClose }: { result: Result; keepAs: stri
           <span className="min-w-0 flex-1 truncate">
             <span className="font-mono">@{keepAs}</span> lives in this browser only. Save your key to keep it.
           </span>
-          <ArrowRight className="size-3.5 shrink-0" />
         </Link>
       )}
     </div>

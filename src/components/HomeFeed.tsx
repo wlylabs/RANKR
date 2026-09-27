@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatMultiple, tokenHref } from "@/lib/format";
@@ -38,8 +38,8 @@ function Panel({ title, href, children }: { title: string; href: string; childre
     <section className="min-w-0 overflow-hidden rounded-lg border border-border">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <h2 className="text-sm font-medium">{title}</h2>
-        <Link href={href} className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">
-          View all <ArrowRight className="size-3" />
+        <Link href={href} className="text-xs text-muted hover:text-fg">
+          View all
         </Link>
       </div>
       <div className="divide-y divide-border">{children}</div>

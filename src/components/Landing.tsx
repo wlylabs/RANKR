@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, Check, Lock } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -74,13 +74,9 @@ export function LiveCall() {
           <span className={clsx("size-1.5 rounded-full", live ? "bg-up" : "bg-subtle")} />
           {live ? "#1 on the board right now" : "Example"}
         </span>
-        {live && top ? (
-          <Link href={tokenHref(top)} className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">
-            Token page <ArrowRight className="size-3" />
-          </Link>
-        ) : (
-          <Link href={APP_HOME} className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">
-            Paste the first CA <ArrowRight className="size-3" />
+        {top && (
+          <Link href={tokenHref(top)} className="text-xs text-muted hover:text-fg">
+            Token page
           </Link>
         )}
       </div>
@@ -101,7 +97,7 @@ export function LiveCall() {
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px]">
           <span className={clsx("tabular", tone)}>{formatChange(call.multiple)}</span>
           <span className="tabular text-muted">
-            {formatUsd(call.entryMarketCap)} → <span className="text-fg">{formatUsd(call.marketCap)}</span> mc
+            entry {formatUsd(call.entryMarketCap)} · now <span className="text-fg">{formatUsd(call.marketCap)}</span>
           </span>
         </div>
       </div>

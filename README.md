@@ -23,10 +23,12 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
-- **Landing page** at `/`: what Rankr does, the board's #1 token live, how it works, features, install steps, FAQ.
+- **Landing page** at `/`: what Rankr does, the board's #1 token live, how it works, features, FAQ.
   The app itself (paste box + live board) is at **`/app`**.
-- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls), an
-  offline page and an "Install app" button (next section).
+- **Settings menu** (the gear in the header): theme, and the app: open it, install it, copy its link. It is the
+  only place with app buttons, so pages stay clean.
+- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
+  offline page (next section).
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme.
 
 ## Design
@@ -49,9 +51,9 @@ hairline borders), "decrypted text" reveal effects, and hash visualisations such
 The web app manifest (`src/app/manifest.ts`) has `id` and `start_url` `/app` with `scope` `/`, so the installed
 app skips the landing page and every page of the site opens inside it. The app link is `https://your-domain/app`.
 
-- **Install button** (`src/components/Pwa.tsx`, `src/lib/pwa.ts`): Chrome, Edge and Android show the browser's own
-  install dialog (`beforeinstallprompt`); iPhone and iPad get the Share → Add to Home Screen steps; other browsers
-  get their menu steps. Once installed the button hides.
+- **Install app** in the settings menu (`src/components/SettingsMenu.tsx`, `src/lib/pwa.ts`): Chrome, Edge and
+  Android show the browser's own install dialog (`beforeinstallprompt`); iPhone and iPad get the Share → Add to
+  Home Screen step; other browsers get their menu step. Once installed it reads "Installed on this device".
 - **Service worker** (`public/sw.js`, registered in production only): pages and API calls always go to the network
   (prices are live), with navigation preload; when the network is gone it shows `public/offline.html` and reloads
   once back online. It is served with `Cache-Control: no-cache` (`next.config.ts`) so updates reach installed apps.
@@ -219,7 +221,7 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/callers, api/me/*      caller board, your account, username and calls
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
-src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, Pwa...)
+src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, SettingsMenu...)
 src/lib/                     address parsing, DexScreener client, metrics, formatting
 src/lib/store/               storage: file (local) and Supabase adapters, shared query rules
 src/lib/accounts.ts          accounts (Supabase Auth: guests, keys), names and calls, server side

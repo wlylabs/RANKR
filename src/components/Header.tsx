@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Download, House, Plus, Trophy, UserRound, X } from "lucide-react";
+import { House, Plus, Trophy, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -9,7 +9,7 @@ import { APP_HOME } from "@/lib/login";
 import { AccountMenu } from "./AccountMenu";
 import { Logo, RANKR_SHA256 } from "./Logo";
 import { PasteBox } from "./PasteBox";
-import { ThemeToggle } from "./ThemeToggle";
+import { SettingsMenu } from "./SettingsMenu";
 
 export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
@@ -60,7 +60,7 @@ export function Header() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
+            <SettingsMenu />
             <AccountMenu />
             <button
               type="button"
@@ -144,14 +144,9 @@ export function Footer() {
           </p>
         </div>
         {/* The landing page is for the web; the installed app has no way back to it. */}
-        <nav aria-label="About" className="flex gap-4 text-xs text-muted standalone:hidden">
-          <Link href="/" className="hover:text-fg">
-            About Rankr
-          </Link>
-          <Link href="/#install" className="inline-flex items-center gap-1.5 hover:text-fg">
-            <Download className="size-3" /> Install the app
-          </Link>
-        </nav>
+        <Link href="/" className="text-xs text-muted hover:text-fg standalone:hidden">
+          About Rankr
+        </Link>
       </div>
     </footer>
   );
