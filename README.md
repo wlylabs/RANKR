@@ -19,6 +19,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   **Dead tokens** (down 70% or more from their first paste) are left off the boards so junk doesn't pile up; they're
   back if they recover, a search still finds them, and nothing is deleted: calls on them still count as losses on
   the caller board. The background refresh checks them hourly instead of every minute.
+- **Monthly reset**: on the 1st of every month (00:00 UTC) every token and call is cleared and everyone starts from
+  zero; the month's top 10 callers and tokens are kept under Leaderboard -> Last month (details below).
 - **Accounts**: pasting needs an account, so every call on Rankr has a name behind it. Continue as a
   **guest** in one click; save a **key** (`rk-7F3A-K9QX-2MPD-W8HT-ZC4N`) any time to sign in on any device.
   No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
@@ -139,6 +141,8 @@ Rankr runs on a JSON file locally and on **Supabase (Postgres)** in production. 
 4. Turn on guests and keys in Supabase Auth (next section).
 5. Optional, for peaks/lows while nobody is browsing: run `supabase/cron.sql` (pg_cron + pg_net call
    `/api/cron/refresh` every minute).
+6. For the monthly reset (next section), enable **pg_cron** (Database -> Extensions) and run `setup.sql` again, or
+   the `rankr-monthly-reset` line of `supabase/cron.sql`.
 
 ### Accounts (guest + key)
 
@@ -246,6 +250,18 @@ An official account's name is locked (only `rankr_set_official` changes it), so 
 the same name. Names starting with `rankr` or containing `official` are reserved for everyone else, so nobody
 can pass for the project without the badge. The function can't be called from the browser (service role only).
 
+### Monthly reset
+
+At **00:00 UTC on the 1st of every month** the boards start from zero: `rankr_end_month()` deletes every token,
+and with it every call and milestone. Accounts stay (names, keys, bios, links, verified X accounts). Just before,
+the month's **top 10 callers** (by hit rate, 5+ calls, as on the caller board) and **top 10 tokens** (by peak x
+since the first paste, with who called each first) are kept in `public.seasons`, shown under Leaderboard ->
+Last month. The leaderboard and My calls say when the next reset is.
+
+It runs as a pg_cron job, `rankr-monthly-reset` (`0 0 1 * *`, pg_cron runs in UTC), which `setup.sql` schedules
+when pg_cron is enabled. By hand: `select rankr_end_month();`. Stop it: `select cron.unschedule('rankr-monthly-reset');`.
+The file store (local dev) doesn't reset.
+
 ### Caller profiles
 
 On `/account` a caller can add (rules in `src/lib/profile.ts`, the same in SQL):
@@ -275,6 +291,7 @@ rolls everything back. Run it against a local or throwaway database:
 | --- | --- |
 | `POST /api/track` `{input}` | paste a CA / link (needs an account when accounts are on) |
 | `GET /api/tokens?sort=top\|peak\|losers\|new\|hot&range=24h\|7d\|30d\|all&chain=&q=&ids=&limit=&offset=` | leaderboard page (without dead tokens, unless `q` or `ids`) |
+| `GET /api/season` | the last month that ended: its top 10 callers and tokens |
 | `GET /api/lookup?input=` | what a paste points at, before choosing: live data, and Rankr's record if any (writes nothing) |
 | `GET /api/watchlist?ids=<chain>:<address>,...` | live data for watched tokens, tracked or not |
 | `GET /api/tokens/:chain/:address` | one token (or a preview if untracked) |
@@ -328,8 +345,9 @@ src/lib/watchlist.ts         the watchlist (saved tokens with their price when s
 src/lib/feed-scope.ts        the feed filter, everyone or top callers (kept in the browser)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
+src/lib/season.ts            the monthly reset: when the next one is, month names
 public/sw.js, offline.html   service worker and the offline page
-supabase/                    migrations, setup.sql (all of them in one file), smoke test, optional cron job
+supabase/                    migrations, setup.sql (all of them in one file), smoke test, cron jobs (refresh, monthly reset)
 ```
 
 Not financial advice. Memecoins can and do go to zero.

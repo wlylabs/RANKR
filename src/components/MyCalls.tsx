@@ -9,7 +9,8 @@ import { refreshBoards, removeMyCall, useAccountCalls, useMyCalls, useTokens, ty
 import { loginHref } from "@/lib/login";
 import { MAX_LIMIT } from "@/lib/params";
 import { ratio, tierOf } from "@/lib/metrics";
-import { apiFetch } from "@/lib/supabase-browser";
+import { nextResetAt, resetDay } from "@/lib/season";
+import { accountsAvailable, apiFetch } from "@/lib/supabase-browser";
 import type { CallView, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { OfficialBadge } from "./OfficialBadge";
@@ -215,6 +216,9 @@ function Page({
         <>
           <p className="mt-4 text-sm text-muted">
             Measured from the moment <em>you</em> pasted. {intro && <span className="text-subtle">{intro}</span>}
+            {accountsAvailable && (
+              <span className="text-subtle"> Calls reset with the boards on {resetDay(nextResetAt())}, 00:00 UTC.</span>
+            )}
           </p>
 
           {children ?? (!rows.length && !loading ? (

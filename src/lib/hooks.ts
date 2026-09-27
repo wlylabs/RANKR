@@ -11,6 +11,7 @@ import type {
   FeedResponse,
   MarketSnapshot,
   MyCallsResponse,
+  SeasonResponse,
   StatsResponse,
   TokenView,
   TokensResponse,
@@ -97,6 +98,12 @@ export function useWatchlistMarkets(ids: string[]) {
 /** The live market of a watched token, whichever way it came. */
 export function marketOf(item: WatchlistResponse["items"][number] | undefined): MarketSnapshot | null {
   return item?.token?.market ?? item?.market ?? null;
+}
+
+/** The last month that ended, with its top 10s. It changes once a month. */
+export function useLastSeason(enabled = true) {
+  const { data, isLoading } = useSWR<SeasonResponse>(enabled ? "/api/season" : null, fetcher, { revalidateOnFocus: false });
+  return { season: data?.last ?? null, isLoading };
 }
 
 /** A caller's public profile, refreshed like the boards. */

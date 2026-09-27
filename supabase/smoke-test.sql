@@ -324,4 +324,42 @@ begin
   raise notice 'rankr smoke test: limits ok';
 end $$;
 
+-- Monthly reset (needs all migrations): the top 10s are kept, every token, call and milestone goes,
+-- accounts stay.
+do $$
+declare
+  r jsonb;
+  s record;
+  v_profiles int := (select count(*) from public.profiles);
+begin
+  assert (select count(*) from public.calls) > 0 and (select count(*) from public.call_milestones) > 0, 'something to reset';
+  r := public.rankr_end_month('2026-10-01 00:05+00');
+  assert (r->>'ok')::boolean and r->>'month' = '2026-09-01', 'the month that just ended: ' || r::text;
+  assert (r->>'tokens')::int > 0 and (r->>'calls')::int > 0 and (r->>'callers')::int > 0, r::text;
+
+  select * into s from public.seasons order by ended_at desc limit 1;
+  assert s.month = '2026-09-01' and s.ended_at = '2026-10-01 00:05+00';
+  assert s.callers->0->>'username' = 'sprayer', 'hit rate board, 5+ calls: ' || s.callers::text;
+  assert jsonb_array_length(s.tokens) = least(10, (r->>'tokens')::int), 'top 10 tokens';
+  assert (s.tokens->0->>'peak_multiple')::float8 >= (s.tokens->1->>'peak_multiple')::float8, 'by peak x';
+  assert (select bool_and(t ? 'first_caller') from jsonb_array_elements(s.tokens) t);
+
+  assert (select count(*) from public.tokens) = 0 and (select count(*) from public.calls) = 0, 'everything goes';
+  assert (select count(*) from public.call_milestones) = 0;
+  assert (select count(*) from public.profiles) = v_profiles, 'accounts stay';
+  assert (public.rankr_callers()->>'total')::int = 0, 'the caller board starts from zero';
+
+  r := public.rankr_end_month('2026-10-01 00:06+00');
+  assert (r->>'skipped')::boolean and (select count(*) from public.seasons) = 1, 'nothing to keep, nothing written';
+  assert date_trunc('month', timestamptz '2026-09-15 12:00+00' - interval '12 hours')::date = '2026-09-01', 'by hand mid-month: this month';
+
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    assert not has_function_privilege('anon', 'public.rankr_end_month(timestamptz)', 'execute');
+    assert not has_function_privilege('authenticated', 'public.rankr_end_month(timestamptz)', 'execute');
+    assert has_function_privilege('service_role', 'public.rankr_end_month(timestamptz)', 'execute');
+  end if;
+
+  raise notice 'rankr smoke test: monthly reset ok';
+end $$;
+
 rollback;

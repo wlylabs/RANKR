@@ -7,7 +7,7 @@ import { parsePostId, xCode, type ProfileFields } from "./profile";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
-import type { CallView, CallerAbout, CallerView, FeedItem, TokenView } from "./types";
+import type { CallView, CallerAbout, CallerView, FeedItem, Season, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 import { readPost, type Post } from "./x-post";
 
@@ -384,5 +384,62 @@ export async function callerProfile(
     caller: { userId: row.user_id, username: row.username, official: !!row.official, ...callerStats(calls) },
     about: about.xVerified ? about : { ...about, x: null },
     calls,
+  };
+}
+
+type SeasonRow = {
+  month: string;
+  ended_at: string;
+  counts: { tokens?: number; calls?: number; callers?: number };
+  callers: CallerRow[];
+  tokens: {
+    id: string;
+    chain_id: string;
+    address: string;
+    symbol: string;
+    name: string;
+    entry_market_cap: number | null;
+    peak_multiple: number;
+    first_caller: string | null;
+  }[];
+};
+
+/** The last month that ended (see rankr_end_month), with callers by the names they have now; null before the first. */
+export async function lastSeason(): Promise<Season | null> {
+  const api = rest();
+  if (!api) return null;
+  const [row] = await api.select<SeasonRow[]>("seasons?select=*&order=ended_at.desc&limit=1");
+  if (!row) return null;
+  // A caller may have renamed since the month ended.
+  const ids = [...new Set([...row.callers.map((c) => c.user_id), ...row.tokens.flatMap((t) => (t.first_caller ? [t.first_caller] : []))])];
+  const now = ids.length
+    ? await api.select<{ user_id: string; username: string; official?: boolean }[]>(
+        `profiles?select=user_id,username,official&user_id=in.(${ids.map(encodeURIComponent).join(",")})`,
+      )
+    : [];
+  const byId = new Map(now.map((p) => [p.user_id, p]));
+  return {
+    month: row.month,
+    endedAt: Date.parse(row.ended_at),
+    counts: { tokens: row.counts.tokens ?? 0, calls: row.counts.calls ?? 0, callers: row.counts.callers ?? 0 },
+    callers: row.callers.map((c) => ({
+      userId: c.user_id,
+      username: byId.get(c.user_id)?.username ?? c.username,
+      official: byId.get(c.user_id)?.official ?? !!c.official,
+      calls: c.calls,
+      hits: c.hits,
+      avgMultiple: c.avg_multiple,
+      bestMultiple: c.best_multiple,
+    })),
+    tokens: row.tokens.map((t) => ({
+      id: t.id,
+      chainId: t.chain_id,
+      address: t.address,
+      symbol: t.symbol,
+      name: t.name,
+      entryMarketCap: t.entry_market_cap,
+      peakMultiple: t.peak_multiple,
+      firstCaller: t.first_caller ? (byId.get(t.first_caller)?.username ?? null) : null,
+    })),
   };
 }
