@@ -18,3 +18,16 @@ export function passes(m: Pick<MarketSnapshot, "marketCap" | "fdv" | "volume24h"
     below(m.liquidityUsd, MINIMUMS.liq)
   );
 }
+
+export type CapTier = "high" | "mid" | "low";
+
+/**
+ * A memecoin's tier by market cap (FDV when there's none), on pump.fun's milestones: a token "graduates" from
+ * its bonding curve to a DEX at about $69K, and few ever reach $1M. High: $1M and up; mid: $69K to $1M; low:
+ * under $69K. Null when the market cap isn't known.
+ */
+export function capTier(m: Pick<MarketSnapshot, "marketCap" | "fdv">): CapTier | null {
+  const mc = m.marketCap ?? m.fdv;
+  if (mc === null || mc === undefined) return null;
+  return mc >= 1_000_000 ? "high" : mc >= 69_000 ? "mid" : "low";
+}

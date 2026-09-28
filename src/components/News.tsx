@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
-import { passes } from "@/lib/token-filters";
+import { capTier, passes, type CapTier } from "@/lib/token-filters";
 import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
 import { ChainTag } from "./Chain";
 import { Tab } from "./Leaderboard";
@@ -32,12 +32,28 @@ function inTab(items: NewsItem[], tab: TabKey): NewsItem[] {
   });
 }
 
+const TIER_LABELS: Record<CapTier, string> = { high: "high cap", mid: "mid cap", low: "low cap" };
+
 /** A token named after a story: who it is (chain, address, age) and its market, linking to its page on Rankr. */
 function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
+  const tier = capTier(m);
   return (
     <Link href={tokenHref(m)} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-2">
       <div className="min-w-0 flex-1">
-        <TokenName symbol={m.symbol} name={m.name} className="min-w-0" />
+        <div className="flex min-w-0 items-center gap-2">
+          <TokenName symbol={m.symbol} name={m.name} className="min-w-0" />
+          {tier && (
+            <span
+              className={clsx(
+                "shrink-0 rounded border px-1 font-mono text-[10px] leading-4",
+                tier === "high" ? "border-border-strong text-fg" : "border-border text-muted",
+              )}
+              title={tier === "high" ? "$1M and up" : tier === "mid" ? "$69K to $1M: past pump.fun's bonding curve" : "under $69K"}
+            >
+              {TIER_LABELS[tier]}
+            </span>
+          )}
+        </div>
         <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
           <ChainTag chainId={m.chainId} /> · {shortAddress(m.address)}
           {m.pairCreatedAt && (
@@ -121,7 +137,7 @@ function Namesakes({ keywords }: { keywords: string[] }) {
         <p className="px-3 py-4 text-sm text-muted">Type a name to see the tokens named after it.</p>
       ) : (
         <>
-          <p className="px-3 pt-2 font-mono text-[11px] text-subtle">tokens named &ldquo;{keyword}&rdquo; · most liquid first</p>
+          <p className="px-3 pt-2 font-mono text-[11px] text-subtle">tokens named &ldquo;{keyword}&rdquo; · most traded first</p>
           {isLoading ? (
             <ListSkeleton rows={3} />
           ) : error && !items.length ? (

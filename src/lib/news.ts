@@ -188,8 +188,13 @@ function searchCached(query: string): Promise<MarketSnapshot[]> {
   return tokens;
 }
 
+/** Most traded first (24h volume, as Birdeye ranks tokens), then most liquid; unknown numbers last. */
+export function byVolume(a: MarketSnapshot, b: MarketSnapshot): number {
+  return (b.volume24h ?? -1) - (a.volume24h ?? -1) || (b.liquidityUsd ?? -1) - (a.liquidityUsd ?? -1);
+}
+
 /**
- * Every token named after `keyword` (a name from a story), most liquid first: many tokens share a name or a
+ * Every token named after `keyword` (a name from a story), most traded first: many tokens share a name or a
  * ticker, and the reader picks. Searched as written and run together ("Bukang-i" and "Bukangi"). Throws
  * UpstreamError when DexScreener can't be reached.
  */
@@ -200,5 +205,5 @@ export async function namesakes(keyword: string): Promise<MarketSnapshot[]> {
   for (const tokens of await Promise.all(queries.map(searchCached))) {
     for (const t of tokens) if (isNamesake(t, keywords)) byId.set(`${t.chainId}:${t.address}`, t);
   }
-  return [...byId.values()].sort((a, b) => (b.liquidityUsd ?? -1) - (a.liquidityUsd ?? -1)).slice(0, NAMESAKES);
+  return [...byId.values()].sort(byVolume).slice(0, NAMESAKES);
 }
