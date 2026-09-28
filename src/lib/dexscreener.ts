@@ -138,9 +138,10 @@ export async function searchTokens(query: string): Promise<MarketSnapshot[]> {
   if (MOCK) {
     // Made-up namesakes, so the news page works offline.
     const name = query.replace(/^\$/, "");
+    const ticker = name.replace(/[^\p{L}\p{N}]/gu, "").toUpperCase();
     return ["1", "2", "3"].map((n, i) => ({
-      ...mockSnapshot(`${name}Mock${n}${"x".repeat(32)}`.slice(0, 44), "solana"),
-      symbol: (i === 2 ? name.slice(0, -1) : name).toUpperCase(),
+      ...mockSnapshot(`${ticker}Mock${n}${"x".repeat(32)}`.slice(0, 44), "solana"),
+      symbol: i === 2 ? ticker.slice(0, -1) : ticker,
       name: i === 1 ? `${name} Inu` : name,
     }));
   }

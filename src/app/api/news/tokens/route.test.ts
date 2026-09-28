@@ -29,13 +29,13 @@ const get = async (qs: string) => {
 };
 
 describe("GET /api/news/tokens", () => {
-  it("needs a name or a ticker", async () => {
+  it("needs a name", async () => {
     expect((await get("")).status).toBe(400);
-    expect((await get(`name=${"x".repeat(65)}`)).status).toBe(400);
+    expect((await get(`q=${"x".repeat(65)}`)).status).toBe(400);
   });
 
   it("gives the namesakes with Rankr's multiple for the tracked ones", async () => {
-    const body = await (await get("name=Bukangi&symbol=BUKANGI")).json();
+    const body = await (await get("q=Bukang-i")).json();
     expect(body.items.map((i: { market: { address: string }; multiple: number | null }) => [i.market.address, i.multiple])).toEqual([
       ["AAA", null],
       ["BBB", 4.2],
@@ -44,7 +44,7 @@ describe("GET /api/news/tokens", () => {
 
   it("says so when DexScreener isn't answering", async () => {
     fail = true;
-    const res = await get("symbol=BUKANGI");
+    const res = await get("q=Bukangi");
     fail = false;
     expect(res.status).toBe(502);
   });

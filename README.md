@@ -46,16 +46,17 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
-- **News** (`/news`, in the nav): headlines that name a token on Rankr, e.g. "Over 560,000 visitors flock to
-  Busan to see canal-trapped shark Bukang-i" for $BUKANGI. Just the headline, the publisher and a link to the
-  article. Pick a token to see only its own (`/news?token=solana:<address>`, also the News button on a token
-  page). Headlines come from Google News (its RSS search, no key), searched by token name and kept if they name
-  it however it's spelled ("Bukang-i" is Bukangi) or its $ticker; names under 4 letters need the $ticker. Without
-  a token: the month's 10 most pasted and 10 top tokens. Cached 15 minutes; with `RANKR_MOCK=1`, made-up headlines.
-  Many tokens share a ticker, so a headline isn't tied to one: its **Tokens** button lists every token named like
-  the story's (by name and by ticker, from DexScreener's search, e.g. $BUKANGI, "Bukangi Shark", $BUKANG), most
-  liquid first, with chain, address, age, market cap, 24h volume, liquidity and 24h change, and Rankr's multiple
-  for the ones it tracks. The reader picks one (it opens its page on Rankr, to watch or call it).
+- **News** (`/news`, in the nav): what's in the news right now, live, newest first, e.g. "Over 560,000 visitors
+  flock to Busan to see canal-trapped shark Bukang-i". Just the headline (a link to the article), the publisher
+  and how long ago; nothing has to be pasted first. From Google News' RSS (no key): top stories (the US and
+  Singapore editions) and the World, Entertainment, Science and Technology sections, each story once, read every
+  5 minutes; the page refreshes every 2. A search box searches the news (`/news?q=shark`).
+  Each headline has a **Tokens** button: every token named after the story. The names in the headline are the
+  choices ("Bukang-i", "Busan"; the likeliest is picked: a quoted name, a run of capitalised words like "Moo
+  Deng", then single ones), or type another. Tokens come from DexScreener's search (the name as written and run
+  together: "Bukang-i", "Bukangi"), most liquid first, each with chain, address, age, market cap, 24h volume,
+  liquidity and 24h change, and Rankr's multiple for the ones it tracks. Many tokens share a name or a ticker, so
+  the reader picks one (it opens its page on Rankr, to watch or call it). With `RANKR_MOCK=1`, made-up stories.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
@@ -326,8 +327,8 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
-| `GET /api/news?token=` | headlines that name a token (`solana:<address>`), or the month's most pasted and top tokens |
-| `GET /api/news/tokens?name=&symbol=` | every token named like a story's token, most liquid first, with market data and Rankr's multiple |
+| `GET /api/news`, `GET /api/news?q=` | what's in the news right now, or a search, newest first, each with the names a token would be called |
+| `GET /api/news/tokens?q=` | every token named after a name from a story, most liquid first, with market data and Rankr's multiple |
 | `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 
 ## How the numbers work
@@ -354,7 +355,7 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/cron/refresh           background price refresh
   api/callers, api/me/*      caller board, your account, username, profile, calls and rank
   api/feed                   GET the feed: calls and milestones
-  api/news, api/news/tokens  GET headlines that name a token, and the tokens named like it
+  api/news, api/news/tokens  GET the live news, and the tokens named after a story
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, SettingsMenu...)
@@ -370,7 +371,7 @@ src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
-src/lib/news.ts              news: Google News headlines that name a token, and its namesakes on DexScreener
+src/lib/news.ts              news: live Google News headlines, the names in them, and their namesakes on DexScreener
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

@@ -1,10 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowUpRight, ChevronDown, ChevronRight, Coins, Newspaper } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronRight, Coins, Newspaper, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
 import type { NamesakesResponse, NewsItem } from "@/lib/types";
@@ -13,7 +13,7 @@ import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton, TokenName } from "./TokenList";
 
-/** One of a story's namesakes: who it is (chain, address, age) and its market, linking to its page on Rankr. */
+/** A token named after a story: who it is (chain, address, age) and its market, linking to its page on Rankr. */
 function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
   return (
     <Link href={tokenHref(m)} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-2">
@@ -48,26 +48,68 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
   );
 }
 
-/** Every token named like the story's token: many share a ticker, so the reader picks by the numbers. */
-function Namesakes({ token }: { token: NewsItem["token"] }) {
-  const { items, error, isLoading } = useNamesakes(token.name, token.symbol);
+/**
+ * Every token named after a story: pick one of the names in the headline (the likeliest is picked) or type
+ * another, then pick a token by its numbers. Many tokens share a name or a ticker.
+ */
+function Namesakes({ keywords }: { keywords: string[] }) {
+  const [keyword, setKeyword] = useState(keywords[0] ?? "");
+  const [draft, setDraft] = useState("");
+  const { items, error, isLoading } = useNamesakes(keyword);
+
   return (
     <div className="mt-3 overflow-hidden rounded-md border border-border bg-surface">
-      <p className="border-b border-border px-3 py-2 font-mono text-[11px] text-subtle">
-        tokens named &ldquo;{token.name}&rdquo; or ${token.symbol} · most liquid first
-      </p>
-      {isLoading ? (
-        <ListSkeleton rows={3} />
-      ) : error && !items.length ? (
-        <p className="px-3 py-4 text-sm text-down">Couldn&apos;t load the tokens. Try again in a moment.</p>
-      ) : !items.length ? (
-        <p className="px-3 py-4 text-sm text-muted">No token named like this on DexScreener yet.</p>
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-2">
+        {keywords.map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setKeyword(k)}
+            aria-pressed={keyword === k}
+            className={clsx(
+              "h-7 rounded-md border px-2.5 text-xs transition-colors",
+              keyword === k ? "border-border-strong bg-surface-2 text-fg" : "border-border text-muted hover:text-fg",
+            )}
+          >
+            {k}
+          </button>
+        ))}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (draft.trim()) setKeyword(draft.trim());
+          }}
+          className="min-w-32 flex-1"
+        >
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Another name or $ticker"
+            maxLength={64}
+            aria-label="Search tokens by name"
+            className="h-7 w-full rounded-md border border-border bg-bg px-2.5 text-xs outline-none placeholder:text-subtle focus:border-border-strong"
+          />
+        </form>
+      </div>
+      {!keyword ? (
+        <p className="px-3 py-4 text-sm text-muted">Type a name to see the tokens named after it.</p>
       ) : (
-        <div className="divide-y divide-border">
-          {items.map((n) => (
-            <Namesake key={`${n.market.chainId}:${n.market.address}`} {...n} />
-          ))}
-        </div>
+        <>
+          <p className="px-3 pt-2 font-mono text-[11px] text-subtle">tokens named &ldquo;{keyword}&rdquo; · most liquid first</p>
+          {isLoading ? (
+            <ListSkeleton rows={3} />
+          ) : error && !items.length ? (
+            <p className="px-3 py-4 text-sm text-down">Couldn&apos;t load the tokens. Try again in a moment.</p>
+          ) : !items.length ? (
+            <p className="px-3 py-4 text-sm text-muted">No token named like this on DexScreener yet.</p>
+          ) : (
+            <div className="mt-1 divide-y divide-border">
+              {items.map((n) => (
+                <Namesake key={`${n.market.chainId}:${n.market.address}`} {...n} />
+              ))}
+            </div>
+          )}
+        </>
       )}
       <p className="border-t border-border px-3 py-2 font-mono text-[11px] text-subtle">
         same ticker, different token: check the chain and address before you buy
@@ -102,61 +144,64 @@ function Headline({ item }: { item: NewsItem }) {
           onClick={() => setOpen(!open)}
           aria-expanded={open}
           className={clsx(
-            "ml-auto inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 font-sans text-xs transition-colors hover:bg-surface-2 hover:text-fg",
+            "ml-auto inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border border-border px-2.5 font-sans text-xs transition-colors hover:bg-surface-2 hover:text-fg",
             open ? "bg-surface-2 text-fg" : "text-muted",
           )}
         >
-          <Coins className="size-3.5" />
-          Tokens · ${item.token.symbol}
-          <ChevronDown className={clsx("size-3.5 transition-transform", open && "rotate-180")} />
+          <Coins className="size-3.5 shrink-0" />
+          <span className="truncate">Tokens{item.keywords[0] && ` · ${item.keywords[0]}`}</span>
+          <ChevronDown className={clsx("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
         </button>
       </div>
-      {open && <Namesakes token={item.token} />}
+      {open && <Namesakes keywords={item.keywords} />}
     </li>
   );
 }
 
-/** Headlines that name the tokens on Rankr, newest first: a headline and a link, nothing more. */
+/** What's in the news right now, newest first, or a search: a headline and a link, and the tokens named after it. */
 export function News() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const token = params.get("token");
-  // All tokens: what to pick from. One token: its own headlines (and its name, if it isn't among them).
-  const all = useNews(null);
-  const picked = useNews(token);
-  const { items, isLoading } = token ? picked : all;
+  const q = params.get("q") ?? "";
+  const [draft, setDraft] = useState(q);
+  const { items, error, isLoading } = useNews(q);
 
-  const named = new Set(all.items.map((n) => n.token.id));
-  const options = all.tokens.filter((t) => named.has(t.id) || t.id === token);
-  const current = picked.tokens.find((t) => t.id === token);
-  if (current && !options.some((t) => t.id === current.id)) options.unshift(current);
-
-  function pick(id: string) {
-    router.replace(id === "all" ? pathname : `${pathname}?token=${encodeURIComponent(id)}`, { scroll: false });
-  }
+  // The search goes in the URL after a pause in typing.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const next = draft.trim();
+      if (next !== q) router.replace(next ? `${pathname}?q=${encodeURIComponent(next)}` : pathname, { scroll: false });
+    }, 400);
+    return () => clearTimeout(id);
+  }, [draft, q, pathname, router]);
 
   return (
     <div className="pt-10 sm:pt-14">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">News</h1>
-      <p className="mt-1.5 text-sm text-muted">Headlines that name the tokens on Rankr. Pick a token to see only its own.</p>
-
-      <div className="relative mt-6 sm:w-72">
-        <select
-          value={token ?? "all"}
-          onChange={(e) => pick(e.target.value)}
-          aria-label="Token"
-          className="h-9 w-full cursor-pointer appearance-none rounded-md border border-border bg-bg pr-8 pl-3 text-sm text-fg outline-none transition-colors hover:bg-surface-2 focus-visible:border-border-strong"
-        >
-          <option value="all">All tokens</option>
-          {options.map((t) => (
-            <option key={t.id} value={t.id}>
-              ${t.symbol} · {t.name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-subtle" />
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">News</h1>
+        {!q && (
+          <span className="label inline-flex items-center gap-1.5 text-subtle">
+            <span className="relative flex size-1.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-50" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-up" />
+            </span>
+            Live
+          </span>
+        )}
       </div>
+      <p className="mt-1.5 text-sm text-muted">What&apos;s in the news right now. Tokens shows every token named after a story.</p>
+
+      <label className="mt-6 flex h-9 w-full items-center gap-2 rounded-md border border-border px-3 transition-colors focus-within:border-border-strong sm:max-w-sm">
+        <Search className="size-3.5 text-subtle" />
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Search the news"
+          maxLength={100}
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-subtle"
+        />
+      </label>
 
       <div className="mt-4">
         {isLoading && !items.length ? (
@@ -166,11 +211,9 @@ export function News() {
         ) : !items.length ? (
           <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
             <Newspaper className="mx-auto size-5 text-subtle" />
-            <p className="mt-3 font-medium">No headlines yet</p>
+            <p className="mt-3 font-medium">{q ? `No headlines for “${q}”` : "No headlines right now"}</p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-              {current
-                ? `Nothing in the news names $${current.symbol} yet.`
-                : "Nothing in the news names the tokens on the board yet."}
+              {error ? "Couldn't reach the news. Trying again shortly." : q ? "Try other words." : "Check back in a minute."}
             </p>
           </div>
         ) : (
@@ -180,9 +223,6 @@ export function News() {
             ))}
           </ul>
         )}
-        <p className="mt-3 font-mono text-[11px] text-subtle">
-          headlines from Google News, matched by the token&apos;s name or $ticker · each opens the article
-        </p>
       </div>
     </div>
   );
