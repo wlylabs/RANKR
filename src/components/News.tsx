@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
-import { passes, setTokenFilters, TXNS_STEPS, USD_STEPS, useTokenFilters, type TokenFilters } from "@/lib/token-filters";
+import { passes } from "@/lib/token-filters";
 import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
 import { ChainTag } from "./Chain";
 import { Tab } from "./Leaderboard";
@@ -68,45 +68,6 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
   );
 }
 
-/** "any", "$1K", "$10K", "$100K", "$1M" (or a count, for transactions). */
-function stepLabel(value: number, usd: boolean): string {
-  if (!value) return "any";
-  const short = value >= 1_000_000 ? `${value / 1_000_000}M` : value >= 1_000 ? `${value / 1_000}K` : String(value);
-  return usd ? `$${short}` : short;
-}
-
-/** The minimums a token must meet to be listed, the same for every story (kept in this browser). */
-function Minimums({ filters }: { filters: TokenFilters }) {
-  const fields: [keyof TokenFilters, readonly number[], boolean][] = [
-    ["mc", USD_STEPS, true],
-    ["vol", USD_STEPS, true],
-    ["liq", USD_STEPS, true],
-    ["txns", TXNS_STEPS, false],
-  ];
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-3 py-2 font-mono text-[11px] text-subtle">
-      <span>min</span>
-      {fields.map(([key, steps, usd]) => (
-        <label key={key} className="inline-flex items-center gap-1">
-          {key}
-          <select
-            value={filters[key]}
-            onChange={(e) => setTokenFilters({ ...filters, [key]: Number(e.target.value) })}
-            aria-label={`Minimum ${key}`}
-            className="h-6 cursor-pointer rounded border border-border bg-bg px-1 text-[11px] text-fg outline-none hover:bg-surface-2 focus-visible:border-border-strong"
-          >
-            {steps.map((v) => (
-              <option key={v} value={v}>
-                {stepLabel(v, usd)}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
-    </div>
-  );
-}
-
 /**
  * Every token named after a story: pick one of the names in the headline (the likeliest is picked) or type
  * another, then pick a token by its numbers. Many tokens share a name or a ticker.
@@ -117,8 +78,8 @@ function Namesakes({ keywords }: { keywords: string[] }) {
   const [showAll, setShowAll] = useState(false);
   const found = useNamesakes(keyword);
   const { error, isLoading } = found;
-  const filters = useTokenFilters();
-  const kept = found.items.filter((n) => passes(n.market, filters));
+  // Dead tokens stay out ($1K market cap, volume and liquidity), and can still be shown.
+  const kept = found.items.filter((n) => passes(n.market));
   const items = showAll ? found.items : kept;
   const hidden = found.items.length - kept.length;
 
@@ -156,7 +117,6 @@ function Namesakes({ keywords }: { keywords: string[] }) {
           />
         </form>
       </div>
-      <Minimums filters={filters} />
       {!keyword ? (
         <p className="px-3 py-4 text-sm text-muted">Type a name to see the tokens named after it.</p>
       ) : (
@@ -168,7 +128,7 @@ function Namesakes({ keywords }: { keywords: string[] }) {
             <p className="px-3 py-4 text-sm text-down">Couldn&apos;t load the tokens. Try again in a moment.</p>
           ) : !items.length ? (
             <p className="px-3 py-4 text-sm text-muted">
-              {hidden ? "Every token named like this is below the minimums." : "No token named like this on DexScreener yet."}
+              {hidden ? "Every token named like this is below $1K market cap, volume or liquidity." : "No token named like this on DexScreener yet."}
             </p>
           ) : (
             <div className="mt-1 divide-y divide-border">
@@ -183,7 +143,7 @@ function Namesakes({ keywords }: { keywords: string[] }) {
               onClick={() => setShowAll(!showAll)}
               className="w-full border-t border-border px-3 py-2 text-left font-mono text-[11px] text-subtle transition-colors hover:text-fg"
             >
-              {showAll ? "hide the ones below the minimums" : `${hidden} more below the minimums · show them`}
+              {showAll ? "hide the ones below $1K" : `${hidden} more below $1K mc, vol or liq · show them`}
             </button>
           )}
         </>

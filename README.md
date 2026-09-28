@@ -69,11 +69,10 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   together: "Bukang-i", "Bukangi"), most liquid first, each with chain, address, age, market cap, 24h volume,
   liquidity, 24h transactions and 24h change, and Rankr's multiple for the ones it tracks. Many tokens share a
   name or a ticker, so the reader picks one (it opens its page on Rankr, to watch or call it). Dead tokens stay
-  out: minimums for market cap, 24h volume, liquidity and 24h transactions (as DexScreener's and GMGN's
-  screeners filter), $1K each by default and any number of transactions, set in the Tokens panel and kept in the
-  browser for every story. A number the DEX doesn't give (a pump.fun token on its bonding curve has no
-  liquidity) doesn't count against a token; the ones below the minimums can still be shown. With
-  `RANKR_MOCK=1`, made-up stories.
+  out: under $1K market cap, 24h volume or liquidity (the minimums DexScreener's and GMGN's screeners filter
+  by), with no filter controls; a line under the list shows them on demand. A number the DEX doesn't give (a
+  pump.fun token on its bonding curve has no liquidity) doesn't count against a token. With `RANKR_MOCK=1`,
+  made-up stories.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
