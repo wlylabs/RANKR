@@ -90,12 +90,15 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
-- **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, three steps and a
-  four-question FAQ. English only: Rankr is for DEX traders everywhere.
+- **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, the board's top 5
+  runners live (the product itself, no copy), three steps and a five-question FAQ. English only: Rankr is for DEX
+  traders everywhere.
   The app itself is at **`/app`**.
 - **Home** (`/app`): signed out, the headline and the paste box; signed in, the paste box and your place on the
   caller board (with your best call), without the headline. Then this month (the countdown to the reset and the
   board's totals) and three panels: top callers, top runners and the latest milestones.
+- **Track** (the header button, or **⌘K / Ctrl+K** from anywhere in the app): the paste box, as a sheet from the
+  bottom on phones and a dialog from sm up.
 - **Settings menu** (the gear in the header): theme (switching cross-fades the page), milestone alerts, About
   Rankr (the landing page) or Open app, Install app and the app link. It keeps pages free of app buttons.
 - **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
@@ -115,13 +118,27 @@ hairline borders), "decrypted text" reveal effects, and hash visualizations such
 - **UI**: black / white / grays, color only for P&L (green up, red down). No token icons: tokens are shown as
   ticker + name. A multiple that moves on a live refresh flashes green or red. Geist Sans for text, Geist Mono for numbers, addresses and hashes. The hero headline and the
   big multiple "decrypt" out of random hex on first load (skipped with reduced motion).
+- **Depth**, still monochrome: panels (the `card` utility) are hairlines lit from above in the dark theme (a
+  faint wash down from the top edge, which catches the light) and sit on the softest shadow in the light one;
+  what floats over the page (menus, the Track dialog, your pinned rank) casts a real shadow (`shadow-float`). In
+  the dark, a soft key light falls over the top of every app page. The token page's big multiple lights its own
+  card, green or red. One monochrome ring marks keyboard focus everywhere.
 - **Motion** (cinematic, `src/app/globals.css` + `src/components/Cinema.tsx`), with Material 3 easing
   (emphasized decelerate for arrivals) and everything off with reduced motion:
   - the landing hero opens like a title sequence: a dot-matrix "hash field" (lit cells from `SHA-256("rankr")`,
     breathing, framing the text), each line arriving out of a blur in turn, a light that follows the pointer,
     faint film grain; scrolling away, the hero drifts up and dims (scroll-driven, Chromium);
+  - under it, the board's top runners stand tipped back like a screen on a desk and swing upright as they scroll
+    into view, the counter-move to the hero pulling away (scroll-driven, Chromium);
   - sections below arrive as they scroll into view;
-  - app pages settle in on every navigation (`(app)/template.tsx`);
+  - app pages settle in on every navigation (`(app)/template.tsx`): the title, then the line under it, then
+    lists cascading in row by row (`Cascade`; only on first show, so live re-ranks and new rows don't replay it);
+    whole-number stats count up (`CountUp`); loading rows shimmer;
+  - tab underlines, segmented controls and the header nav's current-page line glide to the picked option
+    (`src/components/Tabs.tsx`); a pill follows the pointer across the header nav; the phone's bottom nav marks
+    the current page with Material 3's indicator pill, opening out from the icon;
+  - menus open out of their corner; Track rises as a sheet on phones and settles in as a dialog from sm up, over a
+    blurred page, and plays backwards on close (where the browser can animate the top layer);
   - switching theme opens the new theme as a circle from the toggle (View Transitions).
 - Colors live as CSS variables in `src/app/globals.css` (dark and light).
 

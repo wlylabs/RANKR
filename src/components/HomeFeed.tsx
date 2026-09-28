@@ -10,8 +10,11 @@ import { monthLabel, nextResetAt, resetDay, untilLabel } from "@/lib/season";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
 import { CallerRateRow } from "./CallersBoard";
+import { Cascade } from "./Cinema";
+import { CountUp } from "./CountUp";
 import { FeedRow } from "./Feed";
 import { RankCard } from "./MyCalls";
+import { LiveDot } from "./PageHeader";
 import { PasteBox } from "./PasteBox";
 import { ListSkeleton, TokenRow } from "./TokenList";
 
@@ -40,11 +43,8 @@ export function LiveStatus() {
   const { stats } = useStats();
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted">
-      <span className="relative flex size-1.5">
-        <span className="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-50" />
-        <span className="relative inline-flex size-1.5 rounded-full bg-up" />
-      </span>
-      <span className="tabular">{stats ? stats.total.toLocaleString("en-US") : "…"}</span>
+      <LiveDot />
+      <span className="tabular">{stats ? <CountUp value={stats.total} /> : "…"}</span>
       tokens tracked live
     </span>
   );
@@ -62,14 +62,14 @@ function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: 
 
 function Panel({ title, href, children }: { title: string; href: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-border">
+    <section className="min-w-0 overflow-hidden card">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <h2 className="text-sm font-medium">{title}</h2>
         <Link href={href} className="text-xs text-muted hover:text-fg">
           View all
         </Link>
       </div>
-      <div className="divide-y divide-border">{children}</div>
+      {children}
     </section>
   );
 }
@@ -85,11 +85,11 @@ function StatsGrid() {
   const pct = (n: number) => (stats?.total ? `${Math.round((n / stats.total) * 100)}% of all pastes` : "—");
 
   return (
-    <div className="grid grid-cols-2 divide-border rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x">
-      <Stat label="Tracked" value={stats ? stats.total.toLocaleString("en-US") : "…"} hint="tokens since first paste" />
+    <div className="grid grid-cols-2 divide-border card max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x">
+      <Stat label="Tracked" value={stats ? <CountUp value={stats.total} /> : "…"} hint="tokens since first paste" />
       <Stat
         label="Hit 2x+"
-        value={stats ? stats.doubled.toLocaleString("en-US") : "…"}
+        value={stats ? <CountUp value={stats.doubled} /> : "…"}
         hint={stats ? pct(stats.doubled) : "—"}
       />
       <Stat
@@ -107,7 +107,15 @@ function StatsGrid() {
       />
       <Stat
         label="In the red"
-        value={stats ? <span className={clsx(stats.inRed && "text-down")}>{stats.inRed.toLocaleString("en-US")}</span> : "…"}
+        value={
+          stats ? (
+            <span className={clsx(stats.inRed && "text-down")}>
+              <CountUp value={stats.inRed} />
+            </span>
+          ) : (
+            "…"
+          )
+        }
         hint="below entry right now"
       />
     </div>
@@ -135,7 +143,11 @@ function TopCallers() {
       {isLoading ? (
         <ListSkeleton rows={PANEL_ROWS} />
       ) : callers.length ? (
-        callers.slice(0, PANEL_ROWS).map((c, i) => <CallerRateRow key={c.userId} c={c} rank={i + 1} />)
+        <Cascade className="divide-y divide-border">
+          {callers.slice(0, PANEL_ROWS).map((c, i) => (
+            <CallerRateRow key={c.userId} c={c} rank={i + 1} />
+          ))}
+        </Cascade>
       ) : (
         <Empty>Nobody has the 5 calls a hit rate needs yet.</Empty>
       )}
@@ -150,7 +162,11 @@ function TopRunners() {
       {isLoading ? (
         <ListSkeleton rows={PANEL_ROWS} />
       ) : tokens.length ? (
-        tokens.map((t, i) => <TokenRow key={t.id} token={t} rank={i + 1} meta="peak" />)
+        <Cascade className="divide-y divide-border">
+          {tokens.map((t, i) => (
+            <TokenRow key={t.id} token={t} rank={i + 1} meta="peak" />
+          ))}
+        </Cascade>
       ) : (
         <Empty />
       )}
@@ -165,7 +181,11 @@ function Milestones() {
       {isLoading ? (
         <ListSkeleton rows={PANEL_ROWS} />
       ) : items.length ? (
-        items.map((item) => <FeedRow key={item.id} item={item} />)
+        <Cascade className="divide-y divide-border">
+          {items.map((item) => (
+            <FeedRow key={item.id} item={item} />
+          ))}
+        </Cascade>
       ) : (
         <Empty>No call has hit 2x yet this month.</Empty>
       )}
@@ -181,7 +201,11 @@ function JustPasted() {
       {isLoading ? (
         <ListSkeleton rows={PANEL_ROWS} />
       ) : tokens.length ? (
-        tokens.map((t) => <TokenRow key={t.id} token={t} />)
+        <Cascade className="divide-y divide-border">
+          {tokens.map((t) => (
+            <TokenRow key={t.id} token={t} />
+          ))}
+        </Cascade>
       ) : (
         <Empty />
       )}

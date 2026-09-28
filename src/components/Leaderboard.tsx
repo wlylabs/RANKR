@@ -3,23 +3,17 @@
 import clsx from "clsx";
 import { ChevronDown, RefreshCw, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { chainMeta } from "@/lib/chains";
 import { useNow, useStats, useTokenPages } from "@/lib/hooks";
-import {
-  CALLER_SORTS,
-  parseCallerSort,
-  parseRange,
-  parseSort,
-  RANGES,
-  SORT_KEYS,
-  type RangeKey,
-  type SortKey,
-} from "@/lib/params";
+import { parseCallerSort, parseRange, parseSort, type RangeKey, type SortKey } from "@/lib/params";
 import { nextResetAt, resetDay, untilLabel } from "@/lib/season";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { CALLER_SORT_LABELS, CallersBoard } from "./CallersBoard";
+import { Cascade } from "./Cinema";
 import { LastMonth } from "./LastMonth";
+import { PageHeader } from "./PageHeader";
+import { Segmented, TabBar } from "./Tabs";
 import { ListSkeleton, TokenRow, TokenTable } from "./TokenList";
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -29,6 +23,9 @@ const SORT_LABELS: Record<SortKey, string> = {
   new: "Newest",
   hot: "Most pasted",
 };
+
+// With the monthly reset, everything on the board is from this month.
+const RANGE_LABELS: Record<RangeKey, string> = { "24h": "24h", "7d": "7d", all: accountsAvailable ? "month" : "all" };
 
 const PAGE = 50;
 
@@ -49,63 +46,6 @@ const DESCRIPTIONS: Record<Month, Record<Board, string>> = {
     callers: "Last month's top 10 callers by hit rate, kept when the boards reset.",
   },
 };
-
-function Segmented<K extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: Record<K, string>;
-  value: K;
-  onChange: (key: K) => void;
-}) {
-  return (
-    <div className="flex h-8 items-center rounded-md border border-border p-0.5" role="tablist" aria-label={label}>
-      {(Object.keys(options) as K[]).map((key) => (
-        <button
-          key={key}
-          type="button"
-          role="tab"
-          aria-selected={value === key}
-          onClick={() => onChange(key)}
-          className={clsx(
-            "h-full rounded px-3 text-xs whitespace-nowrap transition-colors",
-            value === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
-          )}
-        >
-          {options[key]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  // On a phone the row scrolls: keep the selected tab in view (e.g. opened on "Most pasted").
-  useEffect(() => {
-    if (active) ref.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [active]);
-  return (
-    <button
-      ref={ref}
-      type="button"
-      role="tab"
-      onClick={onClick}
-      aria-selected={active}
-      className={clsx(
-        "relative h-10 shrink-0 text-sm whitespace-nowrap transition-colors",
-        active
-          ? "text-fg after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-fg"
-          : "text-muted hover:text-fg",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 export function Leaderboard() {
   const params = useSearchParams();
@@ -157,8 +97,7 @@ export function Leaderboard() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
-      <p className="mt-1.5 text-sm text-muted">{DESCRIPTIONS[month][board]}</p>
+      <PageHeader title="Leaderboard">{DESCRIPTIONS[month][board]}</PageHeader>
 
       {accountsAvailable && (
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
@@ -192,30 +131,24 @@ export function Leaderboard() {
         <LastMonth board={board} />
       ) : board === "callers" ? (
         <>
-          <div
-            className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
-            role="tablist"
-          >
-            {CALLER_SORTS.map((key) => (
-              <Tab key={key} active={callerSort === key} onClick={() => setParam("by", key, "rate")}>
-                {CALLER_SORT_LABELS[key]}
-              </Tab>
-            ))}
-          </div>
+          <TabBar
+            label="Sort callers"
+            options={CALLER_SORT_LABELS}
+            value={callerSort}
+            onChange={(key) => setParam("by", key, "rate")}
+            className="mt-6"
+          />
           <CallersBoard sort={callerSort} />
         </>
       ) : (
         <>
-          <div
-            className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
-            role="tablist"
-          >
-            {SORT_KEYS.map((key) => (
-              <Tab key={key} active={sort === key} onClick={() => setParam("sort", key, "top")}>
-                {SORT_LABELS[key]}
-              </Tab>
-            ))}
-          </div>
+          <TabBar
+            label="Sort tokens"
+            options={SORT_LABELS}
+            value={sort}
+            onChange={(key) => setParam("sort", key, "top")}
+            className="mt-6"
+          />
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
             <label className="flex h-9 w-full items-center gap-2 rounded-md border border-border px-3 transition-colors focus-within:border-border-strong sm:max-w-xs">
@@ -228,23 +161,15 @@ export function Leaderboard() {
               />
             </label>
             <div className="flex items-center gap-2 sm:ml-auto">
-              <div className="flex h-9 items-center rounded-md border border-border p-0.5">
-                {(Object.keys(RANGES) as RangeKey[]).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setParam("range", key, "all")}
-                    aria-pressed={range === key}
-                    className={clsx(
-                      "h-full rounded px-2.5 font-mono text-[11px] uppercase transition-colors",
-                      range === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
-                    )}
-                  >
-                    {/* With the monthly reset, everything on the board is from this month. */}
-                    {key === "all" && accountsAvailable ? "month" : key}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                label="Range"
+                pressed
+                options={RANGE_LABELS}
+                value={range}
+                onChange={(key) => setParam("range", key, "all")}
+                className="h-9"
+                optionClassName="px-2.5 font-mono text-[11px] uppercase"
+              />
               {/* The native picker (best on phones), styled like the other controls. */}
               <div className="relative min-w-0 flex-1 sm:flex-none">
                 <select
@@ -267,7 +192,7 @@ export function Leaderboard() {
 
           <div className="mt-4">
             {loading ? (
-              <div className="rounded-lg border border-border">
+              <div className="card">
                 <ListSkeleton rows={8} />
               </div>
             ) : !tokens.length ? (
@@ -284,11 +209,11 @@ export function Leaderboard() {
                 <div className="hidden md:block">
                   <TokenTable tokens={tokens} />
                 </div>
-                <div className="divide-y divide-border overflow-hidden rounded-lg border border-border md:hidden">
+                <Cascade className="divide-y divide-border overflow-hidden card md:hidden">
                   {tokens.map((t, i) => (
                     <TokenRow key={t.id} token={t} rank={i + 1} meta={sort === "peak" ? "peak" : "pasted"} />
                   ))}
-                </div>
+                </Cascade>
                 {total > tokens.length && (
                   <button
                     type="button"

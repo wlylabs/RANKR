@@ -138,7 +138,7 @@ export function ProfileSection({ about }: { about: CallerAbout }) {
 
   const errorOf = (field: keyof ProfileInput) => (problem?.field === field ? problem.error : null);
   return (
-    <section className="mt-6 rounded-lg border border-border p-5">
+    <section className="mt-6 card p-5">
       <h2 className="text-sm font-medium">Profile</h2>
       <p className="mt-1 mb-5 text-sm text-muted">What people see on your caller page, next to your calls.</p>
       <form onSubmit={submit} className="space-y-5">
@@ -225,7 +225,7 @@ export function XVerify({ userId, username, about }: { userId: string; username:
 
   if (about.xVerified) {
     return (
-      <section className="mt-6 rounded-lg border border-border p-5">
+      <section className="mt-6 card p-5">
         <h2 className="flex items-center gap-1.5 text-sm font-medium">
           <XLogo className="size-3" /> X account
         </h2>

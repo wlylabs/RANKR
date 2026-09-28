@@ -106,7 +106,7 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
           id={panelId}
           role="group"
           aria-label="Settings"
-          className="animate-fade-in fixed inset-x-4 top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-50 overflow-hidden rounded-lg border border-border bg-bg shadow-lg sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-72"
+          className="animate-pop-in fixed inset-x-4 top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] z-50 overflow-hidden rounded-lg border border-border bg-bg shadow-float sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-72"
         >
           <div className="flex items-center justify-between gap-3 px-3 py-2.5">
             <span className="text-sm text-muted">Theme</span>

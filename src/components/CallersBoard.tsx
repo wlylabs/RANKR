@@ -9,6 +9,7 @@ import { MIN_CALLS_RANKED, minCallsFor, type CallerSort } from "@/lib/params";
 import type { CallerView, MyRankResponse } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { Cascade } from "./Cinema";
 import { MultipleBadge } from "./MultipleBadge";
 import { OfficialBadge } from "./OfficialBadge";
 import { ListSkeleton } from "./TokenList";
@@ -117,7 +118,7 @@ function MyRank({ sort }: { sort: CallerSort }) {
 
   return (
     <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 mt-3 md:bottom-4">
-      <div className="flex items-center gap-3 rounded-lg border border-border-strong bg-bg/90 px-4 py-3 shadow-lg backdrop-blur-md">
+      <div className="flex items-center gap-3 rounded-lg border border-border-strong bg-bg/90 px-4 py-3 shadow-float backdrop-blur-md">
         <span className="tabular w-6 shrink-0 font-mono text-xs text-fg" title={rank ? `#${rank} of ${total}` : "not ranked yet"}>
           {rank ? rankLabel(rank) : "—"}
         </span>
@@ -144,7 +145,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
         </p>
       )}
       {loading ? (
-        <div className="rounded-lg border border-border">
+        <div className="card">
           <ListSkeleton rows={6} />
         </div>
       ) : !callers.length ? (
@@ -156,7 +157,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
         </div>
       ) : (
         <>
-          <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+          <div className="hidden overflow-hidden card md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="label border-b border-border text-left text-subtle">
@@ -170,7 +171,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
                   <th className="py-2.5 pr-4 text-right font-normal">Best call</th>
                 </tr>
               </thead>
-              <tbody className="font-mono text-[13px]">
+              <Cascade as="tbody" className="font-mono text-[13px]">
                 {callers.map((c, i) => (
                   <tr key={c.userId} className={clsx("border-b border-border last:border-0", c.userId === userId && "bg-surface-2")}>
                     <td className={clsx("tabular py-3 pl-4 text-xs", i < 3 ? "text-fg" : "text-subtle")}>{rankLabel(i + 1)}</td>
@@ -189,11 +190,11 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
                     </td>
                   </tr>
                 ))}
-              </tbody>
+              </Cascade>
             </table>
           </div>
 
-          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border md:hidden">
+          <Cascade as="ul" className="divide-y divide-border overflow-hidden card md:hidden">
             {callers.map((c, i) => (
               <li key={c.userId} className={clsx("flex items-center gap-3 px-4 py-3", c.userId === userId && "bg-surface-2")}>
                 <span className={clsx("tabular w-6 shrink-0 font-mono text-xs", i < 3 ? "text-fg" : "text-subtle")}>
@@ -209,7 +210,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
                 <SortValue sort={sort} c={c} />
               </li>
             ))}
-          </ul>
+          </Cascade>
 
           {total > callers.length && (
             <button

@@ -15,7 +15,7 @@ const HIT =
 
 function Card({ title, readout, children }: { title: string; readout: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-border p-4">
+    <section className="card p-4">
       <h2 className="label text-subtle">{title}</h2>
       {/* The hovered or focused mark's numbers, else the summary. */}
       <p aria-live="polite" className="mt-1 min-h-4 truncate font-mono text-xs text-muted">

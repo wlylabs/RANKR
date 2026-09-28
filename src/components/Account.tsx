@@ -7,6 +7,7 @@ import { APP_HOME, loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { KeyReveal, KeySignInForm } from "./Key";
 import { OfficialBadge } from "./OfficialBadge";
+import { PageHeader } from "./PageHeader";
 import { ProfileSection, XVerify } from "./ProfileForm";
 import { UsernameForm } from "./UsernameForm";
 
@@ -40,17 +41,16 @@ export function Account() {
   const keyProps = { username, shownKey, setShownKey };
   return (
     <div className="mx-auto max-w-lg pt-10 sm:pt-14">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Account</h1>
-      <p className="mt-1.5 text-sm text-muted">
+      <PageHeader title="Account">
         You are <span className="font-mono text-fg">@{username}</span>
         {official && <OfficialBadge className="ml-1" />} on the caller board
         {official ? ", as an official account." : hasKey ? "." : ", as a guest."}
-      </p>
+      </PageHeader>
 
       {hasKey && !shownKey ? <KeySection {...keyProps} /> : <SaveKey {...keyProps} />}
 
       {official ? (
-        <section className="mt-6 rounded-lg border border-border p-5">
+        <section className="mt-6 card p-5">
           <h2 className="flex items-center gap-1.5 text-sm font-medium">
             <OfficialBadge /> Official account
           </h2>
@@ -60,7 +60,7 @@ export function Account() {
           </p>
         </section>
       ) : (
-        <section className="mt-6 rounded-lg border border-border p-5">
+        <section className="mt-6 card p-5">
           <h2 className="text-sm font-medium">Change username</h2>
           <p className="mt-1 mb-5 text-sm text-muted">Your calls move with you. The old name becomes free for others.</p>
           <UsernameForm key={username} initial={username} current={username} submitLabel="Save username" onSaved={() => setSaved(true)} />
@@ -197,7 +197,7 @@ function KeySection({ setShownKey }: KeyProps) {
   const [confirm, setConfirm] = useState(false);
 
   return (
-    <section className="mt-8 rounded-lg border border-border p-5">
+    <section className="mt-8 card p-5">
       <h2 className="text-sm font-medium">Sign-in key</h2>
       <p className="mt-1 text-sm text-muted">
         Your key is the only way back into this account. Rankr keeps only a hash of it, so it can&apos;t show it again.

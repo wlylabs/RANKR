@@ -26,6 +26,13 @@
   --chart-down: #e5534b;
   --chart-mid: #8f8f8f;
   --chart-up: #116329;
+  /* Depth, still monochrome. A card sits on the page with a hairline and the softest drop; what floats
+     over the page (menus, the Track dialog, the pinned rank) casts a real shadow. */
+  --card-lift: transparent;
+  --card-edge: 0 1px 2px rgb(0 0 0 / 0.04);
+  --float: 0 0 0 1px rgb(0 0 0 / 0.03), 0 12px 32px -8px rgb(0 0 0 / 0.16), 0 3px 8px -3px rgb(0 0 0 / 0.08);
+  /* The light over the top of the app (see .ambient): only in the dark, where there's something to light. */
+  --ambient: transparent;
   color-scheme: light;
 }
 
@@ -45,6 +52,11 @@
   --chart-down: #f85149;
   --chart-mid: #8a8a8a;
   --chart-up: #2ea043;
+  /* In the dark a card is lit from above: a faint wash down from its top edge, which catches the light. */
+  --card-lift: rgb(255 255 255 / 0.018);
+  --card-edge: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --float: 0 0 0 1px rgb(255 255 255 / 0.02), 0 20px 48px -12px rgb(0 0 0 / 0.8), 0 6px 16px -6px rgb(0 0 0 / 0.6);
+  --ambient: rgb(255 255 255 / 0.055);
   color-scheme: dark;
 }
 
@@ -64,6 +76,7 @@
   --color-chart-down: var(--chart-down);
   --color-chart-mid: var(--chart-mid);
   --color-chart-up: var(--chart-up);
+  --shadow-float: var(--float);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   /* Material 3 motion. "emphasized": quick start, long gentle settle (expand / collapse, the theme slide).
@@ -74,6 +87,7 @@
 
 html {
   background: var(--bg);
+  scrollbar-color: var(--border-strong) transparent;
   -webkit-tap-highlight-color: transparent;
   /* Anchor links (e.g. /app#paste) land below the sticky header. */
   scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
@@ -104,6 +118,28 @@ body {
 ::selection {
   background: var(--fg);
   color: var(--bg);
+}
+
+/* Keyboard focus: one monochrome ring everywhere, following each control's corners. In the base layer, so a
+   control that draws its own (an input's border, a chart mark's ring) still wins. */
+@layer base {
+  :focus-visible {
+    outline: 1.5px solid var(--fg);
+    outline-offset: 2px;
+  }
+}
+
+/* A panel: hairline, rounded, and lit per theme (--card-lift, --card-edge). Empty states stay dashed and flat. */
+@utility card {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background-image: linear-gradient(to bottom, var(--card-lift), transparent 10rem);
+  box-shadow: var(--card-edge);
+}
+
+/* The app's key light: a soft wash over the top of every page, like a lamp above a dark set. */
+.ambient {
+  background: radial-gradient(ellipse 70% 100% at 50% 0%, var(--ambient), transparent 70%);
 }
 
 .tabular {
@@ -138,16 +174,137 @@ body {
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
+    transform: translateY(4px);
   }
 }
 
 .animate-fade-in {
-  animation: fade-in 0.18s ease-out;
+  animation: fade-in 0.3s var(--ease-enter) backwards;
+}
+
+/* Menus open out of the corner they hang from (`--origin`), quick and soft. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+    filter: blur(2px);
+  }
+}
+.animate-pop-in {
+  transform-origin: var(--origin, top right);
+  animation: pop-in 0.22s var(--ease-enter) backwards;
+}
+
+/*
+ * The Track dialog (a native <dialog>): a sheet rising from the bottom edge on phones, a card settling in the
+ * middle from sm up, over a dimmed and blurred page. It plays backwards on close where the browser can animate
+ * out of the top layer (allow-discrete); elsewhere it opens with the same motion and simply closes.
+ */
+.sheet {
+  opacity: 0;
+  transform: translateY(100%);
+  transition:
+    opacity 0.2s var(--ease-emphasized),
+    transform 0.45s var(--ease-emphasized),
+    overlay 0.45s allow-discrete,
+    display 0.45s allow-discrete;
+}
+.sheet[open] {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  .sheet[open] {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+@media (min-width: 40rem) {
+  .sheet {
+    transition-duration: 0.25s, 0.35s, 0.35s, 0.35s;
+  }
+  .sheet:not([open]) {
+    transform: translateY(12px) scale(0.97);
+  }
+  @starting-style {
+    .sheet[open] {
+      transform: translateY(12px) scale(0.97);
+    }
+  }
+}
+.sheet::backdrop {
+  background: rgb(0 0 0 / 0);
+  backdrop-filter: blur(0);
+  transition:
+    background-color 0.35s var(--ease-emphasized),
+    backdrop-filter 0.35s var(--ease-emphasized),
+    overlay 0.35s allow-discrete,
+    display 0.35s allow-discrete;
+}
+.sheet[open]::backdrop {
+  background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(6px);
+}
+@starting-style {
+  .sheet[open]::backdrop {
+    background: rgb(0 0 0 / 0);
+    backdrop-filter: blur(0);
+  }
+}
+
+/* A list arriving: its rows rise in one after another (the first dozen staggered, the rest together).
+   Opacity and transform only, so a long board stays cheap. Cascade (Cinema.tsx) drops the class once
+   the list has settled, so live re-ranks and new rows don't replay it. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.cascade > * {
+  animation: rise-in 0.55s var(--ease-enter) backwards;
+  animation-delay: calc(var(--i, 12) * 35ms);
+}
+.cascade > :nth-child(1) { --i: 0; }
+.cascade > :nth-child(2) { --i: 1; }
+.cascade > :nth-child(3) { --i: 2; }
+.cascade > :nth-child(4) { --i: 3; }
+.cascade > :nth-child(5) { --i: 4; }
+.cascade > :nth-child(6) { --i: 5; }
+.cascade > :nth-child(7) { --i: 6; }
+.cascade > :nth-child(8) { --i: 7; }
+.cascade > :nth-child(9) { --i: 8; }
+.cascade > :nth-child(10) { --i: 9; }
+.cascade > :nth-child(11) { --i: 10; }
+.cascade > :nth-child(12) { --i: 11; }
+
+/* Loading placeholders: a slow band of light sweeping across, instead of blinking. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+      90deg,
+      var(--surface-2) 25%,
+      color-mix(in srgb, var(--surface-2), var(--fg) 7%) 50%,
+      var(--surface-2) 75%
+    )
+    0 0 / 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* The big multiple lit in its own direction's color (`--glow`), as if the number were the light source. */
+.pnl-glow {
+  background: radial-gradient(
+    60% 90% at 12% 35%,
+    color-mix(in srgb, var(--glow) 13%, transparent),
+    transparent 70%
+  );
 }
 
 /*
@@ -237,6 +394,23 @@ body {
   }
 }
 
+/* The product shot under the hero: tipped back like a screen on a desk, it swings upright as it scrolls into
+   view, the counter-move to the hero pulling away (scroll-driven; elsewhere it simply stands upright). */
+@keyframes tilt-in {
+  from {
+    opacity: 0.35;
+    transform: perspective(1400px) rotateX(22deg) scale(0.9);
+  }
+}
+@supports (animation-timeline: view()) {
+  .tilt-in {
+    transform-origin: 50% 0;
+    animation: tilt-in linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 42%;
+  }
+}
+
 /* Film grain over the landing page: static, very faint, never in the way of clicks. */
 .grain::after {
   content: "";
@@ -303,8 +477,10 @@ body {
     transition-delay: 0ms !important;
   }
   .hero-exit,
+  .tilt-in,
   .twinkle,
-  .ticker {
+  .ticker,
+  .skeleton {
     animation: none !important;
   }
   .ticker-mask {

@@ -7,6 +7,7 @@ import { useLastSeason, useNow } from "@/lib/hooks";
 import { monthLabel, nextResetAt, resetDay } from "@/lib/season";
 import { CallerRateRow } from "./CallersBoard";
 import { ChainTag } from "./Chain";
+import { Cascade } from "./Cinema";
 import { MultipleBadge } from "./MultipleBadge";
 import { ListSkeleton, TokenName } from "./TokenList";
 
@@ -16,9 +17,11 @@ function List({ title, empty, children }: { title: string; empty: string; childr
   return (
     <section>
       <h2 className="label text-subtle">{title}</h2>
-      <div className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border">
-        {children.length ? children : <p className="px-4 py-6 text-center text-sm text-muted">{empty}</p>}
-      </div>
+      {children.length ? (
+        <Cascade className="mt-2 divide-y divide-border overflow-hidden card">{children}</Cascade>
+      ) : (
+        <p className="mt-2 card px-4 py-6 text-center text-sm text-muted">{empty}</p>
+      )}
     </section>
   );
 }
@@ -30,7 +33,7 @@ export function LastMonth({ board }: { board: "tokens" | "callers" }) {
 
   if (isLoading) {
     return (
-      <div className="mt-6 rounded-lg border border-border">
+      <div className="mt-6 card">
         <ListSkeleton rows={6} />
       </div>
     );

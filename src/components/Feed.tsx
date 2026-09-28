@@ -10,13 +10,15 @@ import { setFeedScope, useFeedScope } from "@/lib/feed-scope";
 import { dayLabel } from "@/lib/format";
 import { useFeedPages, useNow, useStats } from "@/lib/hooks";
 import { loginHref } from "@/lib/login";
-import { FEED_KINDS, FEED_SCOPES, parseFeedKind, parseFeedScope, type FeedKind, type FeedScope } from "@/lib/params";
+import { parseFeedKind, parseFeedScope, type FeedKind, type FeedScope } from "@/lib/params";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import type { FeedItem } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
+import { Cascade } from "./Cinema";
 import { FeedSentence } from "./FeedLine";
-import { Tab } from "./Leaderboard";
 import { MultipleBadge } from "./MultipleBadge";
+import { PageHeader } from "./PageHeader";
+import { Segmented, TabBar } from "./Tabs";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton } from "./TokenList";
 
@@ -129,42 +131,24 @@ export function Feed() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Feed</h1>
-      <p className="mt-1.5 text-sm text-muted">
+      <PageHeader title="Feed" live>
         Every call as it lands, and every call that hits 2x, 5x, 10x and up, each from the caller&apos;s own entry.
-      </p>
+      </PageHeader>
 
       {accountsAvailable && (
-        <div
-          className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
-          role="tablist"
-          aria-label="Callers"
-        >
-          {FEED_SCOPES.map((s) => (
-            <Tab key={s} active={scope === s} onClick={() => pickScope(s)}>
-              {SCOPE_LABELS[s]}
-            </Tab>
-          ))}
-        </div>
+        <TabBar label="Callers" options={SCOPE_LABELS} value={scope} onChange={pickScope} className="mt-6" />
       )}
 
       <div className="mt-4 flex items-center gap-2">
-        <div className="flex h-9 items-center rounded-md border border-border p-0.5" role="group" aria-label="Kind">
-          {FEED_KINDS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setParam("kind", k, "all")}
-              aria-pressed={kind === k}
-              className={clsx(
-                "h-full rounded px-2.5 text-xs transition-colors",
-                kind === k ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
-              )}
-            >
-              {KIND_LABELS[k]}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Kind"
+          pressed
+          options={KIND_LABELS}
+          value={kind}
+          onChange={(k) => setParam("kind", k, "all")}
+          className="h-9"
+          optionClassName="px-2.5 text-xs"
+        />
         <div className="relative ml-auto min-w-0 flex-1 sm:flex-none">
           <select
             value={chain}
@@ -189,7 +173,7 @@ export function Feed() {
           <button
             type="button"
             onClick={showNew}
-            className="animate-fade-in mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg shadow-lg transition-opacity hover:opacity-85"
+            className="animate-fade-in mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg shadow-float transition-opacity hover:opacity-85"
           >
             <ArrowUp className="size-3.5" />
             {fresh} new
@@ -211,7 +195,7 @@ export function Feed() {
             }
           />
         ) : loading ? (
-          <div className="rounded-lg border border-border">
+          <div className="card">
             <ListSkeleton rows={8} />
           </div>
         ) : !shown.length ? (
@@ -231,11 +215,11 @@ export function Feed() {
               {byDay(shown, now).map((day) => (
                 <section key={day.label} aria-label={day.label}>
                   <h2 className="label mb-2 text-subtle">{day.label}</h2>
-                  <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                  <Cascade className="divide-y divide-border overflow-hidden card">
                     {day.items.map((item) => (
                       <FeedRow key={item.id} item={item} />
                     ))}
-                  </div>
+                  </Cascade>
                 </section>
               ))}
             </div>
