@@ -33,15 +33,6 @@ function inTab(items: NewsItem[], tab: TabKey): NewsItem[] {
 }
 
 const TIER_LABELS: Record<CapTier, string> = { high: "high cap", mid: "mid cap", low: "low cap" };
-/**
- * Each tier's color (globals.css), solid like the official check badge (OfficialBadge): filled with the color,
- * the text cut out in the page's background color.
- */
-const TIER_COLORS: Record<CapTier, string> = {
-  high: "border-tier-high bg-tier-high text-bg",
-  mid: "border-tier-mid bg-tier-mid text-bg",
-  low: "border-tier-low bg-tier-low text-bg",
-};
 
 /** A token named after a story: who it is (chain, address, age) and its market, linking to its page on Rankr. */
 function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
@@ -51,9 +42,11 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <TokenName symbol={m.symbol} name={m.name} className="min-w-0" />
+          {/* Black and white like the official check badge (OfficialBadge): filled with the text color, the
+              label cut out in the background color. */}
           {tier && (
             <span
-              className={clsx("shrink-0 rounded border px-1 font-mono text-[10px] leading-4", TIER_COLORS[tier])}
+              className="shrink-0 rounded border border-fg bg-fg px-1 font-mono text-[10px] leading-4 text-bg"
               title={tier === "high" ? "$1M and up" : tier === "mid" ? "$69K to $1M: past pump.fun's bonding curve" : "under $69K"}
             >
               {TIER_LABELS[tier]}

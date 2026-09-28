@@ -5,8 +5,7 @@
 @custom-variant standalone (@media (display-mode: standalone));
 
 /*
- * Monochrome system: the UI is black / white / greys, color is reserved for P&L, and for the cap tier tags
- * (News), in hues kept apart from P&L's green and red.
+ * Monochrome system: the UI is black / white / greys, color is reserved for P&L.
  * Hairline borders do the structuring work instead of filled cards.
  */
 :root {
@@ -27,12 +26,6 @@
   --chart-down: #e5534b;
   --chart-mid: #8f8f8f;
   --chart-up: #116329;
-  /* Cap tiers (src/lib/token-filters.ts): Primer's attention (yellow: the riskiest), accent (blue) and done
-     (purple) colors, one step darker than its light theme's (yellow-5, blue-5, purple-5). Tags are filled with
-     them, with text in --bg: 7:1 or more here, 6.4:1 or more in the dark theme. */
-  --tier-low: #7d4e00;
-  --tier-mid: #0550ae;
-  --tier-high: #6639ba;
   color-scheme: light;
 }
 
@@ -52,9 +45,6 @@
   --chart-down: #f85149;
   --chart-mid: #8a8a8a;
   --chart-up: #2ea043;
-  --tier-low: #d29922;
-  --tier-mid: #4493f8;
-  --tier-high: #ab7df8;
   color-scheme: dark;
 }
 
@@ -74,9 +64,6 @@
   --color-chart-down: var(--chart-down);
   --color-chart-mid: var(--chart-mid);
   --color-chart-up: var(--chart-up);
-  --color-tier-low: var(--tier-low);
-  --color-tier-mid: var(--tier-mid);
-  --color-tier-high: var(--tier-high);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   /* Material 3 motion. "emphasized": quick start, long gentle settle (expand / collapse, the theme slide).
