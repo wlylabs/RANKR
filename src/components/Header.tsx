@@ -15,7 +15,7 @@ export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
   { href: "/feed", label: "Feed", icon: Radio },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { href: "/me", label: "My calls", icon: UserRound },
+  { href: "/me", label: "You", icon: UserRound },
 ];
 
 function isActive(pathname: string, href: string) {

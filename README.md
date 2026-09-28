@@ -27,7 +27,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   **guest** in one click; save a **key** (`rk-7F3A-K9QX-2MPD-W8HT-ZC4N`) any time to sign in on any device.
   No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
   and can rename itself.
-- **My calls**: every token you pasted, measured from *your* paste.
+- **You** (`/me`): your name, bio and links as on your public profile, your place on the caller board (and how
+  far the caller one place up is), and three tabs: **Calls** (every token you pasted, measured from *your*
+  paste), **Stats** (the charts of your public profile) and **Watchlist**. The tab is in the URL (`?tab=stats`).
 - **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Signed
   in, your place stays pinned under the board: your rank and how far behind the caller one place up you are
   (or how many calls you still need to be ranked). Each caller has a public profile at `/u/<username>` with their
@@ -42,7 +44,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone or top callers (the top 25 of
   the caller board), by calls or milestones, and by chain. The ticker shows the filter picked on the feed page.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
-  under My calls → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
+  under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
   new milestone (2x, 3x, 5x, 10x...), while Rankr is open. A token already past a milestone when first seen
   doesn't alert for it.
@@ -157,7 +159,7 @@ Pasting needs an account. Someone signed out who pastes a CA goes to `/login`:
 
 Either way they land back in the app (`/app`) and the CA they pasted is tracked. Browsing needs no account.
 
-A guest saves a key on `/account` (the header avatar, the account menu, "My calls" and the paste result all
+A guest saves a key on `/account` (the header avatar, the account menu, "You" and the paste result all
 point there until one is saved). The key is shown once, with copy and download, next to a 5x5 dot pattern from
 its hash; the same pattern shows up when the key is pasted to sign in, so the two can be matched at a glance.
 The same page makes a new key: the old one stops working and other devices are signed out.
@@ -232,7 +234,7 @@ How it works:
 - The caller board ranks callers by hit rate (share of calls at 2x+, 5+ calls, the default), average x
   (5+ calls), 2x hits, best call and number of calls.
 - Without the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` vars (local dev), there are no accounts: pasting works
-  for everyone and "My calls" is kept in the browser.
+  for everyone and your calls ("You") are kept in the browser.
 
 ### Official accounts
 
@@ -261,7 +263,7 @@ At **00:00 UTC on the 1st of every month** the boards start from zero: `rankr_en
 and with it every call and milestone. Accounts stay (names, keys, bios, links, verified X accounts). Just before,
 the month's **top 10 callers** (by hit rate, 5+ calls, as on the caller board) and **top 10 tokens** (by peak x
 since the first paste, with who called each first) are kept in `public.seasons`, shown under Leaderboard ->
-Last month. The leaderboard and My calls say when the next reset is.
+Last month. The leaderboard and "You" say when the next reset is.
 
 It runs as a pg_cron job, `rankr-monthly-reset` (`0 0 1 * *`, pg_cron runs in UTC), which `setup.sql` schedules
 when pg_cron is enabled. By hand: `select rankr_end_month();`. Stop it: `select cron.unschedule('rankr-monthly-reset');`.

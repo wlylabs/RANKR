@@ -6,7 +6,7 @@ import { behind } from "@/lib/caller-stats";
 import { callerHref, formatMultiple, tokenHref } from "@/lib/format";
 import { useCallerPages, useMyRank } from "@/lib/hooks";
 import { MIN_CALLS_RANKED, minCallsFor, type CallerSort } from "@/lib/params";
-import type { CallerView } from "@/lib/types";
+import type { CallerView, MyRankResponse } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { MultipleBadge } from "./MultipleBadge";
@@ -63,29 +63,31 @@ function SortValue({ sort, c }: { sort: CallerSort; c: CallerView }) {
 }
 
 /**
+ * What to tell a caller about their place on the board for `sort`: how far the caller one place up is, or
+ * what they still need to get on it. Null when there is nothing to say.
+ */
+export function rankLine(sort: CallerSort, { rank, caller, ahead, calls, total }: MyRankResponse): string | null {
+  if (rank && caller) {
+    if (!ahead) return `top of the board · ${total} ${total === 1 ? "caller" : "callers"}`;
+    const gap = behind(sort, caller, ahead);
+    return `${gap ? `${gap} behind` : "level with"} @${ahead.username} at #${rank - 1}`;
+  }
+  if (calls === 0) return "no calls this month yet · paste a CA to get on the board";
+  const need = minCallsFor(sort) - calls;
+  if (need <= 0) return null;
+  return `${calls} ${calls === 1 ? "call" : "calls"} · ${need} more to be ranked by ${CALLER_SORT_LABELS[sort].toLowerCase()}`;
+}
+
+/**
  * The signed-in caller's place on the board, pinned to the bottom of the screen (above the bottom nav on
  * phones) while the board scrolls under it: their rank, and how far the caller one place up is.
  */
 function MyRank({ sort }: { sort: CallerSort }) {
   const { userId, username, official } = useAuth();
   const mine = useMyRank(sort, userId);
-  if (!userId || !username || !mine) return null;
-
-  const { rank, caller, ahead, calls, total } = mine;
-  const need = minCallsFor(sort) - calls;
-  let line: string;
-  if (rank && caller) {
-    const gap = ahead && behind(sort, caller, ahead);
-    line = !ahead
-      ? `top of the board · ${total} ${total === 1 ? "caller" : "callers"}`
-      : `${gap ? `${gap} behind` : "level with"} @${ahead.username} at #${rank - 1}`;
-  } else if (calls === 0) {
-    line = "no calls this month yet · paste a CA to get on the board";
-  } else if (need > 0) {
-    line = `${calls} ${calls === 1 ? "call" : "calls"} · ${need} more to be ranked by ${CALLER_SORT_LABELS[sort].toLowerCase()}`;
-  } else {
-    return null;
-  }
+  const line = mine && rankLine(sort, mine);
+  if (!userId || !username || !mine || !line) return null;
+  const { rank, caller, total } = mine;
 
   return (
     <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 mt-3 md:bottom-4">
