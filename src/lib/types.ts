@@ -191,7 +191,7 @@ export type NewsItem = {
 export type NewsResponse = { items: NewsItem[]; updatedAt: number };
 
 /**
- * Tokens named after a story, most liquid first, for the reader to pick from: live DEX data, and Rankr's
+ * Live tokens named after a story, most traded first, for the reader to pick from: DEX data, and Rankr's
  * multiple since the first paste for the ones it tracks.
  */
 export type NamesakesResponse = { items: { market: MarketSnapshot; multiple: number | null }[]; updatedAt: number };

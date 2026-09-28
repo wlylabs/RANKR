@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
-import { capTier, passes, type CapTier } from "@/lib/token-filters";
+import { capTier, type CapTier } from "@/lib/token-filters";
 import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
 import { ChainTag } from "./Chain";
 import { Tab } from "./Leaderboard";
@@ -97,13 +97,7 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
 function Namesakes({ keywords }: { keywords: string[] }) {
   const [keyword, setKeyword] = useState(keywords[0] ?? "");
   const [draft, setDraft] = useState("");
-  const [showAll, setShowAll] = useState(false);
-  const found = useNamesakes(keyword);
-  const { error, isLoading } = found;
-  // Dead tokens stay out ($1K market cap, volume and liquidity), and can still be shown.
-  const kept = found.items.filter((n) => passes(n.market));
-  const items = showAll ? found.items : kept;
-  const hidden = found.items.length - kept.length;
+  const { items, error, isLoading } = useNamesakes(keyword);
 
   return (
     <div className="mt-3 overflow-hidden rounded-md border border-border bg-surface">
@@ -149,24 +143,13 @@ function Namesakes({ keywords }: { keywords: string[] }) {
           ) : error && !items.length ? (
             <p className="px-3 py-4 text-sm text-down">Couldn&apos;t load the tokens. Try again in a moment.</p>
           ) : !items.length ? (
-            <p className="px-3 py-4 text-sm text-muted">
-              {hidden ? "Every token named like this is below $1K market cap, volume or liquidity." : "No token named like this on DexScreener yet."}
-            </p>
+            <p className="px-3 py-4 text-sm text-muted">No live token named like this yet.</p>
           ) : (
             <div className="mt-1 divide-y divide-border">
               {items.map((n) => (
                 <Namesake key={`${n.market.chainId}:${n.market.address}`} {...n} />
               ))}
             </div>
-          )}
-          {hidden > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowAll(!showAll)}
-              className="w-full border-t border-border px-3 py-2 text-left font-mono text-[11px] text-subtle transition-colors hover:text-fg"
-            >
-              {showAll ? "hide the ones below $1K" : `${hidden} more below $1K mc, vol or liq · show them`}
-            </button>
           )}
         </>
       )}

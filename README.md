@@ -70,10 +70,10 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   each tagged high, mid or low cap on pump.fun's milestones ($1M and up; $69K, where a token leaves its bonding
   curve, to $1M; under $69K), with chain, address, age, market cap, 24h volume,
   liquidity, 24h transactions and 24h change, and Rankr's multiple for the ones it tracks. Many tokens share a
-  name or a ticker, so the reader picks one (it opens its page on Rankr, to watch or call it). Dead tokens stay
-  out: under $1K market cap, 24h volume or liquidity (the minimums DexScreener's and GMGN's screeners filter
-  by), with no filter controls; a line under the list shows them on demand. A number the DEX doesn't give (a
-  pump.fun token on its bonding curve has no liquidity) doesn't count against a token. With `RANKR_MOCK=1`,
+  name or a ticker, so the reader picks one (it opens its page on Rankr, to watch or call it). Dead tokens are
+  left out altogether: under $1K market cap, 24h volume or liquidity (the minimums DexScreener's and GMGN's
+  screeners filter by), with no filter controls. A number the DEX doesn't give (a pump.fun token on its bonding
+  curve has no liquidity) doesn't count against a token. With `RANKR_MOCK=1`,
   made-up stories.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
