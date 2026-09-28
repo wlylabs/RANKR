@@ -48,9 +48,16 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   filter picked on the feed page.
 - **News** (`/news`, in the nav): what's in the news right now, live, newest first, e.g. "Over 560,000 visitors
   flock to Busan to see canal-trapped shark Bukang-i". Just the headline (a link to the article), the publisher
-  and how long ago; nothing has to be pasted first. From Google News' RSS (no key): top stories (the US and
-  Singapore editions) and the World, Entertainment, Science and Technology sections, each story once, read every
-  5 minutes; the page refreshes every 2. A search box searches the news (`/news?q=shark`).
+  and how long ago; nothing has to be pasted first. From every free source, each story once, today's news only,
+  at most 20 from any one source; the page refreshes every 2 minutes. A search box searches them all
+  (`/news?q=shark`). Sources (`src/lib/news-sources.ts`):
+  - no key, always on: Google News (top stories in the US and Singapore editions; World, Entertainment,
+    Science and Technology; search), Bing News (search), GDELT (search), Hacker News (front page, search),
+    and publishers' RSS: BBC, The Guardian, Al Jazeera, NPR, Sky News, Yonhap, CNA, UPI Odd News, New York
+    Post, CoinDesk, Cointelegraph, Decrypt;
+  - free key, on once set (`.env.example`): GNews, NewsData.io, The Guardian API, NewsAPI.org, Currents,
+    TheNewsAPI, each read as often as its free daily quota allows. Keys never show in logs.
+  Not included: Reddit (needs an OAuth app), CryptoPanic (paid since 2026), Mediastack (free plan is HTTP only).
   Each headline has a **Tokens** button: every token named after the story. The names in the headline are the
   choices ("Bukang-i", "Busan"; the likeliest is picked: a quoted name, a run of capitalised words like "Moo
   Deng", then single ones), or type another. Tokens come from DexScreener's search (the name as written and run
@@ -371,7 +378,8 @@ src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
-src/lib/news.ts              news: live Google News headlines, the names in them, and their namesakes on DexScreener
+src/lib/news.ts              news: the live headlines, the names in them, and their namesakes on DexScreener
+src/lib/news-sources.ts      every free news source (RSS and JSON APIs, keyed ones when set), read and cached
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

@@ -1,64 +1,19 @@
-// News: what's in the news right now, from Google News' RSS (top stories and a few sections; no key), and
+// News: what's in the news right now from every free source (src/lib/news-sources.ts), each story once, and
 // every token named after a story, from DexScreener. Only the headline, the publisher and a link are kept; the
 // article stays on the publisher's page. Server only.
 import { MOCK, searchTokens } from "./dexscreener";
+import { newsSources, readSource, type Headline } from "./news-sources";
 import type { MarketSnapshot, NewsItem } from "./types";
 
-const GOOGLE_NEWS = "https://news.google.com/rss";
-const EN_US = "hl=en-US&gl=US&ceid=US:en";
-/**
- * The live list: top stories (the US edition and an Asian one, where stories like Busan's shark break) and the
- * sections memes come from.
- */
-const FEEDS = [
-  `${GOOGLE_NEWS}?${EN_US}`,
-  `${GOOGLE_NEWS}?hl=en-SG&gl=SG&ceid=SG:en`,
-  ...["WORLD", "ENTERTAINMENT", "SCIENCE", "TECHNOLOGY"].map((t) => `${GOOGLE_NEWS}/headlines/section/topic/${t}?${EN_US}`),
-];
-const LIVE_TTL = 5 * 60_000;
-const SEARCH_TTL = 15 * 60_000;
-const MAX_ITEMS = 60;
+const MAX_ITEMS = 80;
+/** No one source crowds out the rest. */
+const PER_SOURCE = 20;
+/** The live list is today's news: feeds that keep older items don't bring them back. */
+const LIVE_WINDOW = 48 * 3_600_000;
 
 /** Lower case, letters and digits only: "Bukang-i" and "BUKANGI" are both "bukangi". */
 export function normalize(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-
-function decode(text: string): string {
-  return text
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
-      if (e[0] === "#") {
-        const code = e[1].toLowerCase() === "x" ? Number.parseInt(e.slice(2), 16) : Number.parseInt(e.slice(1), 10);
-        return Number.isFinite(code) && code <= 0x10ffff ? String.fromCodePoint(code) : m;
-      }
-      return ENTITIES[e.toLowerCase()] ?? m;
-    })
-    .trim();
-}
-
-function tag(item: string, name: string): string | null {
-  const m = item.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i"));
-  return m ? decode(m[1]) : null;
-}
-
-export type Headline = { title: string; url: string; source: string | null; publishedAt: number };
-
-/** The items of an RSS feed. Google News ends a title with " - Publisher", which is dropped. */
-export function parseRss(xml: string): Headline[] {
-  const out: Headline[] = [];
-  for (const [, item] of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
-    const source = tag(item, "source");
-    let title = tag(item, "title") ?? "";
-    if (source && title.endsWith(` - ${source}`)) title = title.slice(0, -(source.length + 3)).trim();
-    const url = tag(item, "link") ?? "";
-    const publishedAt = Date.parse(tag(item, "pubDate") ?? "");
-    // Only web links: the page puts it in an href.
-    if (title && /^https?:\/\//i.test(url) && Number.isFinite(publishedAt)) out.push({ title, url, source, publishedAt });
-  }
-  return out;
 }
 
 // Words a headline has in capitals only because they start it, or that name nothing a token would be named after.
@@ -152,35 +107,6 @@ function mockHeadlines(): Headline[] {
   }));
 }
 
-async function fetchFeed(url: string): Promise<Headline[]> {
-  try {
-    const res = await fetch(url, {
-      headers: { accept: "application/rss+xml, application/xml" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (res.ok) return parseRss(await res.text());
-    console.warn(`[rankr] news feed responded ${res.status}`);
-  } catch (err) {
-    console.warn(`[rankr] news feed failed: ${(err as Error).message}`);
-  }
-  return [];
-}
-
-// Feeds in flight or read, so parallel and repeated reads ask once per TTL.
-const cache = new Map<string, { headlines: Promise<Headline[]>; until: number }>();
-
-/** A feed's headlines, cached for `ttl`. Nothing (not an error) when it can't be reached. */
-function read(url: string, ttl: number): Promise<Headline[]> {
-  const now = Date.now();
-  const hit = cache.get(url);
-  if (hit && hit.until > now) return hit.headlines;
-  if (cache.size > 500) for (const [k, v] of cache) if (v.until <= now) cache.delete(k);
-  const headlines = fetchFeed(url);
-  cache.set(url, { headlines, until: now + ttl });
-  return headlines;
-}
-
 /** Newest first, each story once (the same headline can be in several feeds), with its keywords. */
 function toItems(headlines: Headline[]): NewsItem[] {
   const seen = new Set<string>();
@@ -196,16 +122,28 @@ function toItems(headlines: Headline[]): NewsItem[] {
     .map((h) => ({ id: h.url, ...h, keywords: keywordsOf(h.title) }));
 }
 
-/** What's in the news right now: top stories and a few sections, newest first. */
-export async function liveNews(): Promise<NewsItem[]> {
-  if (MOCK) return toItems(mockHeadlines());
-  return toItems((await Promise.all(FEEDS.map((url) => read(url, LIVE_TTL)))).flat());
+/** The newest `PER_SOURCE` of each list (since `since`), all together. */
+function merge(lists: Headline[][], since = 0): Headline[] {
+  return lists.flatMap((list) =>
+    list
+      .filter((h) => h.publishedAt >= since)
+      .sort((a, b) => b.publishedAt - a.publishedAt)
+      .slice(0, PER_SOURCE),
+  );
 }
 
-/** Headlines for a search, newest first. */
+/** What's in the news right now, from every source with a live list, newest first. */
+export async function liveNews(): Promise<NewsItem[]> {
+  if (MOCK) return toItems(mockHeadlines());
+  const lists = await Promise.all(newsSources().flatMap((s) => (s.live ? [readSource(s, s.live)] : [])));
+  return toItems(merge(lists, Date.now() - LIVE_WINDOW));
+}
+
+/** Headlines for a search, from every source that can search, newest first. */
 export async function searchNews(query: string): Promise<NewsItem[]> {
   if (MOCK) return toItems(mockHeadlines().filter((h) => normalize(h.title).includes(normalize(query))));
-  return toItems(await read(`${GOOGLE_NEWS}/search?q=${encodeURIComponent(query)}&${EN_US}`, SEARCH_TTL));
+  const lists = await Promise.all(newsSources().flatMap((s) => (s.search ? [readSource(s, s.search(query))] : [])));
+  return toItems(merge(lists));
 }
 
 /**

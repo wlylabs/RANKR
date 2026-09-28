@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchTokens } from "./dexscreener";
-import { isNamesake, keywordsOf, liveNews, namesakes, normalize, parseRss, searchNews } from "./news";
+import { isNamesake, keywordsOf, liveNews, namesakes, normalize, searchNews } from "./news";
 import type { MarketSnapshot } from "./types";
 
 vi.mock("./dexscreener", () => ({ MOCK: false, searchTokens: vi.fn() }));
@@ -11,29 +11,6 @@ const item = (title: string, link: string, date: string, source = "Yonhap News A
   `<item><title>${title} - ${source}</title><link>${link}</link><guid isPermaLink="false">x</guid>` +
   `<pubDate>${date}</pubDate><description>&lt;a href="${link}"&gt;${title}&lt;/a&gt;</description>` +
   `<source url="https://en.yna.co.kr">${source}</source></item>`;
-
-describe("parseRss", () => {
-  it("reads headline, publisher, link and time, without the ' - Publisher' ending", () => {
-    const xml = rss([
-      item("Shark &#39;Bukang-i&#39; that drew 400,000 people &amp; more", "https://news.google.com/rss/articles/A?oc=5", "Sun, 28 Sep 2026 03:40:00 GMT"),
-      item("<![CDATA[A CDATA headline]]>", "https://news.google.com/rss/articles/B", "Sat, 27 Sep 2026 10:00:00 GMT", "Korea Times"),
-      item("Not a web link", "javascript:alert(1)", "Sat, 27 Sep 2026 10:00:00 GMT"),
-      item("No date", "https://news.google.com/rss/articles/C", "soon"),
-    ]);
-    expect(parseRss(xml)).toEqual([
-      {
-        title: "Shark 'Bukang-i' that drew 400,000 people & more",
-        url: "https://news.google.com/rss/articles/A?oc=5",
-        source: "Yonhap News Agency",
-        publishedAt: Date.parse("2026-09-28T03:40:00Z"),
-      },
-      { title: "A CDATA headline", url: "https://news.google.com/rss/articles/B", source: "Korea Times", publishedAt: Date.parse("2026-09-27T10:00:00Z") },
-    ]);
-    expect(parseRss(rss([item("Odd &#99999999; entity", "https://x.test/a", "Sat, 27 Sep 2026 10:00:00 GMT")]))[0].title).toBe(
-      "Odd &#99999999; entity",
-    );
-  });
-});
 
 describe("keywordsOf", () => {
   it("finds what a token named after the story would be called, best first", () => {
@@ -61,37 +38,55 @@ describe("keywordsOf", () => {
 
 describe("liveNews and searchNews", () => {
   afterEach(() => vi.unstubAllGlobals());
+  const hours = (h: number) => new Date(Date.now() - h * 3_600_000).toUTCString();
 
-  it("reads every feed once, keeps each story once (same link or same headline), newest first", async () => {
-    const fetchMock = vi.fn(async (url: string) =>
-      new Response(
-        url.includes("section/topic/WORLD")
-          ? rss([
-              item("Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "https://news.google.com/rss/articles/other-link", "Sun, 28 Sep 2026 03:40:00 GMT"),
-              item("Moo Deng turns two", "https://news.google.com/rss/articles/moo", "Sat, 27 Sep 2026 03:00:00 GMT", "Reuters"),
-            ])
-          : rss([
-              item("Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "https://news.google.com/rss/articles/busan", "Sun, 28 Sep 2026 03:40:00 GMT"),
-              item("Markets close higher", "https://news.google.com/rss/articles/mkt", "Sun, 28 Sep 2026 05:00:00 GMT", "AP"),
-            ]),
-      ),
-    );
+  it("brings every source together: each story once, today's news only, newest first", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("https://news.google.com/rss?hl=en-US")) {
+        return new Response(
+          rss([
+            item("Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "https://news.google.com/rss/articles/busan", hours(1)),
+            ...Array.from({ length: 25 }, (_, i) => item(`Filler story ${i}`, `https://news.google.com/rss/articles/f${i}`, hours(2 + i / 10), "AP")),
+          ]),
+        );
+      }
+      if (url === "https://feeds.bbci.co.uk/news/world/rss.xml") {
+        return new Response(
+          rss([
+            // The same story, as the BBC links it: shown once.
+            `<item><title>Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i</title><link>https://bbc.co.uk/busan</link><pubDate>${hours(1)}</pubDate></item>`,
+            `<item><title>Moo Deng turns two</title><link>https://bbc.co.uk/moo</link><pubDate>${hours(3)}</pubDate></item>`,
+            `<item><title>Old news</title><link>https://bbc.co.uk/old</link><pubDate>${hours(72)}</pubDate></item>`,
+          ]),
+        );
+      }
+      if (url.startsWith("https://hn.algolia.com/")) {
+        return Response.json({ hits: [{ title: "Show HN: a shark tracker", url: "https://hn.test/shark", created_at: new Date(Date.now() - 1_800_000).toISOString() }] });
+      }
+      return new Response("not found", { status: 404 });
+    });
     vi.stubGlobal("fetch", fetchMock);
-    const news = await liveNews();
-    expect(news.map((n) => n.title)).toEqual([
-      "Markets close higher",
-      "Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i",
-      "Moo Deng turns two",
-    ]);
-    expect(news[1]).toMatchObject({ source: "Yonhap News Agency", keywords: ["Bukang-i", "Busan"] });
-    const feeds = fetchMock.mock.calls.length;
-    expect(feeds).toBeGreaterThanOrEqual(4);
 
+    const news = await liveNews();
+    const titles = news.map((n) => n.title);
+    expect(titles[0]).toBe("Show HN: a shark tracker");
+    expect(titles.filter((t) => t.includes("Bukang-i"))).toHaveLength(1);
+    expect(titles).toContain("Moo Deng turns two");
+    expect(titles).not.toContain("Old news");
+    expect(titles.filter((t) => t.startsWith("Filler"))).toHaveLength(19); // 20 from Google News, one of them Busan
+    expect(news.find((n) => n.title.includes("Bukang-i"))?.keywords).toEqual(["Bukang-i", "Busan"]);
+
+    const reads = fetchMock.mock.calls.length;
     await liveNews();
-    expect(fetchMock).toHaveBeenCalledTimes(feeds); // read again only after a few minutes
+    expect(fetchMock).toHaveBeenCalledTimes(reads); // read again only after a few minutes
 
     await searchNews("bukangi");
-    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain("/rss/search?q=bukangi");
+    const searched = fetchMock.mock.calls.slice(reads).map(([u]) => String(u));
+    expect(searched.some((u) => u.includes("news.google.com/rss/search?q=bukangi"))).toBe(true);
+    expect(searched.some((u) => u.includes("bing.com/news/search?q=bukangi"))).toBe(true);
+    expect(searched.some((u) => u.includes("api.gdeltproject.org"))).toBe(true);
+    expect(searched.some((u) => u.includes("hn.algolia.com/api/v1/search_by_date?query=bukangi"))).toBe(true);
   });
 
   it("is empty, not an error, when the news can't be reached", async () => {
