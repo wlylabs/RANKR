@@ -7,11 +7,29 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
-import type { NamesakesResponse, NewsItem } from "@/lib/types";
+import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
 import { ChainTag } from "./Chain";
+import { Tab } from "./Leaderboard";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton, TokenName } from "./TokenList";
+
+const TABS = { all: "All", world: "World", viral: "Viral", crypto: "Crypto", tech: "Tech" } as const;
+type TabKey = keyof typeof TABS;
+
+/** "All" takes the newest this many of each category, so crypto's many outlets don't bury the viral stories. */
+const ALL_EACH = 25;
+
+/** A tab's headlines, newest first (they come sorted). */
+function inTab(items: NewsItem[], tab: TabKey): NewsItem[] {
+  if (tab !== "all") return items.filter((i) => i.category === tab);
+  const counts = new Map<NewsCategory, number>();
+  return items.filter((i) => {
+    const n = counts.get(i.category) ?? 0;
+    counts.set(i.category, n + 1);
+    return n < ALL_EACH;
+  });
+}
 
 /** A token named after a story: who it is (chain, address, age) and its market, linking to its page on Rankr. */
 function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
@@ -164,17 +182,33 @@ export function News() {
   const router = useRouter();
   const pathname = usePathname();
   const q = params.get("q") ?? "";
+  const picked = params.get("category");
+  const tab: TabKey = picked && picked in TABS ? (picked as TabKey) : "all";
   const [draft, setDraft] = useState(q);
-  const { items, error, isLoading } = useNews(q);
+  const news = useNews(q);
+  const { error, isLoading } = news;
+  // A search spans every tab.
+  const items = q ? news.items : inTab(news.items, tab);
+
+  function setParam(key: string, value: string, fallback: string) {
+    const next = new URLSearchParams(params.toString());
+    if (value === fallback) next.delete(key);
+    else next.set(key, value);
+    router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
+  }
 
   // The search goes in the URL after a pause in typing.
   useEffect(() => {
     const id = setTimeout(() => {
       const next = draft.trim();
-      if (next !== q) router.replace(next ? `${pathname}?q=${encodeURIComponent(next)}` : pathname, { scroll: false });
+      if (next === q) return;
+      const qs = new URLSearchParams(params.toString());
+      if (next) qs.set("q", next);
+      else qs.delete("q");
+      router.replace(`${pathname}${qs.size ? `?${qs}` : ""}`, { scroll: false });
     }, 400);
     return () => clearTimeout(id);
-  }, [draft, q, pathname, router]);
+  }, [draft, q, params, pathname, router]);
 
   return (
     <div className="pt-10 sm:pt-14">
@@ -203,6 +237,20 @@ export function News() {
         />
       </label>
 
+      {!q && (
+        <div
+          className="scrollbar-none fade-end -mx-4 mt-4 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
+          role="tablist"
+          aria-label="Category"
+        >
+          {(Object.keys(TABS) as TabKey[]).map((key) => (
+            <Tab key={key} active={tab === key} onClick={() => setParam("category", key, "all")}>
+              {TABS[key]}
+            </Tab>
+          ))}
+        </div>
+      )}
+
       <div className="mt-4">
         {isLoading && !items.length ? (
           <div className="rounded-lg border border-border">
@@ -211,7 +259,9 @@ export function News() {
         ) : !items.length ? (
           <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
             <Newspaper className="mx-auto size-5 text-subtle" />
-            <p className="mt-3 font-medium">{q ? `No headlines for “${q}”` : "No headlines right now"}</p>
+            <p className="mt-3 font-medium">
+              {q ? `No headlines for “${q}”` : tab === "all" ? "No headlines right now" : `No ${TABS[tab].toLowerCase()} headlines right now`}
+            </p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
               {error ? "Couldn't reach the news. Trying again shortly." : q ? "Try other words." : "Check back in a minute."}
             </p>

@@ -33,6 +33,7 @@ describe("keywordsOf", () => {
     expect(k).toContain("Busan Canal");
     expect(k).not.toContain("Flock");
     expect(keywordsOf("the market is quiet today")).toEqual([]);
+    expect(keywordsOf("Memecoin named after Busan's shark Bukangi jumps 300% in a day")).toEqual(["Busan", "Bukangi"]);
   });
 });
 
@@ -75,7 +76,8 @@ describe("liveNews and searchNews", () => {
     expect(titles).toContain("Moo Deng turns two");
     expect(titles).not.toContain("Old news");
     expect(titles.filter((t) => t.startsWith("Filler"))).toHaveLength(19); // 20 from Google News, one of them Busan
-    expect(news.find((n) => n.title.includes("Bukang-i"))?.keywords).toEqual(["Bukang-i", "Busan"]);
+    expect(news.find((n) => n.title.includes("Bukang-i"))).toMatchObject({ keywords: ["Bukang-i", "Busan"], category: "world" });
+    expect(news.find((n) => n.title.startsWith("Show HN"))?.category).toBe("tech");
 
     const reads = fetchMock.mock.calls.length;
     await liveNews();

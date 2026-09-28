@@ -1,12 +1,25 @@
 // Where the news comes from: every free source. The ones without a key are always read: Google News (live
 // sections and search), Bing News and GDELT (search), Hacker News, and publishers' own RSS. The ones with a
 // free key are read once their key is set, as often as their daily quota allows. Server only.
+//
+// Feed URLs are taken from references, not guessed:
+// - github.com/plenaryapp/awesome-rss-feeds (curated feeds, and its PR #45 for Yonhap, The Korea Herald and
+//   Korea Times), github.com/vandenbroucke/rss-news-list;
+// - github.com/nirholas/cryptocurrency.cv (an open-source crypto news aggregator; src/lib/crypto-news.ts, only
+//   feeds its health check left enabled);
+// - Google News RSS: its /rss, /rss/search and /rss/headlines/section/topic/<TOPIC> forms with hl, gl, ceid;
+//   Bing News: a news search with &format=rss (and qft=sortbydate="1" for newest first); GDELT DOC 2.0 API
+//   (one request per 5 seconds per IP); Hacker News' Algolia API; UPI Odd News and New York Post feeds as
+//   their sites list them.
+import type { NewsCategory } from "./types";
 
 export type Headline = { title: string; url: string; source: string | null; publishedAt: number };
 
 export type Source = {
   /** For logs; never the URL, which may hold a key. */
   name: string;
+  /** Which tab of the news page its headlines are in. */
+  category: NewsCategory;
   /** The live list, if the source has one. */
   live?: string;
   /** A search, if the source can (and its quota allows it). */
@@ -102,20 +115,63 @@ const GOOGLE = "https://news.google.com/rss";
 const EN_US = "hl=en-US&gl=US&ceid=US:en";
 const q = encodeURIComponent;
 
-/** Publishers' own RSS: world news, Asia (where stories like Busan's shark break), odd news, and crypto. */
-const PUBLISHERS: [name: string, url: string][] = [
+type Feed = [name: string, url: string];
+
+/** Publishers' own RSS, by tab: world news (Asia too, where stories like Busan's shark break), odd news, crypto. */
+const WORLD: Feed[] = [
   ["BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml"],
   ["The Guardian", "https://www.theguardian.com/world/rss"],
   ["Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"],
-  ["NPR", "https://feeds.npr.org/1001/rss.xml"],
+  ["NPR", "https://www.npr.org/rss/rss.php?id=1004"],
   ["Sky News", "https://feeds.skynews.com/feeds/rss/world.xml"],
+  ["DW", "https://rss.dw.com/xml/rss-en-all"],
+  ["CBC News", "https://www.cbc.ca/cmlink/rss-world"],
   ["Yonhap News Agency", "https://en.yna.co.kr/RSS/news.xml"],
+  ["The Korea Herald", "https://www.koreaherald.com/rss/newsAll"],
+  ["Korea Times", "https://www.koreatimes.co.kr/www/rss/nation.xml"],
   ["CNA", "https://www.channelnewsasia.com/rssfeeds/8395986"],
+];
+const VIRAL: Feed[] = [
   ["UPI Odd News", "https://rss.upi.com/news/odd_news.rss"],
   ["New York Post", "https://nypost.com/feed/"],
+];
+/** Crypto news outlets, as cryptocurrency.cv lists them (enabled ones). */
+const CRYPTO: Feed[] = [
   ["CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"],
-  ["Cointelegraph", "https://cointelegraph.com/rss"],
+  ["The Block", "https://www.theblock.co/rss.xml"],
   ["Decrypt", "https://decrypt.co/feed"],
+  ["CoinTelegraph", "https://cointelegraph.com/rss"],
+  ["Blockworks", "https://blockworks.co/feed"],
+  ["CryptoSlate", "https://cryptoslate.com/feed/"],
+  ["NewsBTC", "https://www.newsbtc.com/feed/"],
+  ["Bitcoinist", "https://bitcoinist.com/feed/"],
+  ["BeInCrypto", "https://beincrypto.com/feed/"],
+  ["U.Today", "https://u.today/rss"],
+  ["Crypto Briefing", "https://cryptobriefing.com/feed/"],
+  ["The Daily Hodl", "https://dailyhodl.com/feed/"],
+  ["Watcher Guru", "https://watcher.guru/news/feed"],
+  ["Cryptopolitan", "https://www.cryptopolitan.com/feed/"],
+  ["Bitcoin.com News", "https://news.bitcoin.com/feed/"],
+  ["CoinJournal", "https://coinjournal.net/feed/"],
+  ["CryptoGlobe", "https://www.cryptoglobe.com/latest/feed/"],
+  ["Crypto Daily", "https://cryptodaily.co.uk/feed"],
+  ["Coinspeaker", "https://www.coinspeaker.com/feed/"],
+  ["TheNewsCrypto", "https://thenewscrypto.com/feed/"],
+  ["Crypto-News Flash", "https://www.crypto-news-flash.com/feed/"],
+  ["InsideBitcoins", "https://insidebitcoins.com/feed"],
+  ["TheCryptoBasic", "https://thecryptobasic.com/feed/"],
+  ["CoinCentral", "https://coincentral.com/news/feed/"],
+  ["CryptoNewsZ", "https://www.cryptonewsz.com/feed/"],
+  ["Protos", "https://protos.com/feed/"],
+  ["Unchained Crypto", "https://unchainedcrypto.com/feed/"],
+  ["Forkast News", "https://forkast.news/feed/"],
+  ["Blockhead", "https://www.blockhead.co/latest/rss/"],
+  ["The Crypto Times India", "https://www.cryptotimes.io/feed/"],
+  ["BitPinas", "https://bitpinas.com/feed/"],
+  ["Wu Blockchain", "https://wublock.substack.com/feed"],
+  ["CNBC Crypto", "https://www.cnbc.com/id/100727362/device/rss/rss.html"],
+  ["Yahoo Finance Crypto", "https://finance.yahoo.com/rss/cryptocurrency"],
+  ["TechCrunch Crypto", "https://techcrunch.com/category/cryptocurrency/feed/"],
 ];
 
 /** Every source to read: the free ones, and the keyed ones whose key is set in `env`. */
@@ -123,27 +179,44 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   const out: Source[] = [
     {
       name: "Google News",
+      category: "world",
       live: `${GOOGLE}?${EN_US}`,
       search: (s) => `${GOOGLE}/search?q=${q(s)}&${EN_US}`,
       parse: (b) => parseRss(b),
       ttl: 5 * MINUTE,
     },
-    { name: "Google News Asia", live: `${GOOGLE}?hl=en-SG&gl=SG&ceid=SG:en`, parse: (b) => parseRss(b), ttl: 5 * MINUTE },
-    ...["WORLD", "ENTERTAINMENT", "SCIENCE", "TECHNOLOGY"].map((topic) => ({
+    {
+      name: "Google News Asia",
+      category: "world",
+      live: `${GOOGLE}?hl=en-SG&gl=SG&ceid=SG:en`,
+      parse: (b) => parseRss(b),
+      ttl: 5 * MINUTE,
+    },
+    ...(
+      [
+        ["WORLD", "world"],
+        ["ENTERTAINMENT", "viral"],
+        ["SCIENCE", "viral"],
+        ["TECHNOLOGY", "tech"],
+      ] as const
+    ).map(([topic, category]) => ({
       name: `Google News ${topic.toLowerCase()}`,
+      category,
       live: `${GOOGLE}/headlines/section/topic/${topic}?${EN_US}`,
       parse: (b: string) => parseRss(b),
       ttl: 5 * MINUTE,
     })),
     {
       name: "Bing News",
-      search: (s) => `https://www.bing.com/news/search?q=${q(s)}&format=rss`,
+      category: "world",
+      search: (s) => `https://www.bing.com/news/search?q=${q(s)}&qft=${q('sortbydate="1"')}&format=rss`,
       parse: (b) => parseRss(b),
       ttl: 15 * MINUTE,
     },
     {
       // Free and keyless, about one request per 5 seconds: searches only.
       name: "GDELT",
+      category: "world",
       search: (s) =>
         `https://api.gdeltproject.org/api/v2/doc/doc?query=${q(`${s} sourcelang:english`)}&mode=artlist&format=json&sort=datedesc&maxrecords=50&timespan=3d`,
       parse: json(
@@ -154,6 +227,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
     },
     {
       name: "Hacker News",
+      category: "tech",
       live: "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=30",
       search: (s) => `https://hn.algolia.com/api/v1/search_by_date?query=${q(s)}&tags=story&hitsPerPage=30`,
       parse: json(
@@ -162,7 +236,15 @@ export function newsSources(env: Record<string, string | undefined> = process.en
       ),
       ttl: 5 * MINUTE,
     },
-    ...PUBLISHERS.map(([name, url]) => ({ name, live: url, parse: (b: string) => parseRss(b, name), ttl: 10 * MINUTE })),
+    ...(
+      [
+        [WORLD, "world"],
+        [VIRAL, "viral"],
+        [CRYPTO, "crypto"],
+      ] as const
+    ).flatMap(([feeds, category]) =>
+      feeds.map(([name, url]) => ({ name, category, live: url, parse: (b: string) => parseRss(b, name), ttl: 10 * MINUTE })),
+    ),
   ];
 
   // Free keys. How often each is read keeps it inside its free daily quota, searches included.
@@ -170,6 +252,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (gnews) {
     out.push({
       name: "GNews", // 100 requests a day
+      category: "world",
       live: `https://gnews.io/api/v4/top-headlines?lang=en&max=10&apikey=${q(gnews)}`,
       search: (s) => `https://gnews.io/api/v4/search?q=${q(s)}&lang=en&sortby=publishedAt&max=10&apikey=${q(gnews)}`,
       parse: json(
@@ -183,6 +266,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (newsdata) {
     out.push({
       name: "NewsData.io", // 200 credits a day
+      category: "world",
       live: `https://newsdata.io/api/1/latest?language=en&apikey=${q(newsdata)}`,
       search: (s) => `https://newsdata.io/api/1/latest?language=en&q=${q(s)}&apikey=${q(newsdata)}`,
       parse: json(
@@ -196,6 +280,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (guardian) {
     out.push({
       name: "The Guardian API", // 5,000 requests a day
+      category: "world",
       live: `https://content.guardianapis.com/search?order-by=newest&page-size=30&api-key=${q(guardian)}`,
       search: (s) => `https://content.guardianapis.com/search?q=${q(s)}&order-by=newest&page-size=30&api-key=${q(guardian)}`,
       parse: json(
@@ -209,6 +294,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (newsapi) {
     out.push({
       name: "NewsAPI.org", // 100 requests a day (its free plan is for development)
+      category: "world",
       live: `https://newsapi.org/v2/top-headlines?language=en&pageSize=50&apiKey=${q(newsapi)}`,
       search: (s) => `https://newsapi.org/v2/everything?q=${q(s)}&language=en&sortBy=publishedAt&pageSize=50&apiKey=${q(newsapi)}`,
       parse: json(
@@ -222,6 +308,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (currents) {
     out.push({
       name: "Currents", // about 600 requests a day
+      category: "world",
       live: `https://api.currentsapi.services/v1/latest-news?language=en&apiKey=${q(currents)}`,
       search: (s) => `https://api.currentsapi.services/v1/search?keywords=${q(s)}&language=en&apiKey=${q(currents)}`,
       parse: json(
@@ -235,6 +322,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (thenewsapi) {
     out.push({
       name: "TheNewsAPI", // 3 requests a day on the free plan: the live list only, three times a day
+      category: "world",
       live: `https://api.thenewsapi.com/v1/news/top?language=en&locale=us&api_token=${q(thenewsapi)}`,
       parse: json(
         (b) => b.data,
@@ -251,7 +339,8 @@ async function fetchSource(source: Source, url: string): Promise<Headline[]> {
     const res = await fetch(url, {
       headers: { accept: "application/rss+xml, application/xml, application/json;q=0.9, */*;q=0.8", "user-agent": "RankrNews/1.0" },
       cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
+      // Many feeds are read at once: a slow one doesn't hold the page up for long.
+      signal: AbortSignal.timeout(6_000),
     });
     if (res.ok) return source.parse(await res.text());
     console.warn(`[rankr] news: ${source.name} responded ${res.status}`);

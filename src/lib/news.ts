@@ -2,10 +2,11 @@
 // every token named after a story, from DexScreener. Only the headline, the publisher and a link are kept; the
 // article stays on the publisher's page. Server only.
 import { MOCK, searchTokens } from "./dexscreener";
-import { newsSources, readSource, type Headline } from "./news-sources";
-import type { MarketSnapshot, NewsItem } from "./types";
+import { newsSources, readSource, type Headline, type Source } from "./news-sources";
+import type { MarketSnapshot, NewsCategory, NewsItem } from "./types";
 
-const MAX_ITEMS = 80;
+/** Each tab's list: the newest of each category. */
+const PER_CATEGORY = 60;
 /** No one source crowds out the rest. */
 const PER_SOURCE = 20;
 /** The live list is today's news: feeds that keep older items don't bring them back. */
@@ -25,7 +26,10 @@ const COMMON = new Set(
     "men women world how why what who when where which amid near just than then their there here our your his her " +
     "they we you i he she one two three four five see sees seen rush rushes flock flocks visitors turns opens owner " +
     "start break report reports live video watch photos update breaking top best big small all no not only still " +
-    "again inside meet meets gets get goes go back home help"
+    "again inside meet meets gets get goes go back home help " +
+    // Crypto headlines' own words: "Memecoin named after Busan's shark Bukangi jumps 300%".
+    "memecoin memecoins coin coins token tokens crypto cryptocurrency price prices market markets rally jumps " +
+    "surges surge soars plunges trader traders whale whales"
   ).split(" "),
 );
 /** Small words that may sit inside a name: "Peanut the Squirrel". */
@@ -88,62 +92,73 @@ export function keywordsOf(title: string): string[] {
     .map((k) => k.text);
 }
 
+/** A headline in its source's category. */
+type Tagged = Headline & { category: NewsCategory };
+
 /** RANKR_MOCK=1: made-up stories, so the page works offline. */
-function mockHeadlines(): Headline[] {
+function mockHeadlines(): Tagged[] {
   const now = Date.now();
-  const hours = [0.3, 2, 5, 9, 20, 30];
-  return [
-    "Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i",
-    "Moo Deng turns two: Thailand's famous pygmy hippo celebrates with a fruit cake",
-    "Peanut the Squirrel's owner opens animal sanctuary a year later",
-    "Shark fever hits Busan as 102,000 rush to see 'Bukangi' at start of Chuseok break",
-    "Chill Guy meme creator on the dog that became a symbol of calm",
-    "Giant pumpkin named 'Big Moe' breaks state record",
-  ].map((title, i) => ({
+  return (
+    [
+      ["Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "world", 0.3],
+      ["Moo Deng turns two: Thailand's famous pygmy hippo celebrates with a fruit cake", "viral", 2],
+      ["Peanut the Squirrel's owner opens animal sanctuary a year later", "viral", 5],
+      ["Shark fever hits Busan as 102,000 rush to see 'Bukangi' at start of Chuseok break", "world", 9],
+      ["Memecoin named after Busan's shark Bukangi jumps 300% in a day", "crypto", 11],
+      ["Chill Guy meme creator on the dog that became a symbol of calm", "viral", 20],
+      ["Show HN: a tracker for tokens named after the news", "tech", 26],
+    ] as const
+  ).map(([title, category, hours], i) => ({
     title,
+    category,
     url: `https://example.com/news/${i}`,
     source: ["Mock Times", "Mock Daily", "Mock Wire"][i % 3],
-    publishedAt: now - hours[i] * 3_600_000,
+    publishedAt: now - hours * 3_600_000,
   }));
 }
 
-/** Newest first, each story once (the same headline can be in several feeds), with its keywords. */
-function toItems(headlines: Headline[]): NewsItem[] {
+/**
+ * Newest first, each story once (the same headline can be in several feeds), at most `PER_CATEGORY` of each
+ * category, with its keywords.
+ */
+function toItems(headlines: Tagged[]): NewsItem[] {
   const seen = new Set<string>();
+  const counts = new Map<NewsCategory, number>();
   return headlines
+    .sort((a, b) => b.publishedAt - a.publishedAt)
     .filter((h) => {
       const keys = [h.url, normalize(h.title)];
       if (keys.some((k) => seen.has(k))) return false;
       keys.forEach((k) => seen.add(k));
-      return true;
+      const n = counts.get(h.category) ?? 0;
+      counts.set(h.category, n + 1);
+      return n < PER_CATEGORY;
     })
-    .sort((a, b) => b.publishedAt - a.publishedAt)
-    .slice(0, MAX_ITEMS)
     .map((h) => ({ id: h.url, ...h, keywords: keywordsOf(h.title) }));
 }
 
-/** The newest `PER_SOURCE` of each list (since `since`), all together. */
-function merge(lists: Headline[][], since = 0): Headline[] {
-  return lists.flatMap((list) =>
-    list
-      .filter((h) => h.publishedAt >= since)
-      .sort((a, b) => b.publishedAt - a.publishedAt)
-      .slice(0, PER_SOURCE),
-  );
+/** A source's newest `PER_SOURCE` headlines at `url` (since `since`), in its category. */
+async function newest(source: Source, url: string, since = 0): Promise<Tagged[]> {
+  return (await readSource(source, url))
+    .filter((h) => h.publishedAt >= since)
+    .sort((a, b) => b.publishedAt - a.publishedAt)
+    .slice(0, PER_SOURCE)
+    .map((h) => ({ ...h, category: source.category }));
 }
 
 /** What's in the news right now, from every source with a live list, newest first. */
 export async function liveNews(): Promise<NewsItem[]> {
   if (MOCK) return toItems(mockHeadlines());
-  const lists = await Promise.all(newsSources().flatMap((s) => (s.live ? [readSource(s, s.live)] : [])));
-  return toItems(merge(lists, Date.now() - LIVE_WINDOW));
+  const since = Date.now() - LIVE_WINDOW;
+  const lists = await Promise.all(newsSources().flatMap((s) => (s.live ? [newest(s, s.live, since)] : [])));
+  return toItems(lists.flat());
 }
 
 /** Headlines for a search, from every source that can search, newest first. */
 export async function searchNews(query: string): Promise<NewsItem[]> {
   if (MOCK) return toItems(mockHeadlines().filter((h) => normalize(h.title).includes(normalize(query))));
-  const lists = await Promise.all(newsSources().flatMap((s) => (s.search ? [readSource(s, s.search(query))] : [])));
-  return toItems(merge(lists));
+  const lists = await Promise.all(newsSources().flatMap((s) => (s.search ? [newest(s, s.search(query))] : [])));
+  return toItems(lists.flat());
 }
 
 /**

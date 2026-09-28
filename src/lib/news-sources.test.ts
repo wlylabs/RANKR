@@ -58,11 +58,36 @@ describe("newsSources", () => {
 
   it("reads the free ones always, and a keyed one once its key is set", () => {
     const free = newsSources({}).map((s) => s.name);
-    expect(free).toEqual(expect.arrayContaining(["Google News", "Bing News", "GDELT", "Hacker News", "BBC News", "Yonhap News Agency", "UPI Odd News", "CoinDesk"]));
+    expect(free).toEqual(
+      expect.arrayContaining([
+        "Google News", "Bing News", "GDELT", "Hacker News", "BBC News", "DW", "CBC News", "Yonhap News Agency",
+        "The Korea Herald", "Korea Times", "UPI Odd News", "CoinDesk", "The Block", "Watcher Guru",
+      ]),
+    );
     expect(free).not.toContain("GNews");
     expect(newsSources(keys).length - free.length).toBe(6);
     expect(byName("GNews").live).toContain("apikey=g-key");
     expect(byName("TheNewsAPI").search).toBeUndefined(); // 3 requests a day: the live list only
+  });
+
+  it("puts each source in a tab, reads each feed once, over https", () => {
+    const all = newsSources(keys);
+    const tab = (name: string) => all.find((s) => s.name === name)?.category;
+    expect([tab("BBC News"), tab("Google News entertainment"), tab("CoinDesk"), tab("Hacker News"), tab("GNews")]).toEqual([
+      "world", "viral", "crypto", "tech", "world",
+    ]);
+    const urls = all.flatMap((s) => [s.live, s.search?.("x")].filter((u): u is string => !!u));
+    expect(new Set(urls).size).toBe(urls.length);
+    expect(urls.filter((u) => !u.startsWith("https://"))).toEqual([]);
+    expect(all.filter((s) => s.category === "crypto").length).toBeGreaterThanOrEqual(30);
+  });
+
+  it("uses the feeds and searches as their references give them", () => {
+    expect(byName("NPR").live).toBe("https://www.npr.org/rss/rss.php?id=1004"); // World, as awesome-rss-feeds lists it
+    expect(byName("Bing News").search?.("bukangi")).toBe(
+      "https://www.bing.com/news/search?q=bukangi&qft=sortbydate%3D%221%22&format=rss",
+    );
+    expect(byName("Google News world").live).toBe("https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en");
   });
 
   it("reads each keyed API's answers", () => {

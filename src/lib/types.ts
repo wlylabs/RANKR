@@ -169,6 +169,9 @@ export type StatsResponse = {
   updatedAt: number;
 };
 
+/** The news page's tabs: world news, viral and odd stories (what memes come from), crypto, tech. */
+export type NewsCategory = "world" | "viral" | "crypto" | "tech";
+
 /** A headline (src/lib/news.ts): only the headline, the publisher and the link. */
 export type NewsItem = {
   id: string;
@@ -180,6 +183,7 @@ export type NewsItem = {
   publishedAt: number;
   /** What a token named after the story would be called, best first: "Bukang-i", "Busan". */
   keywords: string[];
+  category: NewsCategory;
 };
 
 export type NewsResponse = { items: NewsItem[]; updatedAt: number };

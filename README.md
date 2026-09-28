@@ -48,13 +48,18 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   filter picked on the feed page.
 - **News** (`/news`, in the nav): what's in the news right now, live, newest first, e.g. "Over 560,000 visitors
   flock to Busan to see canal-trapped shark Bukang-i". Just the headline (a link to the article), the publisher
-  and how long ago; nothing has to be pasted first. From every free source, each story once, today's news only,
-  at most 20 from any one source; the page refreshes every 2 minutes. A search box searches them all
-  (`/news?q=shark`). Sources (`src/lib/news-sources.ts`):
-  - no key, always on: Google News (top stories in the US and Singapore editions; World, Entertainment,
-    Science and Technology; search), Bing News (search), GDELT (search), Hacker News (front page, search),
-    and publishers' RSS: BBC, The Guardian, Al Jazeera, NPR, Sky News, Yonhap, CNA, UPI Odd News, New York
-    Post, CoinDesk, Cointelegraph, Decrypt;
+  and how long ago; nothing has to be pasted first. Tabs **All · World · Viral · Crypto · Tech**
+  (`/news?category=viral`); All takes the newest 25 of each, so the many crypto outlets don't bury the viral
+  stories memes come from. From every free source, each story once, today's news only, at most 20 from any one
+  source and 60 per tab; the page refreshes every 2 minutes. A search box searches them all (`/news?q=shark`).
+  Sources (`src/lib/news-sources.ts`), with URLs taken from references rather than guessed:
+  - no key, always on: Google News (US and Singapore top stories; World, Entertainment, Science and Technology;
+    search), Bing News (search, newest first), GDELT (search), Hacker News (front page, search); world news RSS:
+    BBC, The Guardian, Al Jazeera, NPR, Sky News, DW, CBC, Yonhap, The Korea Herald, Korea Times, CNA
+    ([awesome-rss-feeds](https://github.com/plenaryapp/awesome-rss-feeds) and its PR #45,
+    [rss-news-list](https://github.com/vandenbroucke/rss-news-list)); viral: UPI Odd News, New York Post;
+    crypto: 35 news outlets (CoinDesk, The Block, Decrypt, Cointelegraph, Blockworks, Watcher Guru, ...), those
+    [cryptocurrency.cv](https://github.com/nirholas/cryptocurrency.cv)'s feed health check keeps enabled;
   - free key, on once set (`.env.example`): GNews, NewsData.io, The Guardian API, NewsAPI.org, Currents,
     TheNewsAPI, each read as often as its free daily quota allows. Keys never show in logs.
   Not included: Reddit (needs an OAuth app), CryptoPanic (paid since 2026), Mediastack (free plan is HTTP only).
