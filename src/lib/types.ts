@@ -186,6 +186,11 @@ export type NewsItem = {
   /** What a token named after the story would be called, best first: "Bukang-i", "Busan". */
   keywords: string[];
   category: NewsCategory;
+  /**
+   * Google searches for the story's topic in the last day, summed over the countries it trends in (Google Trends'
+   * approx_traffic, a floor); null when it isn't a trending search.
+   */
+  searches: number | null;
 };
 
 export type NewsResponse = { items: NewsItem[]; updatedAt: number };

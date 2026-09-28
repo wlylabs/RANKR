@@ -5,7 +5,7 @@ import { ArrowUpRight, ChevronDown, ChevronRight, Coins, Newspaper, Search } fro
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
+import { formatCount, formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
 import { capTier, type CapTier } from "@/lib/token-filters";
 import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
@@ -174,6 +174,14 @@ function Headline({ item }: { item: NewsItem }) {
           </>
         )}
         <TimeAgo at={item.publishedAt} compact />
+        {item.searches !== null && (
+          <>
+            <span>·</span>
+            <span className="text-muted" title="Google searches in the last day, where it trends (Google Trends)">
+              {formatCount(item.searches)}+ searches
+            </span>
+          </>
+        )}
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -193,7 +201,10 @@ function Headline({ item }: { item: NewsItem }) {
   );
 }
 
-/** What's in the news right now, newest first, or a search: a headline and a link, and the tokens named after it. */
+/**
+ * What's in the news right now, most searched first, or a search: a headline and a link, and the tokens named
+ * after it.
+ */
 export function News() {
   const params = useSearchParams();
   const router = useRouter();
@@ -241,7 +252,7 @@ export function News() {
           </span>
         )}
       </div>
-      <p className="mt-1.5 text-sm text-muted">What&apos;s in the news right now. Tokens shows every token named after a story.</p>
+      <p className="mt-1.5 text-sm text-muted">What&apos;s in the news right now, most searched first. Tokens shows every token named after a story.</p>
 
       <label className="mt-6 flex h-9 w-full items-center gap-2 rounded-md border border-border px-3 transition-colors focus-within:border-border-strong sm:max-w-sm">
         <Search className="size-3.5 text-subtle" />

@@ -22,6 +22,8 @@ export type Headline = {
   publishedAt: number;
   /** What people searched for, when the source says (Google Trends): the likeliest name for a token. */
   topic?: string;
+  /** How many searched for it in the last day, when the source says (Google Trends; a floor). */
+  searches?: number;
 };
 
 export type Source = {
@@ -98,20 +100,30 @@ function hidesAnother(url: string): boolean {
   return /:\/\/|data:/i.test(rest);
 }
 
+/** Google Trends' approx_traffic ("2000+", "200,000+", "50K+", "1M+"): its floor, as a number. Null if it isn't one. */
+export function parseTraffic(text: string | null): number | null {
+  const m = text?.replace(/[,\s]/g, "").match(/^(\d+(?:\.\d+)?)([KMB])?\+?$/i);
+  if (!m) return null;
+  const unit = m[2] ? { K: 1e3, M: 1e6, B: 1e9 }[m[2].toUpperCase() as "K" | "M" | "B"] : 1;
+  return Math.round(Number(m[1]) * unit);
+}
+
 /**
  * Google Trends' "Trending now" RSS: each item is a search people make right now, with the stories behind it.
- * One story per search (the first that isn't spam), dated when the search took off, the search as its topic.
+ * One story per search (the first that isn't spam), dated when the search took off, the search as its topic and
+ * how many made it (approx_traffic).
  */
 export function parseTrends(xml: string): Headline[] {
   const out: Headline[] = [];
   for (const [, item] of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
     const topic = tag(item, "title");
     const date = tag(item, "pubDate");
+    const searches = parseTraffic(tag(item, "ht:approx_traffic"));
     for (const [, story] of item.matchAll(/<ht:news_item\b[^>]*>([\s\S]*?)<\/ht:news_item>/gi)) {
       const url = tag(story, "ht:news_item_url") ?? "";
       const h = hidesAnother(url) ? null : headline(tag(story, "ht:news_item_title"), url, tag(story, "ht:news_item_source"), date);
       if (h) {
-        out.push(topic ? { ...h, topic } : h);
+        out.push({ ...h, ...(topic && { topic }), ...(searches && { searches }) });
         break;
       }
     }

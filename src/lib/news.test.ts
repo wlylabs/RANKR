@@ -63,17 +63,18 @@ describe("liveNews and searchNews", () => {
         );
       }
       // Google Trends: a search and the story behind it. The same search trends in two countries: shown once.
-      const trend = (search: string, title: string, link: string, h: number) =>
-        `<item><title>${search}</title><pubDate>${hours(h)}</pubDate><ht:news_item><ht:news_item_title>${title}</ht:news_item_title>` +
+      const trend = (search: string, traffic: string, title: string, link: string, h: number) =>
+        `<item><title>${search}</title><ht:approx_traffic>${traffic}</ht:approx_traffic><pubDate>${hours(h)}</pubDate>` +
+        `<ht:news_item><ht:news_item_title>${title}</ht:news_item_title>` +
         `<ht:news_item_url>${link}</ht:news_item_url><ht:news_item_source>Yonhap News Agency</ht:news_item_source></ht:news_item></item>`;
       if (url === "https://trends.google.com/trending/rss?geo=US") {
-        return new Response(rss([trend("bukangi", "Shark fever hits Busan as 102,000 rush to see 'Bukangi'", "https://yna.test/fever", 0.5)]));
+        return new Response(rss([trend("bukangi", "20,000+", "Shark fever hits Busan as 102,000 rush to see 'Bukangi'", "https://yna.test/fever", 0.5)]));
       }
       if (url === "https://trends.google.com/trending/rss?geo=SG") {
         return new Response(
           rss([
-            trend("bukangi", "Busan's shark draws crowds", "https://yna.test/crowds", 0.6),
-            trend("pygmy hippo", "Thailand's famous hippo celebrates with a fruit cake", "https://yna.test/hippo", 4),
+            trend("bukangi", "5000+", "Busan's shark draws crowds", "https://yna.test/crowds", 0.6),
+            trend("pygmy hippo", "10K+", "Thailand's famous hippo celebrates with a fruit cake", "https://yna.test/hippo", 4),
           ]),
         );
       }
@@ -83,7 +84,9 @@ describe("liveNews and searchNews", () => {
 
     const news = await liveNews();
     const titles = news.map((n) => n.title);
-    expect(titles[0]).toBe("Shark fever hits Busan as 102,000 rush to see 'Bukangi'");
+    // Most searched first (a search trending in two countries counts both), then newest.
+    expect(titles.slice(0, 2)).toEqual(["Shark fever hits Busan as 102,000 rush to see 'Bukangi'", "Thailand's famous hippo celebrates with a fruit cake"]);
+    expect(news.slice(0, 3).map((n) => n.searches)).toEqual([25_000, 10_000, null]);
     expect(titles).not.toContain("Busan's shark draws crowds");
     expect(titles.filter((t) => t.includes("Bukang-i"))).toHaveLength(1);
     expect(titles).toContain("Moo Deng turns two");

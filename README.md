@@ -46,9 +46,14 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
-- **News** (`/news`, in the nav): what's in the news right now, live, newest first, e.g. "Over 560,000 visitors
-  flock to Busan to see canal-trapped shark Bukang-i". Just the headline (a link to the article), the publisher
-  and how long ago; nothing has to be pasted first. Tabs **All · Trending · Crypto** (`/news?category=trending`):
+- **News** (`/news`, in the nav): what's in the news right now, live, most searched first, e.g. "Over 560,000
+  visitors flock to Busan to see canal-trapped shark Bukang-i". Just the headline (a link to the article), the
+  publisher, how long ago and, for a trending search's story, how many searched for it ("200K+ searches");
+  nothing has to be pasted first. Most searched first: Google searches in the last day for the story's topic
+  (Google Trends' approx_traffic, a floor, summed over the countries it trends in), what most people are looking
+  at and the likeliest to get a token named after it (trends ranked by approx_traffic as
+  [trending-search-google](https://github.com/suvrockzzzz/trending-search-google) ranks them); then newest
+  first. Tabs **All · Trending · Crypto** (`/news?category=trending`):
   trending is what people search for and read right now, where memes come from; All takes the newest 25 of each,
   so the many crypto outlets don't bury the trending stories. From every free source, each story once, today's
   news only, at most 20 from any one source and 60 per tab; the page refreshes every 2 minutes. A search box

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { newsSources, parseDate, parseRss, parseTrends, readSource } from "./news-sources";
+import { newsSources, parseDate, parseRss, parseTraffic, parseTrends, readSource } from "./news-sources";
 
 const rss = (items: string[]) => `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items.join("")}</channel></rss>`;
 const item = (title: string, link: string, date: string, extra = "") =>
@@ -52,6 +52,11 @@ describe("parseTrends", () => {
   const feed = (items: string[]) =>
     `<?xml version="1.0" encoding="UTF-8"?><rss xmlns:ht="https://trends.google.com/trending/rss" version="2.0"><channel>${items.join("")}</channel></rss>`;
 
+  it("reads approx_traffic as the number it's at least", () => {
+    expect(["2000+", "200,000+", "50K+", "1M+", "1.5M+", "500"].map(parseTraffic)).toEqual([2_000, 200_000, 50_000, 1_000_000, 1_500_000, 500]);
+    expect([null, "", "lots"].map(parseTraffic)).toEqual([null, null, null]);
+  });
+
   it("takes one story per search, the search as its topic, dated when the search took off", () => {
     const at = Date.parse("2026-09-28T10:40:00Z");
     expect(
@@ -65,7 +70,7 @@ describe("parseTrends", () => {
         ]),
       ),
     ).toEqual([
-      { title: "Shark fever hits Busan as 102,000 rush to see 'Bukangi'", url: "https://en.yna.co.kr/view/1", source: "Yonhap News Agency", publishedAt: at, topic: "bukangi" },
+      { title: "Shark fever hits Busan as 102,000 rush to see 'Bukangi'", url: "https://en.yna.co.kr/view/1", source: "Yonhap News Agency", publishedAt: at, topic: "bukangi", searches: 2_000 },
     ]);
   });
 
