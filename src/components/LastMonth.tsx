@@ -24,8 +24,8 @@ function List({ title, empty, children }: { title: string; empty: string; childr
   );
 }
 
-/** The last month's top 10 callers and tokens, kept when the boards reset on the 1st (see rankr_end_month). */
-export function LastMonth() {
+/** The last month's top 10 callers or tokens, kept when the boards reset on the 1st (see rankr_end_month). */
+export function LastMonth({ board }: { board: "tokens" | "callers" }) {
   const { season, isLoading } = useLastSeason();
   const next = nextResetAt(useNow(60_000));
 
@@ -56,45 +56,48 @@ export function LastMonth() {
         <span className="text-muted">{monthLabel(season.month)}</span> · {counts.calls.toLocaleString("en-US")} calls on{" "}
         {counts.tokens.toLocaleString("en-US")} tokens by {counts.callers.toLocaleString("en-US")} callers
       </p>
-      <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
-        <List title="Top callers" empty="Nobody had the 5 calls a hit rate needs.">
-          {season.callers.map((c, i) => (
-            <div key={c.userId} className="flex items-center gap-3 px-4 py-3">
-              <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rank(i)}</span>
-              <Link href={callerHref(c.username)} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
-                <Avatar userId={c.userId} size={20} />
-                <span className="truncate font-mono text-[13px]">@{c.username}</span>
-                {c.official && <OfficialBadge />}
-              </Link>
-              <span className="text-right">
-                <span className="tabular block font-mono text-[13px] font-medium">
-                  {Math.round((c.hits / Math.max(c.calls, 1)) * 100)}%
+      <div className="mt-4">
+        {board === "callers" ? (
+          <List title="Top callers" empty="Nobody had the 5 calls a hit rate needs.">
+            {season.callers.map((c, i) => (
+              <div key={c.userId} className="flex items-center gap-3 px-4 py-3">
+                <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rank(i)}</span>
+                <Link href={callerHref(c.username)} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
+                  <Avatar userId={c.userId} size={20} />
+                  <span className="truncate font-mono text-[13px]">@{c.username}</span>
+                  {c.official && <OfficialBadge />}
+                </Link>
+                <span className="text-right">
+                  <span className="tabular block font-mono text-[13px] font-medium">
+                    {Math.round((c.hits / Math.max(c.calls, 1)) * 100)}%
+                  </span>
+                  <span className="tabular block font-mono text-[10px] text-subtle">
+                    {c.hits}/{c.calls} at 2x+
+                  </span>
                 </span>
-                <span className="tabular block font-mono text-[10px] text-subtle">
-                  {c.hits}/{c.calls} at 2x+
-                </span>
-              </span>
-            </div>
-          ))}
-        </List>
-        <List title="Top tokens" empty="No tokens that month.">
-          {season.tokens.map((t, i) => (
-            <Link key={t.id} href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
-              <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rank(i)}</span>
-              <div className="min-w-0 flex-1">
-                <TokenName symbol={t.symbol} name={t.name} />
-                <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
-                  <ChainTag chainId={t.chainId} /> · entry {formatUsd(t.entryMarketCap)}
-                  {t.firstCaller && <> · first call @{t.firstCaller}</>}
-                </div>
               </div>
-              <span className="flex items-baseline gap-1">
-                <span className="font-mono text-[10px] text-subtle">peak</span>
-                <MultipleBadge multiple={t.peakMultiple} />
-              </span>
-            </Link>
-          ))}
-        </List>
+            ))}
+          </List>
+        ) : (
+          <List title="Top tokens" empty="No tokens that month.">
+            {season.tokens.map((t, i) => (
+              <Link key={t.id} href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
+                <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rank(i)}</span>
+                <div className="min-w-0 flex-1">
+                  <TokenName symbol={t.symbol} name={t.name} />
+                  <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
+                    <ChainTag chainId={t.chainId} /> · entry {formatUsd(t.entryMarketCap)}
+                    {t.firstCaller && <> · first call @{t.firstCaller}</>}
+                  </div>
+                </div>
+                <span className="flex items-baseline gap-1">
+                  <span className="font-mono text-[10px] text-subtle">peak</span>
+                  <MultipleBadge multiple={t.peakMultiple} />
+                </span>
+              </Link>
+            ))}
+          </List>
+        )}
       </div>
     </div>
   );

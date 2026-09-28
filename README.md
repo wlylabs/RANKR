@@ -15,7 +15,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Entry locked at the first paste**: later pastes of the same token keep the original entry and bump a paste counter.
 - **Live multiple**: current price / entry price, shown as `3.42x` for gains and `-37.2%` for losses.
   Peak and lowest point since the paste are recorded too.
-- **Leaderboard**: top gainers, peak x, biggest dumps, newest, most pasted. Filter by 24h / 7d / 30d, chain, and search.
+- **Leaderboard**: two boards, Tokens and Callers, each for **this month** (live, with the countdown to the reset) or
+  **last month** (its kept top 10). Tokens: top gainers, peak x, biggest dumps, newest, most pasted. Filter by
+  24h / 7d / the whole month, chain, and search.
   **Dead tokens** (down 70% or more from their first paste) are left off the boards so junk doesn't pile up; they're
   back if they recover, a search still finds them, and nothing is deleted: calls on them still count as losses on
   the caller board. The background refresh checks them hourly instead of every minute.
@@ -26,8 +28,10 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
   and can rename itself.
 - **My calls**: every token you pasted, measured from *your* paste.
-- **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Each
-  caller has a public profile at `/u/<username>` with their numbers and every call.
+- **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Signed
+  in, your place stays pinned under the board: your rank and how far behind the caller one place up you are
+  (or how many calls you still need to be ranked). Each caller has a public profile at `/u/<username>` with their
+  numbers and every call.
 - **Caller profiles**: an avatar drawn from the account (a mirrored 5x5 matrix from `sha256(user id)`, in the style
   of the logo, nothing to upload), a short bio, Telegram and website links, and an **X account, shown only once
   verified**: the caller posts a code from that X account and pastes the link (next sections). Edited on
@@ -291,16 +295,17 @@ rolls everything back. Run it against a local or throwaway database:
 | Route | What |
 | --- | --- |
 | `POST /api/track` `{input}` | paste a CA / link (needs an account when accounts are on) |
-| `GET /api/tokens?sort=top\|peak\|losers\|new\|hot&range=24h\|7d\|30d\|all&chain=&q=&ids=&limit=&offset=` | leaderboard page (without dead tokens, unless `q` or `ids`) |
+| `GET /api/tokens?sort=top\|peak\|losers\|new\|hot&range=24h\|7d\|all&chain=&q=&ids=&limit=&offset=` | leaderboard page (without dead tokens, unless `q` or `ids`) |
 | `GET /api/season` | the last month that ended: its top 10 callers and tokens |
 | `GET /api/lookup?input=` | what a paste points at, before choosing: live data, and Rankr's record if any (writes nothing) |
 | `GET /api/watchlist?ids=<chain>:<address>,...` | live data for watched tokens, tracked or not |
 | `GET /api/tokens/:chain/:address` | one token (or a preview if untracked) |
 | `GET /api/stats` | totals for the home page |
 | `GET /api/cron/refresh` | refresh the stalest tokens (needs `CRON_SECRET`) |
-| `GET /api/callers?sort=hits\|avg\|best\|calls&limit=&offset=` | caller leaderboard |
+| `GET /api/callers?sort=rate\|avg\|hits\|best\|calls&limit=&offset=` | caller leaderboard |
 | `GET /api/callers/:username` | a caller's profile: board numbers, bio and links, and calls |
 | `GET /api/me`, `POST /api/me/username` `{username}`, `POST /api/me/key`, `GET /api/me/calls` | your account, username, a new sign-in key (returned once) and calls (`Authorization: Bearer <access token>`) |
+| `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
 | `GET /api/feed?scope=all\|top&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first |
@@ -327,7 +332,7 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/tokens                 GET a leaderboard page (sort, filter, paging)
   api/stats                  GET home page totals
   api/cron/refresh           background price refresh
-  api/callers, api/me/*      caller board, your account, username, profile and calls
+  api/callers, api/me/*      caller board, your account, username, profile, calls and rank
   api/feed                   GET the feed: calls and milestones
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)

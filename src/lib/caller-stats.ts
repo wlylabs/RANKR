@@ -1,3 +1,4 @@
+import type { CallerSort } from "./params";
 import type { CallView, CallerView } from "./types";
 
 type Stats = Pick<CallerView, "calls" | "hits" | "wins" | "avgMultiple" | "bestMultiple" | "bestToken">;
@@ -34,6 +35,39 @@ export function callerStats(calls: CallView[]): Stats {
         }
       : null,
   };
+}
+
+type Ranked = Pick<CallerView, "calls" | "hits" | "avgMultiple" | "bestMultiple">;
+
+const rate = (c: Ranked) => c.hits / Math.max(c.calls, 1);
+
+function gapX(d: number): string | null {
+  return d >= 0.005 ? `${d.toFixed(d >= 100 ? 0 : d >= 10 ? 1 : 2)}x` : null;
+}
+
+/**
+ * How far `me` is behind `ahead` in the number the caller board sorts by: "6 pts" (of hit rate), "2 hits",
+ * "0.35x", "3 calls". Null when they are level as shown (the board's tie-breaks put `ahead` first).
+ */
+export function behind(sort: CallerSort, me: Ranked, ahead: Ranked): string | null {
+  switch (sort) {
+    case "rate": {
+      const pts = Math.round(rate(ahead) * 100) - Math.round(rate(me) * 100);
+      return pts > 0 ? `${pts} ${pts === 1 ? "pt" : "pts"}` : null;
+    }
+    case "hits": {
+      const n = ahead.hits - me.hits;
+      return n > 0 ? `${n} ${n === 1 ? "hit" : "hits"}` : null;
+    }
+    case "calls": {
+      const n = ahead.calls - me.calls;
+      return n > 0 ? `${n} ${n === 1 ? "call" : "calls"}` : null;
+    }
+    case "avg":
+      return gapX(ahead.avgMultiple - me.avgMultiple);
+    case "best":
+      return gapX(ahead.bestMultiple - me.bestMultiple);
+  }
 }
 
 /** Where a caller's calls are now: a loss (below entry), under 2x, or a hit, bucketed by size. */

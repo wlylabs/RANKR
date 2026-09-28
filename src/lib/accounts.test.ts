@@ -20,6 +20,7 @@ describe("accounts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let profile: ProfileRow[];
   let feedArgs: Record<string, unknown> | null;
+  let rankArgs: Record<string, unknown> | null;
   let verifyOk: boolean;
 
   beforeEach(() => {
@@ -28,6 +29,7 @@ describe("accounts", () => {
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
     profile = [{ username: "alpha_caller" }];
     feedArgs = null;
+    rankArgs = null;
     verifyOk = true;
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const auth = new Headers(init?.headers).get("authorization");
@@ -55,6 +57,20 @@ describe("accounts", () => {
               { ...caller, user_id: "u1", username: "rankr", official: true },
               { ...caller, user_id: "u2", username: "degen" },
             ],
+          }),
+        );
+      }
+      if (url.endsWith("/rest/v1/rpc/rankr_caller_rank")) {
+        rankArgs = JSON.parse(String(init?.body));
+        const caller = { calls: 6, hits: 2, wins: 3, avg_multiple: 1.8, best_multiple: 4.2, official: false };
+        return new Response(
+          JSON.stringify({
+            total: 12,
+            calls: 6,
+            rank: 4,
+            caller: { ...caller, user_id: USER.id, username: "alpha_caller",
+                      best_token: { id: "solana:ZZZ", address: "ZZZ", symbol: "ZED", name: "Zed", chain_id: "solana" } },
+            ahead: { ...caller, user_id: "u2", username: "degen", hits: 3, best_token: null },
           }),
         );
       }
@@ -287,6 +303,19 @@ describe("accounts", () => {
         multiple: 6, // price 12, this caller's entry 2
       },
     ]);
+  });
+
+  it("reads a caller's place on the board with the board's minimum calls", async () => {
+    const { callerRank } = await import("./accounts");
+    const out = await callerRank(USER.id, "rate");
+    expect(rankArgs).toEqual({ p_user: USER.id, p_sort: "rate", p_min_calls: 5 });
+    expect(out).toMatchObject({ total: 12, calls: 6, rank: 4 });
+    expect(out.caller).toMatchObject({ userId: USER.id, username: "alpha_caller", hits: 2, avgMultiple: 1.8 });
+    expect(out.caller?.bestToken).toEqual({ id: "solana:ZZZ", address: "ZZZ", symbol: "ZED", name: "Zed", chainId: "solana" });
+    expect(out.ahead).toMatchObject({ userId: "u2", username: "degen", hits: 3, bestToken: null });
+
+    await callerRank(USER.id, "hits");
+    expect(rankArgs).toMatchObject({ p_sort: "hits", p_min_calls: 1 });
   });
 
   it("asks nothing for an empty list of callers", async () => {

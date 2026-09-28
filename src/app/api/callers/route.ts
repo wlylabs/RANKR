@@ -5,7 +5,7 @@ import type { CallersResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/callers?sort=hits|avg|best|calls&limit=50&offset=0 */
+/** GET /api/callers?sort=rate|avg|hits|best|calls&limit=50&offset=0 */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
   if (!accountsEnabled()) {

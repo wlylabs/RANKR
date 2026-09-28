@@ -2,12 +2,12 @@
 // per-user calls. Server only.
 import { callerStats } from "./caller-stats";
 import { generateKey, isKeyEmail, keyEmail } from "./key";
-import { MIN_CALLS_RANKED, type CallerSort } from "./params";
+import { minCallsFor, type CallerSort } from "./params";
 import { parsePostId, xCode, type ProfileFields } from "./profile";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
-import type { CallView, CallerAbout, CallerView, FeedItem, Season, TokenView } from "./types";
+import type { CallView, CallerAbout, CallerView, FeedItem, MyRankResponse, Season, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 import { readPost, type Post } from "./x-post";
 
@@ -324,36 +324,54 @@ type CallerRow = {
   best_token: { id: string; address: string; symbol: string; name: string; chain_id: string } | null;
 };
 
+function callerView(c: CallerRow): CallerView {
+  return {
+    userId: c.user_id,
+    username: c.username,
+    official: !!c.official,
+    calls: c.calls,
+    hits: c.hits,
+    wins: c.wins,
+    avgMultiple: c.avg_multiple,
+    bestMultiple: c.best_multiple,
+    bestToken: c.best_token
+      ? {
+          id: c.best_token.id,
+          address: c.best_token.address,
+          symbol: c.best_token.symbol,
+          name: c.best_token.name,
+          chainId: c.best_token.chain_id,
+        }
+      : null,
+  };
+}
+
 export async function callers(sort: CallerSort, limit: number, offset: number): Promise<{ total: number; callers: CallerView[] }> {
   const api = rest();
   if (!api) return { total: 0, callers: [] };
   const out = await api.rpc<{ total: number; callers: CallerRow[] }>("rankr_callers", {
     p_sort: sort,
-    p_min_calls: sort === "avg" || sort === "rate" ? MIN_CALLS_RANKED : 1,
+    p_min_calls: minCallsFor(sort),
     p_limit: limit,
     p_offset: offset,
   });
+  return { total: out.total, callers: out.callers.map(callerView) };
+}
+
+/** A caller's place on the caller board for `sort`: their rank and the caller one place up (rankr_caller_rank). */
+export async function callerRank(userId: string, sort: CallerSort): Promise<MyRankResponse> {
+  const api = rest();
+  if (!api) return { total: 0, calls: 0, rank: null, caller: null, ahead: null };
+  const out = await api.rpc<{ total: number; calls: number; rank: number | null; caller: CallerRow | null; ahead: CallerRow | null }>(
+    "rankr_caller_rank",
+    { p_user: userId, p_sort: sort, p_min_calls: minCallsFor(sort) },
+  );
   return {
     total: out.total,
-    callers: out.callers.map((c) => ({
-      userId: c.user_id,
-      username: c.username,
-      official: !!c.official,
-      calls: c.calls,
-      hits: c.hits,
-      wins: c.wins,
-      avgMultiple: c.avg_multiple,
-      bestMultiple: c.best_multiple,
-      bestToken: c.best_token
-        ? {
-            id: c.best_token.id,
-            address: c.best_token.address,
-            symbol: c.best_token.symbol,
-            name: c.best_token.name,
-            chainId: c.best_token.chain_id,
-          }
-        : null,
-    })),
+    calls: out.calls,
+    rank: out.rank,
+    caller: out.caller && callerView(out.caller),
+    ahead: out.ahead && callerView(out.ahead),
   };
 }
 

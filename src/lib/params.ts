@@ -3,7 +3,8 @@
 export const SORT_KEYS = ["top", "peak", "losers", "new", "hot"] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 
-export const RANGES = { "24h": 86_400_000, "7d": 7 * 86_400_000, "30d": 30 * 86_400_000, all: null } as const;
+// No 30d: the boards reset monthly, so "all" is already this month (see season.ts).
+export const RANGES = { "24h": 86_400_000, "7d": 7 * 86_400_000, all: null } as const;
 export type RangeKey = keyof typeof RANGES;
 
 export function parseSort(value: string | null | undefined): SortKey {
@@ -38,6 +39,11 @@ export function parseCallerSort(value: string | null | undefined): CallerSort {
 
 /** Hit rate and average x only count callers with this many calls, so one lucky call can't top the board. */
 export const MIN_CALLS_RANKED = 5;
+
+/** Calls a caller needs to be on the caller board for `sort`. */
+export function minCallsFor(sort: CallerSort): number {
+  return sort === "avg" || sort === "rate" ? MIN_CALLS_RANKED : 1;
+}
 
 /**
  * Paste limits: a burst limit per IP, and a daily one per account (a guest gets fewer than an account with a

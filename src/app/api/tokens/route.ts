@@ -11,7 +11,7 @@ function int(value: string | null, fallback: number, max: number) {
 }
 
 /**
- * GET /api/tokens?sort=top|peak|losers|new|hot&range=24h|7d|30d|all&chain=solana&q=pepe&ids=a,b&limit=50&offset=0
+ * GET /api/tokens?sort=top|peak|losers|new|hot&range=24h|7d|all&chain=solana&q=pepe&ids=a,b&limit=50&offset=0
  * The boards leave out dead tokens (−70% or worse, see DEAD_MULTIPLE); a search (`q`) or `ids` includes them.
  */
 export async function GET(req: NextRequest) {

@@ -97,6 +97,19 @@ export type CallerView = {
 
 export type CallersResponse = { enabled: boolean; total: number; callers: CallerView[]; updatedAt: number };
 
+/** The signed-in caller's place on the caller board for one sort (rankr_caller_rank). */
+export type MyRankResponse = {
+  /** Callers on the board. */
+  total: number;
+  /** All of the caller's calls, on the board or not. */
+  calls: number;
+  /** From 1; null off the board (fewer calls than the sort needs), and then `caller` is null too. */
+  rank: number | null;
+  caller: CallerView | null;
+  /** The caller one place up; null at #1. */
+  ahead: CallerView | null;
+};
+
 /**
  * What a caller says about themselves (see src/lib/profile.ts). On a public profile `x` is there only once
  * verified; the account's own view has it either way.
