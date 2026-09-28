@@ -373,7 +373,7 @@ function ChoiceCard({
 
 function WatchSaved({ entry, onClose }: { entry: Watched; onClose: () => void }) {
   return (
-    <div role="status" className="animate-fade-in mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-left text-sm">
+    <div role="status" className="animate-fade-in mt-3 flex items-center gap-2 card bg-surface px-4 py-2.5 text-left text-sm">
       <Star className="size-3.5 shrink-0 fill-current" />
       <span className="min-w-0 flex-1 truncate text-muted">
         <span className="font-medium text-fg">${entry.symbol}</span> saved to your watchlist at {formatUsd(entry.marketCap)} mc.
@@ -398,7 +398,7 @@ function TrackResult({ result, keepAs, onClose }: { result: Result; keepAs: stri
   const t = result.token;
   const created = result.status === "created";
   return (
-    <div role="status" className="animate-fade-in mt-3 overflow-hidden rounded-lg border border-border bg-surface text-left">
+    <div role="status" className="animate-fade-in mt-3 overflow-hidden card bg-surface text-left">
       <Link href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
         <div className="min-w-0 flex-1">
           <TokenName symbol={t.symbol} name={t.name} />

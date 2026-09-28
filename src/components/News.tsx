@@ -10,8 +10,10 @@ import { useNamesakes, useNews } from "@/lib/hooks";
 import { capTier, type CapTier } from "@/lib/token-filters";
 import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
 import { ChainTag } from "./Chain";
-import { Tab } from "./Leaderboard";
+import { Cascade } from "./Cinema";
 import { MultipleBadge } from "./MultipleBadge";
+import { PageHeader } from "./PageHeader";
+import { TabBar } from "./Tabs";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton, TokenName } from "./TokenList";
 
@@ -221,33 +223,15 @@ export function News() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">News</h1>
-        <span className="label inline-flex items-center gap-1.5 text-subtle">
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-50" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-up" />
-          </span>
-          Live
-        </span>
-      </div>
-      <p className="mt-1.5 text-sm text-muted">What&apos;s in the news right now, most searched first. Tokens shows every token named after a story.</p>
+      <PageHeader title="News" live>
+        What&apos;s in the news right now, most searched first. Tokens shows every token named after a story.
+      </PageHeader>
 
-      <div
-        className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
-        role="tablist"
-        aria-label="Category"
-      >
-        {(Object.keys(TABS) as TabKey[]).map((key) => (
-          <Tab key={key} active={tab === key} onClick={() => setParam("category", key, "all")}>
-            {TABS[key]}
-          </Tab>
-        ))}
-      </div>
+      <TabBar label="Category" options={TABS} value={tab} onChange={(key) => setParam("category", key, "all")} className="mt-6" />
 
       <div className="mt-4">
         {isLoading && !items.length ? (
-          <div className="rounded-lg border border-border">
+          <div className="card">
             <ListSkeleton rows={6} />
           </div>
         ) : !items.length ? (
@@ -261,11 +245,11 @@ export function News() {
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          <Cascade as="ul" className="divide-y divide-border overflow-hidden card">
             {items.map((item) => (
               <Headline key={item.id} item={item} />
             ))}
-          </ul>
+          </Cascade>
         )}
       </div>
     </div>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { HashField, Reveal } from "@/components/Cinema";
 import { DecryptText } from "@/components/DecryptText";
 import { LiveStatus } from "@/components/HomeFeed";
-import { Faq } from "@/components/Landing";
+import { BoardPreview, Faq } from "@/components/Landing";
 import { APP_HOME } from "@/lib/login";
 import { delay } from "@/lib/motion";
 
@@ -76,6 +76,8 @@ export default function LandingPage() {
           </p>
         </div>
       </section>
+
+      <BoardPreview />
 
       <section aria-label="How Rankr works" className="border-y border-border">
         <ol className="grid divide-border max-sm:divide-y sm:grid-cols-3 sm:divide-x">

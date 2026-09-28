@@ -7,6 +7,7 @@ import type { FeedItem } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { FeedSentence } from "./FeedLine";
 import { MultipleBadge } from "./MultipleBadge";
+import { LiveDot } from "./PageHeader";
 import { TimeAgo } from "./TimeAgo";
 
 const SCOPE_LABEL = { all: null, top: "Top", you: "You" } as const;
@@ -41,17 +42,14 @@ export function CallTicker() {
   const duration = `${loop.length * 6}s`;
 
   return (
-    <section aria-label="Live feed" className="border-b border-border bg-bg">
+    <section aria-label="Live feed" className="border-b border-border">
       <div className="mx-auto flex h-8 max-w-6xl items-center">
         <Link
           href="/feed"
           className="label flex shrink-0 items-center gap-1.5 border-r border-border pr-3 pl-4 text-subtle transition-colors hover:text-fg sm:pl-6"
           title="Open the feed"
         >
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-50" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-up" />
-          </span>
+          <LiveDot />
           Live
           {SCOPE_LABEL[scope] && <span className="text-muted">· {SCOPE_LABEL[scope]}</span>}
         </Link>

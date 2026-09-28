@@ -86,6 +86,28 @@ export function HashField() {
 }
 
 /**
+ * A list whose rows rise in one after another when it first shows (.cascade). The class goes once the list
+ * has settled, so rows that a live refresh moves or adds don't replay the entrance. `as` keeps list and
+ * table markup valid.
+ */
+export function Cascade({
+  as: Tag = "div",
+  className,
+  children,
+}: {
+  as?: "div" | "ul" | "ol" | "tbody";
+  className?: string;
+  children: ReactNode;
+}) {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setSettled(true), 1200);
+    return () => window.clearTimeout(id);
+  }, []);
+  return <Tag className={clsx(className, !settled && "cascade")}>{children}</Tag>;
+}
+
+/**
  * Below-the-fold content that arrives as it scrolls into view (blur, rise, fade), staggered by `delay`.
  * Anything already on screen when the page loads is left alone, and so is everything with reduced motion,
  * so nothing ever blinks out.

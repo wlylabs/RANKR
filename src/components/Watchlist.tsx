@@ -10,6 +10,7 @@ import { ratio } from "@/lib/metrics";
 import type { MarketSnapshot, TokenView, WatchlistResponse } from "@/lib/types";
 import { settle, unwatch, useWatchlist, watch, watchedFrom, type Watched } from "@/lib/watchlist";
 import { ChainTag } from "./Chain";
+import { Cascade } from "./Cinema";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton, TokenName } from "./TokenList";
@@ -100,15 +101,15 @@ export function Watchlist() {
       <p className="mt-4 text-sm text-muted">
         Measured from when you saved each one. Private, on this device, and not calls.
       </p>
-      <div className="mt-4 overflow-hidden rounded-lg border border-border">
+      <div className="mt-4 overflow-hidden card">
         {isLoading && !items.size ? (
           <ListSkeleton rows={Math.min(list.length, 5)} />
         ) : (
-          <div className="divide-y divide-border">
+          <Cascade className="divide-y divide-border">
             {list.map((w) => (
               <WatchRow key={w.id} w={w} item={items.get(w.id)} loading={isLoading} />
             ))}
-          </div>
+          </Cascade>
         )}
       </div>
     </>

@@ -16,9 +16,13 @@ import { accountsAvailable } from "@/lib/supabase-browser";
 import type { CallView, CallerAbout, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { CallSpread, RecentForm } from "./CallerCharts";
+import { Cascade } from "./Cinema";
+import { CountUp } from "./CountUp";
 import { rankLine } from "./CallersBoard";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
+import { PageHeader } from "./PageHeader";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
+import { Segmented, TabBar } from "./Tabs";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
 import { Watchlist } from "./Watchlist";
@@ -43,6 +47,7 @@ const SORTS = {
   best: (a: Row, b: Row) => b.multiple - a.multiple,
   worst: (a: Row, b: Row) => a.multiple - b.multiple,
 };
+const SORT_LABELS: Record<keyof typeof SORTS, string> = { new: "New", best: "Best", worst: "Worst" };
 
 function deviceRow(call: MyCall, token: TokenView | undefined): Row {
   const price = token?.market?.priceUsd;
@@ -190,7 +195,7 @@ export function RankCard({
   return (
     <Link
       href={href}
-      className={clsx("flex items-center gap-4 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-surface-2", className)}
+      className={clsx("flex items-center gap-4 card px-4 py-3 transition-colors hover:bg-surface-2", className)}
     >
       <span className="tabular font-mono text-2xl font-medium tracking-tight">{mine.rank ? `#${mine.rank}` : "—"}</span>
       <span className="min-w-0 flex-1">
@@ -255,25 +260,22 @@ function Page({
 
   return (
     <div className="pt-10 sm:pt-14">
-      {header ?? <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">You</h1>}
-      <div className="mt-6 flex border-b border-border" role="tablist" aria-label="You">
-        {(Object.keys(TABS) as TabKey[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={clsx(
-              "relative mr-6 h-10 text-sm transition-colors",
-              tab === t ? "text-fg after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-fg" : "text-muted hover:text-fg",
-            )}
-          >
-            {TABS[t]}
-            {t === "watchlist" && watching > 0 && <span className="ml-1.5 font-mono text-xs text-subtle">{watching}</span>}
-          </button>
-        ))}
-      </div>
+      {header ?? <PageHeader title="You" />}
+      <TabBar
+        label="You"
+        options={{
+          ...TABS,
+          watchlist: (
+            <>
+              {TABS.watchlist}
+              {watching > 0 && <span className="ml-1.5 font-mono text-xs text-subtle">{watching}</span>}
+            </>
+          ),
+        }}
+        value={tab}
+        onChange={setTab}
+        className="mt-6"
+      />
 
       {tab === "watchlist" ? (
         <Watchlist />
@@ -316,7 +318,7 @@ function NoCalls() {
 function Stats({ rows, loading }: { rows: Row[]; loading: boolean }) {
   if (!rows.length) {
     return loading ? (
-      <div className="mt-8 rounded-lg border border-border">
+      <div className="mt-8 card">
         <ListSkeleton rows={4} />
       </div>
     ) : (
@@ -345,7 +347,7 @@ export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; lo
 
   if (!rows.length) {
     return (
-      <div className="mt-8 rounded-lg border border-border">
+      <div className="mt-8 card">
         <ListSkeleton rows={4} />
       </div>
     );
@@ -353,14 +355,14 @@ export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; lo
 
   return (
     <>
-      <div className="mt-8 grid grid-cols-2 rounded-lg border border-border max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x lg:divide-border">
-        <Tile label="Calls" value={rows.length} />
+      <div className="mt-8 grid grid-cols-2 card max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x lg:divide-border">
+        <Tile label="Calls" value={<CountUp value={rows.length} />} />
         <Tile
           label="In profit"
           value={withData.length ? `${Math.round((inProfit / withData.length) * 100)}%` : "—"}
           hint={`${inProfit} of ${withData.length}`}
         />
-        <Tile label="2x or better" value={doubled} hint="right now" />
+        <Tile label="2x or better" value={<CountUp value={doubled} />} hint="right now" />
         <Tile
           label="Best call"
           value={best ? <span className={toneOf(best.multiple, "text-fg")}>{formatMultiple(best.multiple)}</span> : "—"}
@@ -372,25 +374,10 @@ export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; lo
         <h2 className="text-sm font-medium">
           {rows.length} {rows.length === 1 ? "token" : "tokens"}
         </h2>
-        <div className="flex h-8 items-center rounded-md border border-border p-0.5">
-          {(Object.keys(SORTS) as (keyof typeof SORTS)[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSort(key)}
-              aria-pressed={sort === key}
-              className={clsx(
-                "h-full rounded px-2.5 text-xs capitalize transition-colors",
-                sort === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
-              )}
-            >
-              {key}
-            </button>
-          ))}
-        </div>
+        <Segmented label="Sort" pressed options={SORT_LABELS} value={sort} onChange={setSort} optionClassName="px-2.5 text-xs" />
       </div>
 
-      <ul className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
+      <Cascade as="ul" className="mt-3 divide-y divide-border overflow-hidden card">
         {rows.map((row) => (
           <li key={row.id} className="transition-colors hover:bg-surface-2">
             <Link href={tokenHref(row)} className="flex min-w-0 items-center gap-3 px-4 py-3">
@@ -416,7 +403,7 @@ export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; lo
             </Link>
           </li>
         ))}
-      </ul>
+      </Cascade>
     </>
   );
 }

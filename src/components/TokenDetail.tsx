@@ -5,7 +5,7 @@ import { Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lu
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import useSWR from "swr";
 import { chainMeta } from "@/lib/chains";
 import {
@@ -110,7 +110,7 @@ function Header({ market, fallback }: { market: MarketSnapshot | null; fallback:
 
 function Section({ title, children, className }: { title?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={clsx("rounded-lg border border-border", className)}>
+    <section className={clsx("card", className)}>
       {title && <h2 className="border-b border-border px-4 py-2.5 text-sm font-medium">{title}</h2>}
       <div className="p-4">{children}</div>
     </section>
@@ -152,7 +152,15 @@ function Tracked({ token: t }: { token: TokenView }) {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3 lg:grid-rows-[auto_1fr] lg:items-start">
         {/* Hero multiple */}
-        <section className="rounded-lg border border-border lg:col-span-2">
+        <section className="card relative isolate overflow-hidden lg:col-span-2">
+          {/* The number lights its own card, green or red. */}
+          {tone(t.multiple) !== "text-fg" && (
+            <div
+              aria-hidden
+              className="pnl-glow pointer-events-none absolute inset-0 -z-10"
+              style={{ "--glow": t.multiple > 1 ? "var(--up)" : "var(--down)" } as CSSProperties}
+            />
+          )}
           <div className="flex flex-wrap items-start justify-between gap-4 p-5 sm:p-6">
             <div>
               <div className="label text-subtle">Since first paste</div>
@@ -310,7 +318,7 @@ function Chart({ market, className }: { market: MarketSnapshot; className?: stri
     `https://dexscreener.com/${market.chainId}/${market.pairAddress}?embed=1&loadChartSettings=0&trades=0&tabs=0` +
     `&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=${theme}&theme=${theme}&chartStyle=1&chartType=marketCap&interval=15`;
   return (
-    <section className={clsx("overflow-hidden rounded-lg border border-border", className)}>
+    <section className={clsx("overflow-hidden card", className)}>
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <h2 className="text-sm font-medium">Chart</h2>
         <a
@@ -418,7 +426,7 @@ function Untracked({ preview: p, onTracked }: { preview: MarketSnapshot; onTrack
   return (
     <>
       <Header market={p} fallback={p} />
-      <section className="mt-8 flex flex-col gap-4 rounded-lg border border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+      <section className="mt-8 flex flex-col gap-4 card p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-medium">Not on Rankr yet</p>
           <p className="mt-1 text-sm text-muted">

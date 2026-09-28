@@ -3,6 +3,7 @@ import Link from "next/link";
 import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
 import type { TokenView } from "@/lib/types";
 import { ChainTag } from "./Chain";
+import { Cascade } from "./Cinema";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 
@@ -47,7 +48,7 @@ export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView
 /** Full table for md+ screens. */
 export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; startRank?: number }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden card">
       <table className="w-full text-sm">
         <thead>
           <tr className="label border-b border-border text-left text-subtle">
@@ -62,7 +63,7 @@ export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; sta
             <th className="py-2.5 pr-4 text-right font-normal">Since paste</th>
           </tr>
         </thead>
-        <tbody className="font-mono text-[13px]">
+        <Cascade as="tbody" className="font-mono text-[13px]">
           {tokens.map((t, i) => (
             <tr key={t.id} className="relative border-b border-border transition-colors last:border-0 hover:bg-surface-2">
               <td className="py-3 pl-4">
@@ -88,7 +89,7 @@ export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; sta
               </td>
             </tr>
           ))}
-        </tbody>
+        </Cascade>
       </table>
     </div>
   );
@@ -98,12 +99,12 @@ export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div aria-hidden>
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex animate-pulse items-center gap-3 px-4 py-3.5">
+        <div key={i} className="flex items-center gap-3 px-4 py-3.5">
           <div className="flex-1 space-y-2">
-            <div className="h-3 w-40 rounded bg-surface-2" />
-            <div className="h-2.5 w-28 rounded bg-surface-2" />
+            <div className="skeleton h-3 w-40 rounded" />
+            <div className="skeleton h-2.5 w-28 rounded" />
           </div>
-          <div className="h-3 w-12 rounded bg-surface-2" />
+          <div className="skeleton h-3 w-12 rounded" />
         </div>
       ))}
     </div>

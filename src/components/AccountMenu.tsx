@@ -76,7 +76,7 @@ export function AccountMenu() {
       {open && (
         <div
           role="menu"
-          className="animate-fade-in absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-bg shadow-lg"
+          className="animate-pop-in absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-bg shadow-float"
         >
           <div className="border-b border-border px-3 py-2.5">
             <div className="flex items-center gap-1 font-mono text-xs text-fg">
