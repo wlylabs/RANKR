@@ -223,7 +223,7 @@ export function News() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <PageHeader title="News" live>
+      <PageHeader title="News">
         What&apos;s in the news right now, most searched first. Tokens shows every token named after a story.
       </PageHeader>
 
