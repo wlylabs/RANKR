@@ -3,6 +3,7 @@
 // article stays on the publisher's page. Server only.
 import { MOCK, searchTokens } from "./dexscreener";
 import { newsSources, readSource, type Headline, type Source } from "./news-sources";
+import { passes } from "./token-filters";
 import type { MarketSnapshot, NewsCategory, NewsItem } from "./types";
 
 /** Each tab's list: the newest of each category. */
@@ -172,7 +173,7 @@ export function isNamesake(token: Pick<MarketSnapshot, "name" | "symbol">, keywo
   );
 }
 
-// More than a page shows by default: the minimums (src/lib/token-filters.ts) leave the dead ones out.
+/** The most a story lists, dead ones already out. */
 const NAMESAKES = 20;
 const found = new Map<string, { tokens: Promise<MarketSnapshot[]>; until: number }>();
 
@@ -194,16 +195,17 @@ export function byVolume(a: MarketSnapshot, b: MarketSnapshot): number {
 }
 
 /**
- * Every token named after `keyword` (a name from a story), most traded first: many tokens share a name or a
- * ticker, and the reader picks. Searched as written and run together ("Bukang-i" and "Bukangi"). Throws
- * UpstreamError when DexScreener can't be reached.
+ * Every live token named after `keyword` (a name from a story), most traded first: many tokens share a name or
+ * a ticker, and the reader picks. Dead ones, below the minimums (src/lib/token-filters.ts), are left out.
+ * Searched as written and run together ("Bukang-i" and "Bukangi"). Throws UpstreamError when DexScreener can't
+ * be reached.
  */
 export async function namesakes(keyword: string): Promise<MarketSnapshot[]> {
   const queries = [...new Set([keyword.trim(), keyword.replace(/[^\p{L}\p{N}]/gu, "")])].filter(Boolean);
   const keywords = [normalize(keyword)].filter(Boolean);
   const byId = new Map<string, MarketSnapshot>();
   for (const tokens of await Promise.all(queries.map(searchCached))) {
-    for (const t of tokens) if (isNamesake(t, keywords)) byId.set(`${t.chainId}:${t.address}`, t);
+    for (const t of tokens) if (isNamesake(t, keywords) && passes(t)) byId.set(`${t.chainId}:${t.address}`, t);
   }
   return [...byId.values()].sort(byVolume).slice(0, NAMESAKES);
 }

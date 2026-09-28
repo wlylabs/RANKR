@@ -113,7 +113,7 @@ describe("namesakes", () => {
   const snap = (address: string, symbol: string, name: string, volume24h: number | null, liquidityUsd: number | null) =>
     ({ chainId: "solana", address, symbol, name, volume24h, liquidityUsd }) as MarketSnapshot;
 
-  it("searches as written and run together, keeps each namesake once, most traded first", async () => {
+  it("searches as written and run together, keeps each live namesake once, most traded first", async () => {
     const search = vi.mocked(searchTokens);
     search.mockImplementation(async (q: string) =>
       q === "Bukang-i"
@@ -122,6 +122,7 @@ describe("namesakes", () => {
             snap("B", "BUKANGI", "Bukangi Inu", 20_000, 90_000),
             snap("D", "BUKANGI", "Bukangi Dog", 20_000, 150_000),
             snap("X", "SHARK", "Shark", 9e6, 1e6),
+            snap("E", "BUKANGI", "Bukangi Dead", 300, 2_000), // below $1K volume: left out
           ]
         : [snap("A", "BUKANGI", "Bukangi", 400_000, 5_000), snap("C", "BUKANG", "Bukang", null, null)],
     );

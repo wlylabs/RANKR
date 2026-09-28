@@ -12,7 +12,7 @@ const MINUTE = 60_000;
 const SEARCHES_PER_MINUTE = 30;
 
 /**
- * GET /api/news/tokens?q=Bukang-i -> every token named after a name from a story, most liquid first, with
+ * GET /api/news/tokens?q=Bukang-i -> every live token named after a name from a story, most traded first, with
  * market cap, volume, liquidity and Rankr's multiple for tracked ones.
  */
 export async function GET(req: NextRequest) {
