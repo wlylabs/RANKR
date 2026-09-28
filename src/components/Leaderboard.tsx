@@ -32,8 +32,55 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 const PAGE = 50;
 
-const VIEWS = { tokens: "Tokens", callers: "Callers", last: "Last month" } as const;
-type View = keyof typeof VIEWS;
+const BOARDS = { tokens: "Tokens", callers: "Callers" } as const;
+type Board = keyof typeof BOARDS;
+
+// The boards reset on the 1st (see season.ts): this month is live, last month is its kept top 10.
+const MONTHS = { this: "This month", last: "Last month" } as const;
+type Month = keyof typeof MONTHS;
+
+const DESCRIPTIONS: Record<Month, Record<Board, string>> = {
+  this: {
+    tokens: "Every token ranked by how it moved since its first paste on Rankr.",
+    callers: "Callers ranked by how often their calls hit 2x, each from the caller's own entry.",
+  },
+  last: {
+    tokens: "Last month's top 10 tokens by peak x, kept when the boards reset.",
+    callers: "Last month's top 10 callers by hit rate, kept when the boards reset.",
+  },
+};
+
+function Segmented<K extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Record<K, string>;
+  value: K;
+  onChange: (key: K) => void;
+}) {
+  return (
+    <div className="flex h-8 items-center rounded-md border border-border p-0.5" role="tablist" aria-label={label}>
+      {(Object.keys(options) as K[]).map((key) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          aria-selected={value === key}
+          onClick={() => onChange(key)}
+          className={clsx(
+            "h-full rounded px-3 text-xs whitespace-nowrap transition-colors",
+            value === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
+          )}
+        >
+          {options[key]}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -66,8 +113,11 @@ export function Leaderboard() {
   const pathname = usePathname();
   const now = useNow(15_000);
 
-  const picked = params.get("view");
-  const view: View = accountsAvailable && (picked === "callers" || picked === "last") ? picked : "tokens";
+  // Boards and months need accounts (callers, and the reset runs in Supabase). "view=last" is the old link
+  // to last month.
+  const view = params.get("view");
+  const board: Board = accountsAvailable && view === "callers" ? "callers" : "tokens";
+  const month: Month = accountsAvailable && (params.get("month") === "last" || view === "last") ? "last" : "this";
   const resetsAt = nextResetAt(now);
   const sort = parseSort(params.get("sort"));
   const callerSort = parseCallerSort(params.get("by"));
@@ -88,6 +138,14 @@ export function Leaderboard() {
   );
   const chains = useStats().stats?.chains ?? [];
 
+  /** Another board or month starts from its default sort and filters. */
+  function go(to: { board?: Board; month?: Month }) {
+    const next = new URLSearchParams();
+    if ((to.board ?? board) !== "tokens") next.set("view", to.board ?? board);
+    if ((to.month ?? month) !== "this") next.set("month", to.month ?? month);
+    router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
+  }
+
   function setParam(key: string, value: string, fallback: string) {
     const next = new URLSearchParams(params.toString());
     if (value === fallback) next.delete(key);
@@ -99,56 +157,28 @@ export function Leaderboard() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
-          <p className="mt-1.5 text-sm text-muted">
-            {view === "tokens"
-              ? "Every token ranked by how it moved since its first paste on Rankr."
-              : view === "callers"
-                ? "Callers ranked by how often their calls hit 2x, each from the caller's own entry."
-                : "The top 10 callers and tokens of the last month, kept when the boards reset."}
-          </p>
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Leaderboard</h1>
+      <p className="mt-1.5 text-sm text-muted">{DESCRIPTIONS[month][board]}</p>
+
+      {accountsAvailable && (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <Segmented label="Month" options={MONTHS} value={month} onChange={(m) => go({ month: m })} />
+          <Segmented label="Board" options={BOARDS} value={board} onChange={(b) => go({ board: b })} />
+        </div>
+      )}
+      {month === "this" && (
+        <div className="mt-2 flex items-center gap-3 font-mono text-[11px] text-subtle">
           {/* Resets run in Supabase (rankr_end_month), so only where accounts are on. */}
-          {accountsAvailable && view !== "last" && (
-            <p className="mt-1 font-mono text-[11px] text-subtle">
-              boards reset {resetDay(resetsAt)}, 00:00 UTC · in {untilLabel(resetsAt, now)}
+          {accountsAvailable && (
+            <p>
+              resets {resetDay(resetsAt)}, 00:00 UTC · in <span className="text-fg">{untilLabel(resetsAt, now)}</span>
             </p>
           )}
-        </div>
-        <div className="flex items-center gap-3">
-          {accountsAvailable && (
-            <div
-              className="flex h-8 items-center rounded-md border border-border p-0.5"
-              role="tablist"
-              aria-label="Board"
-            >
-              {(Object.keys(VIEWS) as View[]).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="tab"
-                  aria-selected={view === v}
-                  onClick={() => {
-                    const next = new URLSearchParams();
-                    if (v !== "tokens") next.set("view", v);
-                    router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
-                  }}
-                  className={clsx(
-                    "h-full rounded px-3 text-xs whitespace-nowrap transition-colors",
-                    view === v ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
-                  )}
-                >
-                  {VIEWS[v]}
-                </button>
-              ))}
-            </div>
-          )}
-          {view === "tokens" && (
+          {board === "tokens" && (
             <button
               type="button"
               onClick={() => mutate()}
-              className="inline-flex items-center gap-1.5 font-mono text-[11px] text-subtle hover:text-fg"
+              className="ml-auto inline-flex items-center gap-1.5 hover:text-fg"
               title="Refresh now"
             >
               <RefreshCw className={clsx("size-3", isValidating && "animate-spin")} />
@@ -156,11 +186,11 @@ export function Leaderboard() {
             </button>
           )}
         </div>
-      </div>
+      )}
 
-      {view === "last" ? (
-        <LastMonth />
-      ) : view === "callers" ? (
+      {month === "last" ? (
+        <LastMonth board={board} />
+      ) : board === "callers" ? (
         <>
           <div
             className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
@@ -210,7 +240,8 @@ export function Leaderboard() {
                       range === key ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
                     )}
                   >
-                    {key}
+                    {/* With the monthly reset, everything on the board is from this month. */}
+                    {key === "all" && accountsAvailable ? "month" : key}
                   </button>
                 ))}
               </div>

@@ -2,9 +2,10 @@
 
 import clsx from "clsx";
 import Link from "next/link";
+import { behind } from "@/lib/caller-stats";
 import { callerHref, formatMultiple, tokenHref } from "@/lib/format";
-import { useCallerPages } from "@/lib/hooks";
-import { MIN_CALLS_RANKED, type CallerSort } from "@/lib/params";
+import { useCallerPages, useMyRank } from "@/lib/hooks";
+import { MIN_CALLS_RANKED, minCallsFor, type CallerSort } from "@/lib/params";
 import type { CallerView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
@@ -31,7 +32,7 @@ function winRate(c: CallerView) {
   return `${Math.round((c.wins / Math.max(c.calls, 1)) * 100)}%`;
 }
 
-function Caller({ c, me }: { c: CallerView; me: boolean }) {
+function Caller({ c, me }: { c: Pick<CallerView, "userId" | "username" | "official">; me: boolean }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
       <Link href={callerHref(c.username)} className="flex min-w-0 items-center gap-1 hover:underline">
@@ -50,6 +51,55 @@ function BestCall({ c }: { c: CallerView }) {
     <Link href={tokenHref(c.bestToken)} className="hover:underline">
       <span className="font-sans font-medium">${c.bestToken.symbol}</span> <MultipleBadge multiple={c.bestMultiple} className="min-w-0" />
     </Link>
+  );
+}
+
+const rankLabel = (rank: number) => String(rank).padStart(2, "0");
+
+/** The number on the right of a compact row. */
+function SortValue({ sort, c }: { sort: CallerSort; c: CallerView }) {
+  if (sort === "rate") return <span className="tabular font-mono text-[13px] font-medium">{hitRate(c)}</span>;
+  return <MultipleBadge multiple={sort === "best" ? c.bestMultiple : c.avgMultiple} />;
+}
+
+/**
+ * The signed-in caller's place on the board, pinned to the bottom of the screen (above the bottom nav on
+ * phones) while the board scrolls under it: their rank, and how far the caller one place up is.
+ */
+function MyRank({ sort }: { sort: CallerSort }) {
+  const { userId, username, official } = useAuth();
+  const mine = useMyRank(sort, userId);
+  if (!userId || !username || !mine) return null;
+
+  const { rank, caller, ahead, calls, total } = mine;
+  const need = minCallsFor(sort) - calls;
+  let line: string;
+  if (rank && caller) {
+    const gap = ahead && behind(sort, caller, ahead);
+    line = !ahead
+      ? `top of the board · ${total} ${total === 1 ? "caller" : "callers"}`
+      : `${gap ? `${gap} behind` : "level with"} @${ahead.username} at #${rank - 1}`;
+  } else if (calls === 0) {
+    line = "no calls this month yet · paste a CA to get on the board";
+  } else if (need > 0) {
+    line = `${calls} ${calls === 1 ? "call" : "calls"} · ${need} more to be ranked by ${CALLER_SORT_LABELS[sort].toLowerCase()}`;
+  } else {
+    return null;
+  }
+
+  return (
+    <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 mt-3 md:bottom-4">
+      <div className="flex items-center gap-3 rounded-lg border border-border-strong bg-bg/90 px-4 py-3 shadow-lg backdrop-blur-md">
+        <span className="tabular w-6 shrink-0 font-mono text-xs text-fg" title={rank ? `#${rank} of ${total}` : "not ranked yet"}>
+          {rank ? rankLabel(rank) : "—"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <Caller c={{ userId, username, official }} me />
+          <p className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">{line}</p>
+        </div>
+        {caller && <SortValue sort={sort} c={caller} />}
+      </div>
+    </div>
   );
 }
 
@@ -95,9 +145,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
               <tbody className="font-mono text-[13px]">
                 {callers.map((c, i) => (
                   <tr key={c.userId} className={clsx("border-b border-border last:border-0", c.userId === userId && "bg-surface-2")}>
-                    <td className={clsx("tabular py-3 pl-4 text-xs", i < 3 ? "text-fg" : "text-subtle")}>
-                      {String(i + 1).padStart(2, "0")}
-                    </td>
+                    <td className={clsx("tabular py-3 pl-4 text-xs", i < 3 ? "text-fg" : "text-subtle")}>{rankLabel(i + 1)}</td>
                     <td className="py-3">
                       <Caller c={c} me={c.userId === userId} />
                     </td>
@@ -121,7 +169,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
             {callers.map((c, i) => (
               <li key={c.userId} className={clsx("flex items-center gap-3 px-4 py-3", c.userId === userId && "bg-surface-2")}>
                 <span className={clsx("tabular w-6 shrink-0 font-mono text-xs", i < 3 ? "text-fg" : "text-subtle")}>
-                  {String(i + 1).padStart(2, "0")}
+                  {rankLabel(i + 1)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <Caller c={c} me={c.userId === userId} />
@@ -130,11 +178,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
                     {c.bestToken && ` · best $${c.bestToken.symbol} ${formatMultiple(c.bestMultiple)}`}
                   </div>
                 </div>
-                {sort === "rate" ? (
-                  <span className="tabular font-mono text-[13px] font-medium">{hitRate(c)}</span>
-                ) : (
-                  <MultipleBadge multiple={sort === "best" ? c.bestMultiple : c.avgMultiple} />
-                )}
+                <SortValue sort={sort} c={c} />
               </li>
             ))}
           </ul>
@@ -151,6 +195,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
           )}
         </>
       )}
+      <MyRank sort={sort} />
     </div>
   );
 }

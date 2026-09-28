@@ -317,10 +317,26 @@ begin
   assert (r->>'total')::int = 1 and r->'callers'->0->>'username' = 'sprayer', 'min calls keeps flukes off';
   assert (public.rankr_callers()->'callers'->0->>'username') = 'alpha_caller', 'rate is the default';
 
+  -- Your position: the board's order, with the caller one place up. By rate: alpha_caller, sprayer, bravo.
+  r := public.rankr_caller_rank(s, 'rate');
+  assert (r->>'rank')::int = 2 and (r->>'total')::int = 3 and r->'ahead'->>'username' = 'alpha_caller', 'sprayer is #2: ' || r::text;
+  assert (r->'caller'->>'calls')::int = 10 and (r->'caller'->>'hits')::int = 3 and (r->>'calls')::int = 10, r::text;
+  assert not (r->'caller' ? 'rn') and not (r->'ahead' ? 'rn'), 'same fields as the board';
+  r := public.rankr_caller_rank(s, 'hits');
+  assert (r->>'rank')::int = 1 and r->'ahead' = 'null'::jsonb, '#1 has nobody ahead: ' || r::text;
+  assert (select (x->>'user_id')::uuid from jsonb_array_elements(public.rankr_callers('avg')->'callers') with ordinality e(x, i)
+          where i = (public.rankr_caller_rank(s, 'avg')->>'rank')::int) = s, 'the board and the rank agree';
+  r := public.rankr_caller_rank(a, 'rate', 5);
+  assert r->'rank' = 'null'::jsonb and r->'caller' = 'null'::jsonb and (r->>'calls')::int = 2 and (r->>'total')::int = 1,
+         'under the minimum: off the board, calls still counted: ' || r::text;
+  r := public.rankr_caller_rank('00000000-0000-4000-8000-0000000000ff');
+  assert (r->>'calls')::int = 0 and r->'rank' = 'null'::jsonb and r->'ahead' = 'null'::jsonb, 'no calls: ' || r::text;
+
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
     assert not has_function_privilege('authenticated', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
     assert has_function_privilege('service_role', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
+    assert has_function_privilege('anon', 'public.rankr_caller_board(text,integer)', 'execute'), 'the public board reads it';
   end if;
 
   raise notice 'rankr smoke test: limits ok';
@@ -350,6 +366,7 @@ begin
   assert (select count(*) from public.call_milestones) = 0;
   assert (select count(*) from public.profiles) = v_profiles, 'accounts stay';
   assert (public.rankr_callers()->>'total')::int = 0, 'the caller board starts from zero';
+  assert (public.rankr_caller_rank('00000000-0000-4000-8000-00000000000e')->>'calls')::int = 0, 'your calls go too';
 
   r := public.rankr_end_month('2026-10-01 00:06+00');
   assert (r->>'skipped')::boolean and (select count(*) from public.seasons) = 1, 'nothing to keep, nothing written';

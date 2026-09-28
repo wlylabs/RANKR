@@ -11,6 +11,7 @@ import type {
   FeedResponse,
   MarketSnapshot,
   MyCallsResponse,
+  MyRankResponse,
   SeasonResponse,
   StatsResponse,
   TokenView,
@@ -136,6 +137,15 @@ export function useCallerPages(sort: CallerSort, pageSize = 50) {
   };
 }
 
+/** The signed-in caller's place on the caller board for `sort` (nothing when `userId` is null). */
+export function useMyRank(sort: CallerSort, userId: string | null) {
+  // No keepPreviousData: after switching accounts, never show the last one's place.
+  const { data } = useSWR<MyRankResponse>(userId ? `/api/me/rank?sort=${sort}&u=${userId}` : null, authedFetcher, {
+    refreshInterval: 20_000,
+  });
+  return data ?? null;
+}
+
 export type FeedParams = {
   scope?: FeedScope;
   kind?: FeedKind;
@@ -194,7 +204,9 @@ export function useAccountCalls(userId: string | null) {
 export function refreshBoards() {
   // `includes` also matches the "$inf$..." keys of paged boards.
   return mutate(
-    (key) => typeof key === "string" && ["/api/tokens", "/api/stats", "/api/me/calls", "/api/callers", "/api/feed"].some((p) => key.includes(p)),
+    (key) =>
+      typeof key === "string" &&
+      ["/api/tokens", "/api/stats", "/api/me/calls", "/api/me/rank", "/api/callers", "/api/feed"].some((p) => key.includes(p)),
   );
 }
 
