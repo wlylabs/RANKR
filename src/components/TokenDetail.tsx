@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Share2 } from "lucide-react";
+import { Check, CircleAlert, ExternalLink, LoaderCircle, Lock, Newspaper, Share2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -70,7 +70,16 @@ function linkLabel(l: TokenLink) {
 const GHOST =
   "inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-fg";
 
-function Header({ market, fallback }: { market: MarketSnapshot | null; fallback: TokenView | MarketSnapshot }) {
+/** `newsFor`: a token Rankr tracks, whose headlines are on the news page. */
+function Header({
+  market,
+  fallback,
+  newsFor,
+}: {
+  market: MarketSnapshot | null;
+  fallback: TokenView | MarketSnapshot;
+  newsFor?: string;
+}) {
   const src = market ?? fallback;
   const links = market ? [...market.websites, ...market.socials].slice(0, 4) : [];
   return (
@@ -92,11 +101,18 @@ function Header({ market, fallback }: { market: MarketSnapshot | null; fallback:
           <CopyButton value={src.address} label={shortAddress(src.address)} />
         </div>
       </div>
-      {market && (
+      {(market || newsFor) && (
         <div className="flex flex-wrap items-center gap-2">
-          <a href={market.url} target="_blank" rel="noreferrer" className={GHOST}>
-            DexScreener <ExternalLink className="size-3" />
-          </a>
+          {newsFor && (
+            <Link href={`/news?token=${encodeURIComponent(newsFor)}`} className={GHOST}>
+              <Newspaper className="size-3" /> News
+            </Link>
+          )}
+          {market && (
+            <a href={market.url} target="_blank" rel="noreferrer" className={GHOST}>
+              DexScreener <ExternalLink className="size-3" />
+            </a>
+          )}
           {links.map((l) => (
             <a key={l.url} href={l.url} target="_blank" rel="noreferrer" className={GHOST}>
               {linkLabel(l)} <ExternalLink className="size-3" />
@@ -148,7 +164,7 @@ function Tracked({ token: t }: { token: TokenView }) {
 
   return (
     <>
-      <Header market={m} fallback={t} />
+      <Header market={m} fallback={t} newsFor={t.id} />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3 lg:grid-rows-[auto_1fr] lg:items-start">
         {/* Hero multiple */}

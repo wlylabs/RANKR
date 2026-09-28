@@ -12,6 +12,8 @@ import type {
   MarketSnapshot,
   MyCallsResponse,
   MyRankResponse,
+  NamesakesResponse,
+  NewsResponse,
   SeasonResponse,
   StatsResponse,
   TokenView,
@@ -197,6 +199,23 @@ export function useFeedPages(params: FeedParams, pageSize = 30) {
     isValidating,
     loadMore: () => setSize(size + 1),
   };
+}
+
+/** Headlines naming a token (`token` is its id), or the month's most pasted and top tokens. Every 5 minutes. */
+export function useNews(token: string | null) {
+  const { data, error, isLoading } = useSWR<NewsResponse>(
+    token ? `/api/news?token=${encodeURIComponent(token)}` : "/api/news",
+    fetcher,
+    { refreshInterval: 5 * 60_000 },
+  );
+  return { items: data?.items ?? [], tokens: data?.tokens ?? [], error, isLoading };
+}
+
+/** Every token named like a story's token (see /api/news/tokens), refreshed every minute. */
+export function useNamesakes(name: string, symbol: string) {
+  const key = `/api/news/tokens?${new URLSearchParams({ name, symbol })}`;
+  const { data, error, isLoading } = useSWR<NamesakesResponse>(key, fetcher, { refreshInterval: 60_000 });
+  return { items: data?.items ?? [], error, isLoading };
 }
 
 export function useStats() {
