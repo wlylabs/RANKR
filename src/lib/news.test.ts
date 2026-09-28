@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchTokens } from "./dexscreener";
-import { isNamesake, keywordsOf, liveNews, namesakes, normalize, searchNews } from "./news";
+import { isNamesake, keywordsOf, liveNews, namesakes, normalize } from "./news";
 import type { MarketSnapshot } from "./types";
 
 vi.mock("./dexscreener", () => ({ MOCK: false, searchTokens: vi.fn() }));
@@ -37,11 +37,14 @@ describe("keywordsOf", () => {
   });
 });
 
-describe("liveNews and searchNews", () => {
-  afterEach(() => vi.unstubAllGlobals());
+describe("liveNews", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
   const hours = (h: number) => new Date(Date.now() - h * 3_600_000).toUTCString();
 
-  it("brings every source together: each story once, today's news only, newest first", async () => {
+  it("brings every source together: each story once, today's news only, most searched then newest first", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const fetchMock = vi.fn(async (url: string) => {
       if (url.startsWith("https://news.google.com/rss?hl=en-US")) {
@@ -52,18 +55,31 @@ describe("liveNews and searchNews", () => {
           ]),
         );
       }
-      if (url === "https://feeds.bbci.co.uk/news/world/rss.xml") {
+      if (url === "https://rss.upi.com/news/odd_news.rss") {
         return new Response(
           rss([
-            // The same story, as the BBC links it: shown once.
-            `<item><title>Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i</title><link>https://bbc.co.uk/busan</link><pubDate>${hours(1)}</pubDate></item>`,
-            `<item><title>Moo Deng turns two</title><link>https://bbc.co.uk/moo</link><pubDate>${hours(3)}</pubDate></item>`,
-            `<item><title>Old news</title><link>https://bbc.co.uk/old</link><pubDate>${hours(72)}</pubDate></item>`,
+            // The same story, as UPI links it: shown once.
+            `<item><title>Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i</title><link>https://upi.test/busan</link><pubDate>${hours(1)}</pubDate></item>`,
+            `<item><title>Moo Deng turns two</title><link>https://upi.test/moo</link><pubDate>${hours(3)}</pubDate></item>`,
+            `<item><title>Old news</title><link>https://upi.test/old</link><pubDate>${hours(72)}</pubDate></item>`,
           ]),
         );
       }
-      if (url.startsWith("https://hn.algolia.com/")) {
-        return Response.json({ hits: [{ title: "Show HN: a shark tracker", url: "https://hn.test/shark", created_at: new Date(Date.now() - 1_800_000).toISOString() }] });
+      // Google Trends: a search and the story behind it. The same search trends in two countries: shown once.
+      const trend = (search: string, traffic: string, title: string, link: string, h: number) =>
+        `<item><title>${search}</title><ht:approx_traffic>${traffic}</ht:approx_traffic><pubDate>${hours(h)}</pubDate>` +
+        `<ht:news_item><ht:news_item_title>${title}</ht:news_item_title>` +
+        `<ht:news_item_url>${link}</ht:news_item_url><ht:news_item_source>Yonhap News Agency</ht:news_item_source></ht:news_item></item>`;
+      if (url === "https://trends.google.com/trending/rss?geo=US") {
+        return new Response(rss([trend("bukangi", "20,000+", "Shark fever hits Busan as 102,000 rush to see 'Bukangi'", "https://yna.test/fever", 0.5)]));
+      }
+      if (url === "https://trends.google.com/trending/rss?geo=SG") {
+        return new Response(
+          rss([
+            trend("bukangi", "5000+", "Busan's shark draws crowds", "https://yna.test/crowds", 0.6),
+            trend("pygmy hippo", "10K+", "Thailand's famous hippo celebrates with a fruit cake", "https://yna.test/hippo", 4),
+          ]),
+        );
       }
       return new Response("not found", { status: 404 });
     });
@@ -71,30 +87,32 @@ describe("liveNews and searchNews", () => {
 
     const news = await liveNews();
     const titles = news.map((n) => n.title);
-    expect(titles[0]).toBe("Show HN: a shark tracker");
+    // Most searched first (a search trending in two countries counts both), then newest.
+    expect(titles.slice(0, 2)).toEqual(["Shark fever hits Busan as 102,000 rush to see 'Bukangi'", "Thailand's famous hippo celebrates with a fruit cake"]);
+    expect(news.slice(0, 3).map((n) => n.searches)).toEqual([25_000, 10_000, null]);
+    expect(titles).not.toContain("Busan's shark draws crowds");
     expect(titles.filter((t) => t.includes("Bukang-i"))).toHaveLength(1);
     expect(titles).toContain("Moo Deng turns two");
     expect(titles).not.toContain("Old news");
     expect(titles.filter((t) => t.startsWith("Filler"))).toHaveLength(19); // 20 from Google News, one of them Busan
-    expect(news.find((n) => n.title.includes("Bukang-i"))).toMatchObject({ keywords: ["Bukang-i", "Busan"], category: "world" });
-    expect(news.find((n) => n.title.startsWith("Show HN"))?.category).toBe("tech");
+    expect(news.find((n) => n.title.includes("Bukang-i"))).toMatchObject({ keywords: ["Bukang-i", "Busan"], category: "trending" });
+    // What people searched for comes first, written as the headline writes it when it does.
+    expect(news[0]).toMatchObject({ keywords: ["Bukangi", "Busan", "Shark"], category: "trending" });
+    expect(news.find((n) => n.title.includes("hippo"))?.keywords).toEqual(["pygmy hippo", "Thailand"]);
+    expect(news[0]).not.toHaveProperty("topic");
 
     const reads = fetchMock.mock.calls.length;
     await liveNews();
     expect(fetchMock).toHaveBeenCalledTimes(reads); // read again only after a few minutes
-
-    await searchNews("bukangi");
-    const searched = fetchMock.mock.calls.slice(reads).map(([u]) => String(u));
-    expect(searched.some((u) => u.includes("news.google.com/rss/search?q=bukangi"))).toBe(true);
-    expect(searched.some((u) => u.includes("bing.com/news/search?q=bukangi"))).toBe(true);
-    expect(searched.some((u) => u.includes("api.gdeltproject.org"))).toBe(true);
-    expect(searched.some((u) => u.includes("hn.algolia.com/api/v1/search_by_date?query=bukangi"))).toBe(true);
   });
 
   it("is empty, not an error, when the news can't be reached", async () => {
+    // A day on, so no read above is still kept.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 24 * 3_600_000);
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await searchNews("nothing here at all")).toEqual([]);
+    expect(await liveNews()).toEqual([]);
   });
 });
 

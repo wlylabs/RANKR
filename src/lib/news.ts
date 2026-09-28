@@ -96,69 +96,83 @@ export function keywordsOf(title: string): string[] {
 /** A headline in its source's category. */
 type Tagged = Headline & { category: NewsCategory };
 
-/** RANKR_MOCK=1: made-up stories, so the page works offline. */
+/** RANKR_MOCK=1: made-up stories, some of them trending searches, so the page works offline. */
 function mockHeadlines(): Tagged[] {
   const now = Date.now();
-  return (
-    [
-      ["Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "world", 0.3],
-      ["Moo Deng turns two: Thailand's famous pygmy hippo celebrates with a fruit cake", "viral", 2],
-      ["Peanut the Squirrel's owner opens animal sanctuary a year later", "viral", 5],
-      ["Shark fever hits Busan as 102,000 rush to see 'Bukangi' at start of Chuseok break", "world", 9],
-      ["Memecoin named after Busan's shark Bukangi jumps 300% in a day", "crypto", 11],
-      ["Chill Guy meme creator on the dog that became a symbol of calm", "viral", 20],
-      ["Show HN: a tracker for tokens named after the news", "tech", 26],
-    ] as const
-  ).map(([title, category, hours], i) => ({
+  const stories: [title: string, category: NewsCategory, hours: number, topic?: string, searches?: number][] = [
+    ["Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "trending", 0.3, "bukangi", 200_000],
+    ["Moo Deng turns two: Thailand's famous pygmy hippo celebrates with a fruit cake", "trending", 2, "moo deng", 50_000],
+    ["Peanut the Squirrel's owner opens animal sanctuary a year later", "trending", 5],
+    ["Shark fever hits Busan as 102,000 rush to see 'Bukangi' at start of Chuseok break", "trending", 9],
+    ["Memecoin named after Busan's shark Bukangi jumps 300% in a day", "crypto", 11],
+    ["Chill Guy meme creator on the dog that became a symbol of calm", "trending", 20, "chill guy", 2_000],
+  ];
+  return stories.map(([title, category, hours, topic, searches], i) => ({
     title,
     category,
     url: `https://example.com/news/${i}`,
     source: ["Mock Times", "Mock Daily", "Mock Wire"][i % 3],
     publishedAt: now - hours * 3_600_000,
+    ...(topic && { topic }),
+    ...(searches && { searches }),
   }));
 }
 
 /**
- * Newest first, each story once (the same headline can be in several feeds), at most `PER_CATEGORY` of each
- * category, with its keywords.
+ * A story's keywords: what people searched for first when the source says (Google Trends' "bukangi", written as
+ * the headline writes it if it does), then the names in its headline.
+ */
+function keywordsFor(title: string, topic: string | undefined): string[] {
+  const named = keywordsOf(title);
+  if (!topic || !normalize(topic)) return named;
+  const key = normalize(topic);
+  const first = named.find((k) => normalize(k) === key) ?? topic;
+  return [first, ...named.filter((k) => normalize(k) !== key)].slice(0, 4);
+}
+
+/**
+ * Most searched first, then newest first: a trending search's story, by how many searched for it in the last
+ * day (summed over the countries it trends in), is what most people are looking at, and the likeliest to get a
+ * token named after it. Google Trends' approx_traffic ranks the searches, as
+ * github.com/suvrockzzzz/trending-search-google ranks them. Each story once (the same headline can be in
+ * several feeds, a search in several countries' trends), at most `PER_CATEGORY` of each category, with its
+ * keywords.
  */
 function toItems(headlines: Tagged[]): NewsItem[] {
+  const totals = new Map<string, number>();
+  for (const h of headlines) {
+    if (h.topic && h.searches) totals.set(normalize(h.topic), (totals.get(normalize(h.topic)) ?? 0) + h.searches);
+  }
   const seen = new Set<string>();
   const counts = new Map<NewsCategory, number>();
   return headlines
-    .sort((a, b) => b.publishedAt - a.publishedAt)
+    .map((h) => ({ ...h, searches: (h.topic && totals.get(normalize(h.topic))) || null }))
+    .sort((a, b) => (b.searches ?? -1) - (a.searches ?? -1) || b.publishedAt - a.publishedAt)
     .filter((h) => {
-      const keys = [h.url, normalize(h.title)];
+      const keys = [h.url, normalize(h.title), ...(h.topic ? [`topic:${normalize(h.topic)}`] : [])];
       if (keys.some((k) => seen.has(k))) return false;
       keys.forEach((k) => seen.add(k));
       const n = counts.get(h.category) ?? 0;
       counts.set(h.category, n + 1);
       return n < PER_CATEGORY;
     })
-    .map((h) => ({ id: h.url, ...h, keywords: keywordsOf(h.title) }));
+    .map(({ topic, ...h }) => ({ id: h.url, ...h, keywords: keywordsFor(h.title, topic) }));
 }
 
-/** A source's newest `PER_SOURCE` headlines at `url` (since `since`), in its category. */
-async function newest(source: Source, url: string, since = 0): Promise<Tagged[]> {
-  return (await readSource(source, url))
+/** A source's `PER_SOURCE` most searched (Google Trends), else newest, headlines since `since`, in its category. */
+async function top(source: Source, since: number): Promise<Tagged[]> {
+  return (await readSource(source, source.live))
     .filter((h) => h.publishedAt >= since)
-    .sort((a, b) => b.publishedAt - a.publishedAt)
+    .sort((a, b) => (b.searches ?? -1) - (a.searches ?? -1) || b.publishedAt - a.publishedAt)
     .slice(0, PER_SOURCE)
     .map((h) => ({ ...h, category: source.category }));
 }
 
-/** What's in the news right now, from every source with a live list, newest first. */
+/** What's in the news right now, from every source, most searched first, then newest. */
 export async function liveNews(): Promise<NewsItem[]> {
   if (MOCK) return toItems(mockHeadlines());
   const since = Date.now() - LIVE_WINDOW;
-  const lists = await Promise.all(newsSources().flatMap((s) => (s.live ? [newest(s, s.live, since)] : [])));
-  return toItems(lists.flat());
-}
-
-/** Headlines for a search, from every source that can search, newest first. */
-export async function searchNews(query: string): Promise<NewsItem[]> {
-  if (MOCK) return toItems(mockHeadlines().filter((h) => normalize(h.title).includes(normalize(query))));
-  const lists = await Promise.all(newsSources().flatMap((s) => (s.search ? [newest(s, s.search(query))] : [])));
+  const lists = await Promise.all(newsSources().map((s) => top(s, since)));
   return toItems(lists.flat());
 }
 

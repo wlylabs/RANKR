@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayLabel, formatChange, formatMultiple, formatPrice, formatUsd, timeAgo } from "./format";
+import { dayLabel, formatChange, formatCount, formatMultiple, formatPrice, formatUsd, timeAgo } from "./format";
 
 describe("formatMultiple", () => {
   it("shows gains as x and losses as %", () => {
@@ -18,6 +18,12 @@ describe("formatChange", () => {
     expect(formatChange(1.5)).toBe("+50.0%");
     expect(formatChange(3)).toBe("+200%");
     expect(formatChange(0.25)).toBe("-75.0%");
+  });
+});
+
+describe("formatCount", () => {
+  it("shortens a count", () => {
+    expect([500, 2_000, 2_500, 200_000, 1_000_000].map(formatCount)).toEqual(["500", "2K", "2.5K", "200K", "1M"]);
   });
 });
 

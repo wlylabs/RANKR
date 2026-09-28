@@ -19,6 +19,11 @@ export function formatUsd(value: number | null | undefined): string {
   return `$${value.toFixed(abs >= 100 ? 0 : abs >= 1 ? 2 : 4)}`;
 }
 
+/** A count in short: 2K, 2.5K, 200K, 1M. */
+export function formatCount(value: number): string {
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
 /** Token price with DexScreener-style zero compression: $0.0₅1234 */
 export function formatPrice(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) return "—";
