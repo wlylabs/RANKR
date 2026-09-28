@@ -15,10 +15,10 @@ import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton, TokenName } from "./TokenList";
 
-const TABS = { all: "All", world: "World", viral: "Viral", crypto: "Crypto", tech: "Tech" } as const;
+const TABS = { all: "All", trending: "Trending", crypto: "Crypto" } as const;
 type TabKey = keyof typeof TABS;
 
-/** "All" takes the newest this many of each category, so crypto's many outlets don't bury the viral stories. */
+/** "All" takes the newest this many of each category, so crypto's many outlets don't bury the trending stories. */
 const ALL_EACH = 25;
 
 /** A tab's headlines, newest first (they come sorted). */

@@ -171,8 +171,8 @@ export type StatsResponse = {
   updatedAt: number;
 };
 
-/** The news page's tabs: world news, viral and odd stories (what memes come from), crypto, tech. */
-export type NewsCategory = "world" | "viral" | "crypto" | "tech";
+/** The news page's tabs: trending (what people search for and read right now, where memes come from), crypto. */
+export type NewsCategory = "trending" | "crypto";
 
 /** A headline (src/lib/news.ts): only the headline, the publisher and the link. */
 export type NewsItem = {

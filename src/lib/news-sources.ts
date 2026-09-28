@@ -1,19 +1,28 @@
-// Where the news comes from: every free source. The ones without a key are always read: Google News (live
-// sections and search), Bing News and GDELT (search), Hacker News, and publishers' own RSS. The ones with a
-// free key are read once their key is set, as often as their daily quota allows. Server only.
+// Where the news comes from: every free source, for two tabs, trending and crypto. The ones without a key are
+// always read: Google Trends (what people search for right now, with the story behind each search), Google News
+// (top stories, and search), Bing News and GDELT (search), and publishers' own RSS. The ones with a free key are
+// read once their key is set, as often as their daily quota allows. Server only.
 //
 // Feed URLs are taken from references, not guessed:
-// - github.com/plenaryapp/awesome-rss-feeds (curated feeds, and its PR #45 for Yonhap, The Korea Herald and
-//   Korea Times), github.com/vandenbroucke/rss-news-list;
+// - Google Trends' "Trending now" RSS, trends.google.com/trending/rss?geo=<country>: each <item> is a search
+//   (its <title>) with the stories behind it (<ht:news_item>: <ht:news_item_title>, _url, _source), as
+//   github.com/minodisk/google-trends-bot reads it. Its story links have carried spam that hides another
+//   address in a real site's link (github.com/tmokmss/my-ambient-agents issue #728): those are dropped;
 // - github.com/nirholas/cryptocurrency.cv (an open-source crypto news aggregator; src/lib/crypto-news.ts, only
 //   feeds its health check left enabled);
 // - Google News RSS: its /rss, /rss/search and /rss/headlines/section/topic/<TOPIC> forms with hl, gl, ceid;
 //   Bing News: a news search with &format=rss (and qft=sortbydate="1" for newest first); GDELT DOC 2.0 API
-//   (one request per 5 seconds per IP); Hacker News' Algolia API; UPI Odd News and New York Post feeds as
-//   their sites list them.
+//   (one request per 5 seconds per IP); UPI Odd News and New York Post feeds as their sites list them.
 import type { NewsCategory } from "./types";
 
-export type Headline = { title: string; url: string; source: string | null; publishedAt: number };
+export type Headline = {
+  title: string;
+  url: string;
+  source: string | null;
+  publishedAt: number;
+  /** What people searched for, when the source says (Google Trends): the likeliest name for a token. */
+  topic?: string;
+};
 
 export type Source = {
   /** For logs; never the URL, which may hold a key. */
@@ -78,6 +87,38 @@ function headline(title: unknown, url: unknown, source: unknown, date: unknown):
   return { title: t, url: u, source: typeof source === "string" && source.trim() ? source.trim() : null, publishedAt };
 }
 
+/** A link hiding another address (a second URL, or a data: URL, in its query) is spam, not a story. */
+function hidesAnother(url: string): boolean {
+  let rest = url.replace(/^https?:\/\//i, "");
+  try {
+    rest = decodeURIComponent(rest);
+  } catch {
+    // Kept as written.
+  }
+  return /:\/\/|data:/i.test(rest);
+}
+
+/**
+ * Google Trends' "Trending now" RSS: each item is a search people make right now, with the stories behind it.
+ * One story per search (the first that isn't spam), dated when the search took off, the search as its topic.
+ */
+export function parseTrends(xml: string): Headline[] {
+  const out: Headline[] = [];
+  for (const [, item] of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
+    const topic = tag(item, "title");
+    const date = tag(item, "pubDate");
+    for (const [, story] of item.matchAll(/<ht:news_item\b[^>]*>([\s\S]*?)<\/ht:news_item>/gi)) {
+      const url = tag(story, "ht:news_item_url") ?? "";
+      const h = hidesAnother(url) ? null : headline(tag(story, "ht:news_item_title"), url, tag(story, "ht:news_item_source"), date);
+      if (h) {
+        out.push(topic ? { ...h, topic } : h);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * The items of an RSS feed. The publisher is the item's <source> (Google News), <News:Source> (Bing) or, for a
  * publisher's own feed, `publisher`. Google News ends a title with " - Publisher", which is dropped.
@@ -117,21 +158,11 @@ const q = encodeURIComponent;
 
 type Feed = [name: string, url: string];
 
-/** Publishers' own RSS, by tab: world news (Asia too, where stories like Busan's shark break), odd news, crypto. */
-const WORLD: Feed[] = [
-  ["BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml"],
-  ["The Guardian", "https://www.theguardian.com/world/rss"],
-  ["Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"],
-  ["NPR", "https://www.npr.org/rss/rss.php?id=1004"],
-  ["Sky News", "https://feeds.skynews.com/feeds/rss/world.xml"],
-  ["DW", "https://rss.dw.com/xml/rss-en-all"],
-  ["CBC News", "https://www.cbc.ca/cmlink/rss-world"],
-  ["Yonhap News Agency", "https://en.yna.co.kr/RSS/news.xml"],
-  ["The Korea Herald", "https://www.koreaherald.com/rss/newsAll"],
-  ["Korea Times", "https://www.koreatimes.co.kr/www/rss/nation.xml"],
-  ["CNA", "https://www.channelnewsasia.com/rssfeeds/8395986"],
-];
-const VIRAL: Feed[] = [
+/** Where Google Trends is read: English-speaking countries, so the names in the stories are in English. */
+const TRENDS_GEOS = ["US", "GB", "CA", "AU", "IN", "SG"];
+
+/** Publishers' own RSS, by tab: odd and viral news (what memes come from), crypto. */
+const TRENDING: Feed[] = [
   ["UPI Odd News", "https://rss.upi.com/news/odd_news.rss"],
   ["New York Post", "https://nypost.com/feed/"],
 ];
@@ -177,9 +208,17 @@ const CRYPTO: Feed[] = [
 /** Every source to read: the free ones, and the keyed ones whose key is set in `env`. */
 export function newsSources(env: Record<string, string | undefined> = process.env): Source[] {
   const out: Source[] = [
+    ...TRENDS_GEOS.map((geo) => ({
+      name: `Google Trends ${geo}`,
+      category: "trending" as const,
+      live: `https://trends.google.com/trending/rss?geo=${geo}`,
+      parse: parseTrends,
+      ttl: 10 * MINUTE,
+    })),
     {
+      // Top stories: what Google ranks as the news right now.
       name: "Google News",
-      category: "world",
+      category: "trending",
       live: `${GOOGLE}?${EN_US}`,
       search: (s) => `${GOOGLE}/search?q=${q(s)}&${EN_US}`,
       parse: (b) => parseRss(b),
@@ -187,28 +226,21 @@ export function newsSources(env: Record<string, string | undefined> = process.en
     },
     {
       name: "Google News Asia",
-      category: "world",
+      category: "trending",
       live: `${GOOGLE}?hl=en-SG&gl=SG&ceid=SG:en`,
       parse: (b) => parseRss(b),
       ttl: 5 * MINUTE,
     },
-    ...(
-      [
-        ["WORLD", "world"],
-        ["ENTERTAINMENT", "viral"],
-        ["SCIENCE", "viral"],
-        ["TECHNOLOGY", "tech"],
-      ] as const
-    ).map(([topic, category]) => ({
+    ...["ENTERTAINMENT", "SCIENCE"].map((topic) => ({
       name: `Google News ${topic.toLowerCase()}`,
-      category,
+      category: "trending" as const,
       live: `${GOOGLE}/headlines/section/topic/${topic}?${EN_US}`,
       parse: (b: string) => parseRss(b),
       ttl: 5 * MINUTE,
     })),
     {
       name: "Bing News",
-      category: "world",
+      category: "trending",
       search: (s) => `https://www.bing.com/news/search?q=${q(s)}&qft=${q('sortbydate="1"')}&format=rss`,
       parse: (b) => parseRss(b),
       ttl: 15 * MINUTE,
@@ -216,7 +248,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
     {
       // Free and keyless, about one request per 5 seconds: searches only.
       name: "GDELT",
-      category: "world",
+      category: "trending",
       search: (s) =>
         `https://api.gdeltproject.org/api/v2/doc/doc?query=${q(`${s} sourcelang:english`)}&mode=artlist&format=json&sort=datedesc&maxrecords=50&timespan=3d`,
       parse: json(
@@ -225,21 +257,9 @@ export function newsSources(env: Record<string, string | undefined> = process.en
       ),
       ttl: 15 * MINUTE,
     },
-    {
-      name: "Hacker News",
-      category: "tech",
-      live: "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=30",
-      search: (s) => `https://hn.algolia.com/api/v1/search_by_date?query=${q(s)}&tags=story&hitsPerPage=30`,
-      parse: json(
-        (b) => b.hits,
-        (a) => headline(a.title, a.url ?? `https://news.ycombinator.com/item?id=${a.objectID}`, "Hacker News", a.created_at),
-      ),
-      ttl: 5 * MINUTE,
-    },
     ...(
       [
-        [WORLD, "world"],
-        [VIRAL, "viral"],
+        [TRENDING, "trending"],
         [CRYPTO, "crypto"],
       ] as const
     ).flatMap(([feeds, category]) =>
@@ -247,12 +267,13 @@ export function newsSources(env: Record<string, string | undefined> = process.en
     ),
   ];
 
-  // Free keys. How often each is read keeps it inside its free daily quota, searches included.
+  // Free keys. How often each is read keeps it inside its free daily quota, searches included. Top headlines are
+  // trending; a list of the latest news isn't, so those APIs only search.
   const gnews = env.GNEWS_API_KEY;
   if (gnews) {
     out.push({
       name: "GNews", // 100 requests a day
-      category: "world",
+      category: "trending",
       live: `https://gnews.io/api/v4/top-headlines?lang=en&max=10&apikey=${q(gnews)}`,
       search: (s) => `https://gnews.io/api/v4/search?q=${q(s)}&lang=en&sortby=publishedAt&max=10&apikey=${q(gnews)}`,
       parse: json(
@@ -266,8 +287,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (newsdata) {
     out.push({
       name: "NewsData.io", // 200 credits a day
-      category: "world",
-      live: `https://newsdata.io/api/1/latest?language=en&apikey=${q(newsdata)}`,
+      category: "trending",
       search: (s) => `https://newsdata.io/api/1/latest?language=en&q=${q(s)}&apikey=${q(newsdata)}`,
       parse: json(
         (b) => b.results,
@@ -280,8 +300,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (guardian) {
     out.push({
       name: "The Guardian API", // 5,000 requests a day
-      category: "world",
-      live: `https://content.guardianapis.com/search?order-by=newest&page-size=30&api-key=${q(guardian)}`,
+      category: "trending",
       search: (s) => `https://content.guardianapis.com/search?q=${q(s)}&order-by=newest&page-size=30&api-key=${q(guardian)}`,
       parse: json(
         (b) => field(b.response, "results"),
@@ -294,7 +313,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (newsapi) {
     out.push({
       name: "NewsAPI.org", // 100 requests a day (its free plan is for development)
-      category: "world",
+      category: "trending",
       live: `https://newsapi.org/v2/top-headlines?language=en&pageSize=50&apiKey=${q(newsapi)}`,
       search: (s) => `https://newsapi.org/v2/everything?q=${q(s)}&language=en&sortBy=publishedAt&pageSize=50&apiKey=${q(newsapi)}`,
       parse: json(
@@ -308,8 +327,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (currents) {
     out.push({
       name: "Currents", // about 600 requests a day
-      category: "world",
-      live: `https://api.currentsapi.services/v1/latest-news?language=en&apiKey=${q(currents)}`,
+      category: "trending",
       search: (s) => `https://api.currentsapi.services/v1/search?keywords=${q(s)}&language=en&apiKey=${q(currents)}`,
       parse: json(
         (b) => b.news,
@@ -322,7 +340,7 @@ export function newsSources(env: Record<string, string | undefined> = process.en
   if (thenewsapi) {
     out.push({
       name: "TheNewsAPI", // 3 requests a day on the free plan: the live list only, three times a day
-      category: "world",
+      category: "trending",
       live: `https://api.thenewsapi.com/v1/news/top?language=en&locale=us&api_token=${q(thenewsapi)}`,
       parse: json(
         (b) => b.data,

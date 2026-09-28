@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { newsSources, parseDate, parseRss, readSource } from "./news-sources";
+import { newsSources, parseDate, parseRss, parseTrends, readSource } from "./news-sources";
 
 const rss = (items: string[]) => `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items.join("")}</channel></rss>`;
 const item = (title: string, link: string, date: string, extra = "") =>
@@ -41,6 +41,50 @@ describe("parseRss", () => {
   });
 });
 
+describe("parseTrends", () => {
+  // Google Trends' "Trending now" RSS: a search, then the stories behind it.
+  const trend = (search: string, stories: [title: string, url: string, source: string][]) =>
+    `<item><title>${search}</title><ht:approx_traffic>2000+</ht:approx_traffic><pubDate>Sun, 28 Sep 2026 03:40:00 -0700</pubDate>` +
+    stories
+      .map(([t, u, s]) => `<ht:news_item><ht:news_item_title>${t}</ht:news_item_title><ht:news_item_url>${u}</ht:news_item_url><ht:news_item_source>${s}</ht:news_item_source></ht:news_item>`)
+      .join("") +
+    "</item>";
+  const feed = (items: string[]) =>
+    `<?xml version="1.0" encoding="UTF-8"?><rss xmlns:ht="https://trends.google.com/trending/rss" version="2.0"><channel>${items.join("")}</channel></rss>`;
+
+  it("takes one story per search, the search as its topic, dated when the search took off", () => {
+    const at = Date.parse("2026-09-28T10:40:00Z");
+    expect(
+      parseTrends(
+        feed([
+          trend("bukangi", [
+            ["Shark fever hits Busan as 102,000 rush to see &#39;Bukangi&#39;", "https://en.yna.co.kr/view/1", "Yonhap News Agency"],
+            ["Busan&#39;s shark, again", "https://koreaherald.com/2", "The Korea Herald"],
+          ]),
+          trend("no stories", []),
+        ]),
+      ),
+    ).toEqual([
+      { title: "Shark fever hits Busan as 102,000 rush to see 'Bukangi'", url: "https://en.yna.co.kr/view/1", source: "Yonhap News Agency", publishedAt: at, topic: "bukangi" },
+    ]);
+  });
+
+  it("drops a story link hiding another address, and takes the next story", () => {
+    const spam = "https://www2.university.test/tour/?&amp;xml=data:gsf,&lt;include url=&quot;//spam.test/x.xml&quot;/&gt;";
+    const redirect = "https://real.test/go?to=https%3A%2F%2Fspam.test";
+    const [h] = parseTrends(
+      feed([
+        trend("f1 gp", [
+          ["HOW TO WATCH F1 GP LIVE", spam, "University"],
+          ["Watch free", redirect, "Real"],
+          ["Italian Grand Prix: Leclerc on pole", "https://news.test/f1", "News"],
+        ]),
+      ]),
+    );
+    expect(h).toMatchObject({ url: "https://news.test/f1", topic: "f1 gp" });
+  });
+});
+
 describe("newsSources", () => {
   const keys = {
     GNEWS_API_KEY: "g-key",
@@ -60,22 +104,27 @@ describe("newsSources", () => {
     const free = newsSources({}).map((s) => s.name);
     expect(free).toEqual(
       expect.arrayContaining([
-        "Google News", "Bing News", "GDELT", "Hacker News", "BBC News", "DW", "CBC News", "Yonhap News Agency",
-        "The Korea Herald", "Korea Times", "UPI Odd News", "CoinDesk", "The Block", "Watcher Guru",
+        "Google Trends US", "Google Trends SG", "Google News", "Google News Asia", "Google News entertainment",
+        "Bing News", "GDELT", "UPI Odd News", "New York Post", "CoinDesk", "The Block", "Watcher Guru",
       ]),
     );
+    // No world news or tech tab any more.
+    expect(free.filter((n) => ["BBC News", "Yonhap News Agency", "Hacker News", "Google News world", "Google News technology"].includes(n))).toEqual([]);
     expect(free).not.toContain("GNews");
     expect(newsSources(keys).length - free.length).toBe(6);
     expect(byName("GNews").live).toContain("apikey=g-key");
     expect(byName("TheNewsAPI").search).toBeUndefined(); // 3 requests a day: the live list only
   });
 
-  it("puts each source in a tab, reads each feed once, over https", () => {
+  it("puts each source in a tab, trending or crypto, reads each feed once, over https", () => {
     const all = newsSources(keys);
     const tab = (name: string) => all.find((s) => s.name === name)?.category;
-    expect([tab("BBC News"), tab("Google News entertainment"), tab("CoinDesk"), tab("Hacker News"), tab("GNews")]).toEqual([
-      "world", "viral", "crypto", "tech", "world",
+    expect([tab("Google Trends US"), tab("Google News"), tab("UPI Odd News"), tab("CoinDesk"), tab("GNews")]).toEqual([
+      "trending", "trending", "trending", "crypto", "trending",
     ]);
+    expect(new Set(all.map((s) => s.category))).toEqual(new Set(["trending", "crypto"]));
+    // Lists of the latest news aren't trending: those APIs only search.
+    expect(["NewsData.io", "The Guardian API", "Currents"].map((n) => byName(n).live)).toEqual([undefined, undefined, undefined]);
     const urls = all.flatMap((s) => [s.live, s.search?.("x")].filter((u): u is string => !!u));
     expect(new Set(urls).size).toBe(urls.length);
     expect(urls.filter((u) => !u.startsWith("https://"))).toEqual([]);
@@ -83,11 +132,11 @@ describe("newsSources", () => {
   });
 
   it("uses the feeds and searches as their references give them", () => {
-    expect(byName("NPR").live).toBe("https://www.npr.org/rss/rss.php?id=1004"); // World, as awesome-rss-feeds lists it
+    expect(byName("Google Trends US").live).toBe("https://trends.google.com/trending/rss?geo=US");
     expect(byName("Bing News").search?.("bukangi")).toBe(
       "https://www.bing.com/news/search?q=bukangi&qft=sortbydate%3D%221%22&format=rss",
     );
-    expect(byName("Google News world").live).toBe("https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en");
+    expect(byName("Google News entertainment").live).toBe("https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=en-US&gl=US&ceid=US:en");
   });
 
   it("reads each keyed API's answers", () => {
@@ -103,9 +152,6 @@ describe("newsSources", () => {
     expect(byName("Currents").parse(JSON.stringify({ news: [{ title: want.title, url: "https://www.news.test/a", published: "2026-09-28 03:40:00 +0000" }] }))).toEqual([{ ...want, url: "https://www.news.test/a", source: "news.test" }]);
     expect(byName("TheNewsAPI").parse(JSON.stringify({ data: [{ title: want.title, url: want.url, published_at: "2026-09-28T03:40:00.000000Z", source: "news.test" }] }))).toEqual([{ ...want, source: "news.test" }]);
     expect(byName("GDELT").parse(JSON.stringify({ articles: [{ title: want.title, url: want.url, seendate: "20260928T034000Z", domain: "yna.co.kr" }] }))).toEqual([{ ...want, source: "yna.co.kr" }]);
-    expect(byName("Hacker News").parse(JSON.stringify({ hits: [{ title: "Ask HN: sharks?", url: null, objectID: "42", created_at: "2026-09-28T03:40:00Z" }] }))).toEqual([
-      { title: "Ask HN: sharks?", url: "https://news.ycombinator.com/item?id=42", source: "Hacker News", publishedAt: at },
-    ]);
     expect(byName("GNews").parse("Please limit requests")).toEqual([]); // not JSON: nothing, not an error
   });
 });

@@ -101,13 +101,12 @@ function mockHeadlines(): Tagged[] {
   const now = Date.now();
   return (
     [
-      ["Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "world", 0.3],
-      ["Moo Deng turns two: Thailand's famous pygmy hippo celebrates with a fruit cake", "viral", 2],
-      ["Peanut the Squirrel's owner opens animal sanctuary a year later", "viral", 5],
-      ["Shark fever hits Busan as 102,000 rush to see 'Bukangi' at start of Chuseok break", "world", 9],
+      ["Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "trending", 0.3],
+      ["Moo Deng turns two: Thailand's famous pygmy hippo celebrates with a fruit cake", "trending", 2],
+      ["Peanut the Squirrel's owner opens animal sanctuary a year later", "trending", 5],
+      ["Shark fever hits Busan as 102,000 rush to see 'Bukangi' at start of Chuseok break", "trending", 9],
       ["Memecoin named after Busan's shark Bukangi jumps 300% in a day", "crypto", 11],
-      ["Chill Guy meme creator on the dog that became a symbol of calm", "viral", 20],
-      ["Show HN: a tracker for tokens named after the news", "tech", 26],
+      ["Chill Guy meme creator on the dog that became a symbol of calm", "trending", 20],
     ] as const
   ).map(([title, category, hours], i) => ({
     title,
@@ -119,8 +118,20 @@ function mockHeadlines(): Tagged[] {
 }
 
 /**
- * Newest first, each story once (the same headline can be in several feeds), at most `PER_CATEGORY` of each
- * category, with its keywords.
+ * A story's keywords: what people searched for first when the source says (Google Trends' "bukangi", written as
+ * the headline writes it if it does), then the names in its headline.
+ */
+function keywordsFor(title: string, topic: string | undefined): string[] {
+  const named = keywordsOf(title);
+  if (!topic || !normalize(topic)) return named;
+  const key = normalize(topic);
+  const first = named.find((k) => normalize(k) === key) ?? topic;
+  return [first, ...named.filter((k) => normalize(k) !== key)].slice(0, 4);
+}
+
+/**
+ * Newest first, each story once (the same headline can be in several feeds, a search in several countries'
+ * trends), at most `PER_CATEGORY` of each category, with its keywords.
  */
 function toItems(headlines: Tagged[]): NewsItem[] {
   const seen = new Set<string>();
@@ -128,14 +139,14 @@ function toItems(headlines: Tagged[]): NewsItem[] {
   return headlines
     .sort((a, b) => b.publishedAt - a.publishedAt)
     .filter((h) => {
-      const keys = [h.url, normalize(h.title)];
+      const keys = [h.url, normalize(h.title), ...(h.topic ? [`topic:${normalize(h.topic)}`] : [])];
       if (keys.some((k) => seen.has(k))) return false;
       keys.forEach((k) => seen.add(k));
       const n = counts.get(h.category) ?? 0;
       counts.set(h.category, n + 1);
       return n < PER_CATEGORY;
     })
-    .map((h) => ({ id: h.url, ...h, keywords: keywordsOf(h.title) }));
+    .map(({ topic, ...h }) => ({ id: h.url, ...h, keywords: keywordsFor(h.title, topic) }));
 }
 
 /** A source's newest `PER_SOURCE` headlines at `url` (since `since`), in its category. */
