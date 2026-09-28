@@ -3,16 +3,12 @@
 import { UserRound } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
-import { formatDay, formatMultiple } from "@/lib/format";
 import { useCallerProfile } from "@/lib/hooks";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
-import { Avatar } from "./Avatar";
 import { CallSpread, RecentForm } from "./CallerCharts";
-import { toneOf } from "./MultipleBadge";
 import { CallsView, callRow } from "./MyCalls";
-import { OfficialBadge } from "./OfficialBadge";
-import { SocialLinks } from "./Social";
+import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
 
 function Message({ title, body }: { title: string; body: string }) {
   return (
@@ -36,40 +32,22 @@ export function CallerProfile({ username }: { username: string }) {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <div className="flex items-center gap-4">
-        <Avatar userId={c?.userId ?? null} size={56} />
-        <div className="min-w-0">
-          <h1 className="flex min-w-0 items-center gap-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
-            <span className="truncate font-mono">@{c?.username ?? username}</span>
-            {c?.official && <OfficialBadge className="size-5" />}
-            {mine && (
-              <span className="rounded border border-border px-1.5 font-mono text-[11px] font-normal text-muted">you</span>
-            )}
-          </h1>
-          <p className="mt-1 font-mono text-xs text-subtle">
-            {c ? (
-              <>
-                {c.hits} at 2x+ · {Math.round((c.wins / Math.max(c.calls, 1)) * 100)}% win · avg{" "}
-                <span className={toneOf(c.avgMultiple)}>{formatMultiple(c.avgMultiple)}</span>
-                {since && <> · calling since {formatDay(since)}</>}
-              </>
-            ) : (
-              "caller"
-            )}
-          </p>
-        </div>
-        {mine && (
-          <Link
-            href="/account"
-            className="ml-auto inline-flex h-8 shrink-0 items-center rounded-md border border-border px-3 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-          >
-            Edit profile
-          </Link>
-        )}
-      </div>
-
-      {about?.bio && <p className="mt-5 max-w-xl text-sm text-pretty break-words">{about.bio}</p>}
-      {about && <SocialLinks about={about} className={about.bio ? "mt-3" : "mt-5"} />}
+      <ProfileHeader
+        userId={c?.userId ?? null}
+        username={c?.username ?? username}
+        official={!!c?.official}
+        stats={c ?? null}
+        since={since}
+        about={about}
+        you={mine}
+        actions={
+          mine && (
+            <Link href="/account" className={PROFILE_ACTION}>
+              Edit profile
+            </Link>
+          )
+        }
+      />
 
       {!accountsAvailable ? (
         <Message title="No caller profiles here" body="This deployment runs without accounts, so calls have no names." />

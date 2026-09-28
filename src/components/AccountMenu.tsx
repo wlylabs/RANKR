@@ -1,11 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { Globe, KeyRound, LogOut, Settings, UserRound } from "lucide-react";
+import { KeyRound, LogOut, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { callerHref } from "@/lib/format";
 import { loginHref } from "@/lib/login";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
@@ -92,10 +91,7 @@ export function AccountMenu() {
             </Link>
           )}
           <Link href="/me" role="menuitem" className={ITEM}>
-            <UserRound className="size-3.5" /> My calls
-          </Link>
-          <Link href={callerHref(username)} role="menuitem" className={ITEM}>
-            <Globe className="size-3.5" /> Public profile
+            <UserRound className="size-3.5" /> You
           </Link>
           <Link href="/account" role="menuitem" className={ITEM}>
             <Settings className="size-3.5" /> Account

@@ -27,7 +27,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   **guest** in one click; save a **key** (`rk-7F3A-K9QX-2MPD-W8HT-ZC4N`) any time to sign in on any device.
   No email, no password. Every account starts with a name derived from `sha256(user id)`, like `@nonce_7f3a`,
   and can rename itself.
-- **My calls**: every token you pasted, measured from *your* paste.
+- **You** (`/me`): your name, bio and links as on your public profile, your place on the caller board (and how
+  far the caller one place up is), and three tabs: **Calls** (every token you pasted, measured from *your*
+  paste), **Stats** (the charts of your public profile) and **Watchlist**. The tab is in the URL (`?tab=stats`).
 - **Caller leaderboard**: callers ranked by hit rate (share of calls at 2x+), average x, 2x hits or best call. Signed
   in, your place stays pinned under the board: your rank and how far behind the caller one place up you are
   (or how many calls you still need to be ranked). Each caller has a public profile at `/u/<username>` with their
@@ -39,10 +41,13 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   last 10 calls (each up or down from its entry, how many are up, and the streak in profit up to the newest).
 - **Feed** (`/feed`, and a live ticker under the header): every call as it lands ("@userx called $SHIB at
   $1.2B mc") and every call that reaches a milestone ("$PEPE hit 10x from @userx's call"), each from the caller's
-  own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone or top callers (the top 25 of
-  the caller board), by calls or milestones, and by chain. The ticker shows the filter picked on the feed page.
+  own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone, top callers (the top 25 of
+  the caller board) or **you** (your own calls and milestones), by calls or milestones, and by chain; the filters
+  are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
+  land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
+  filter picked on the feed page.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
-  under My calls → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
+  under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
   new milestone (2x, 3x, 5x, 10x...), while Rankr is open. A token already past a milestone when first seen
   doesn't alert for it.
@@ -51,7 +56,10 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   DexScreener chart, share to X / native share, and a generated social card per token.
 - **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, three steps and a
   four-question FAQ. English only: Rankr is for DEX traders everywhere.
-  The app itself (paste box + live board) is at **`/app`**.
+  The app itself is at **`/app`**.
+- **Home** (`/app`): signed out, the headline and the paste box; signed in, the paste box and your place on the
+  caller board (with your best call), without the headline. Then this month (the countdown to the reset and the
+  board's totals) and three panels: top callers, top runners and the latest milestones.
 - **Settings menu** (the gear in the header): theme (switching cross-fades the page), milestone alerts, About
   Rankr (the landing page) or Open app, Install app and the app link. It keeps pages free of app buttons.
 - **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
@@ -157,7 +165,7 @@ Pasting needs an account. Someone signed out who pastes a CA goes to `/login`:
 
 Either way they land back in the app (`/app`) and the CA they pasted is tracked. Browsing needs no account.
 
-A guest saves a key on `/account` (the header avatar, the account menu, "My calls" and the paste result all
+A guest saves a key on `/account` (the header avatar, the account menu, "You" and the paste result all
 point there until one is saved). The key is shown once, with copy and download, next to a 5x5 dot pattern from
 its hash; the same pattern shows up when the key is pasted to sign in, so the two can be matched at a glance.
 The same page makes a new key: the old one stops working and other devices are signed out.
@@ -232,7 +240,7 @@ How it works:
 - The caller board ranks callers by hit rate (share of calls at 2x+, 5+ calls, the default), average x
   (5+ calls), 2x hits, best call and number of calls.
 - Without the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` vars (local dev), there are no accounts: pasting works
-  for everyone and "My calls" is kept in the browser.
+  for everyone and your calls ("You") are kept in the browser.
 
 ### Official accounts
 
@@ -261,7 +269,7 @@ At **00:00 UTC on the 1st of every month** the boards start from zero: `rankr_en
 and with it every call and milestone. Accounts stay (names, keys, bios, links, verified X accounts). Just before,
 the month's **top 10 callers** (by hit rate, 5+ calls, as on the caller board) and **top 10 tokens** (by peak x
 since the first paste, with who called each first) are kept in `public.seasons`, shown under Leaderboard ->
-Last month. The leaderboard and My calls say when the next reset is.
+Last month. The leaderboard and "You" say when the next reset is.
 
 It runs as a pg_cron job, `rankr-monthly-reset` (`0 0 1 * *`, pg_cron runs in UTC), which `setup.sql` schedules
 when pg_cron is enabled. By hand: `select rankr_end_month();`. Stop it: `select cron.unschedule('rankr-monthly-reset');`.
@@ -308,7 +316,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
-| `GET /api/feed?scope=all\|top&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first |
+| `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 
 ## How the numbers work
 
@@ -348,7 +356,7 @@ src/lib/avatar.ts            a caller's avatar: a mirrored 5x5 matrix from sha25
 src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and server)
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
-src/lib/feed-scope.ts        the feed filter, everyone or top callers (kept in the browser)
+src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

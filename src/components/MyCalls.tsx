@@ -1,20 +1,24 @@
 "use client";
 
 import clsx from "clsx";
-import { ClipboardPaste, UserRound } from "lucide-react";
+import { ChevronRight, ClipboardPaste, Globe, Pencil, UserRound } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
-import { useAccountCalls, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
+import { callerStats } from "@/lib/caller-stats";
+import { callerHref, formatMultiple, formatUsd, tokenHref } from "@/lib/format";
+import { useAccountCalls, useMyCalls, useMyRank, useTokens, type MyCall } from "@/lib/hooks";
 import { loginHref } from "@/lib/login";
 import { MAX_LIMIT } from "@/lib/params";
 import { ratio, tierOf } from "@/lib/metrics";
 import { nextResetAt, resetDay } from "@/lib/season";
 import { accountsAvailable } from "@/lib/supabase-browser";
-import type { CallView, TokenView } from "@/lib/types";
+import type { CallView, CallerAbout, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
-import { OfficialBadge } from "./OfficialBadge";
+import { CallSpread, RecentForm } from "./CallerCharts";
+import { rankLine } from "./CallersBoard";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
+import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
 import { Watchlist } from "./Watchlist";
@@ -74,12 +78,12 @@ export function callRow(c: CallView): Row {
 }
 
 export function MyCalls() {
-  const { available, ready, userId, username, hasKey, official } = useAuth();
+  const { available, ready, userId, username, hasKey, official, about } = useAuth();
   if (!available) return <DeviceCalls />;
-  if (!ready) return <Page intro={null} rows={[]} loading />;
+  if (!ready) return <Page rows={[]} loading />;
   if (!userId || !username) {
     return (
-      <Page intro={null} rows={[]}>
+      <Page rows={[]}>
         <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
           <UserRound className="mx-auto size-5 text-subtle" />
           <p className="mt-3 font-medium">{userId ? "Pick a name" : "Sign in to see your calls"}</p>
@@ -98,7 +102,7 @@ export function MyCalls() {
       </Page>
     );
   }
-  return <AccountCalls userId={userId} username={username} hasKey={hasKey} official={official} />;
+  return <AccountCalls userId={userId} username={username} hasKey={hasKey} official={official} about={about} />;
 }
 
 function AccountCalls({
@@ -106,36 +110,98 @@ function AccountCalls({
   username,
   hasKey,
   official,
+  about,
 }: {
   userId: string;
   username: string;
   hasKey: boolean;
   official: boolean;
+  about: CallerAbout | null;
 }) {
   const { data, isLoading } = useAccountCalls(userId);
-  const rows = useMemo(() => (data?.calls ?? []).map(callRow), [data]);
+  const calls = useMemo(() => data?.calls ?? [], [data]);
+  const rows = useMemo(() => calls.map(callRow), [calls]);
 
   return (
     <Page
-      intro={
+      header={
         <>
-          Recorded as <span className="font-mono text-fg">@{username}</span>
-          {official && <OfficialBadge className="ml-1" />} and ranked on the caller board.
-          {!hasKey && (
-            <>
-              {" "}
-              Guest account, this browser only:{" "}
-              <Link href="/account" className="text-fg underline-offset-4 hover:underline">
-                save your key to keep it
-              </Link>
-              .
-            </>
-          )}
+          {/* Who you are, as on your public page, and your place on the caller board. */}
+          <ProfileHeader
+            userId={userId}
+            username={username}
+            official={official}
+            stats={calls.length ? callerStats(calls) : null}
+            since={calls.length ? Math.min(...calls.map((c) => c.calledAt)) : null}
+            about={about}
+            actions={
+              <>
+                <Link href={callerHref(username)} className={PROFILE_ACTION} title="Your public page">
+                  <Globe className="size-3.5" />
+                  <span className="max-sm:sr-only">Public page</span>
+                </Link>
+                <Link href="/account" className={PROFILE_ACTION} title="Edit profile">
+                  <Pencil className="size-3.5" />
+                  <span className="max-sm:sr-only">Edit profile</span>
+                </Link>
+              </>
+            }
+          />
+          <RankCard userId={userId} className="mt-6" />
         </>
+      }
+      intro={
+        !hasKey && (
+          <>
+            Guest account, this browser only:{" "}
+            <Link href="/account" className="text-fg underline-offset-4 hover:underline">
+              save your key to keep it
+            </Link>
+            .
+          </>
+        )
       }
       rows={rows}
       loading={isLoading}
     />
+  );
+}
+
+/**
+ * Your place on the caller board (by hit rate, its default) as a link, to the board unless `href` says
+ * otherwise. `best` adds your best call.
+ */
+export function RankCard({
+  userId,
+  href = "/leaderboard?view=callers",
+  best = false,
+  className,
+}: {
+  userId: string;
+  href?: string;
+  best?: boolean;
+  className?: string;
+}) {
+  const mine = useMyRank("rate", userId);
+  if (!mine) return null;
+  const bestCall =
+    best && mine.caller?.bestToken ? `best $${mine.caller.bestToken.symbol} ${formatMultiple(mine.caller.bestMultiple)}` : null;
+  const line = [rankLine("rate", mine), bestCall].filter(Boolean).join(" · ");
+  return (
+    <Link
+      href={href}
+      className={clsx("flex items-center gap-4 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-surface-2", className)}
+    >
+      <span className="tabular font-mono text-2xl font-medium tracking-tight">{mine.rank ? `#${mine.rank}` : "—"}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm">
+          {mine.rank ? `of ${mine.total} on the caller board` : "Not on the caller board yet"}
+          <span className="text-subtle"> · hit rate</span>
+        </span>
+        {line && <span className="mt-0.5 block truncate font-mono text-[11px] text-subtle">{line}</span>}
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-subtle" />
+    </Link>
   );
 }
 
@@ -148,53 +214,62 @@ function DeviceCalls() {
     const byId = new Map(tokens.map((t) => [t.id, t]));
     return calls.map((c) => deviceRow(c, byId.get(c.id)));
   }, [calls, tokens]);
-  return (
-    <Page
-      intro="Saved on this device."
-      rows={rows}
-      loading={isLoading && calls.length > 0}
-    />
-  );
+  return <Page intro="Saved on this device." rows={rows} loading={isLoading && calls.length > 0} />;
 }
 
+const TABS = { calls: "Calls", stats: "Stats", watchlist: "Watchlist" } as const;
+type TabKey = keyof typeof TABS;
+
+/** The tab in the URL (?tab=stats), so it survives a reload and can be linked to. */
+function useTab(): [TabKey, (tab: TabKey) => void] {
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const picked = params.get("tab");
+  const tab: TabKey = picked === "stats" || picked === "watchlist" ? picked : "calls";
+  // Old links: /me#watchlist.
+  useEffect(() => {
+    if (window.location.hash === "#watchlist") router.replace(`${pathname}?tab=watchlist`, { scroll: false });
+  }, [pathname, router]);
+  return [tab, (next) => router.replace(next === "calls" ? pathname : `${pathname}?tab=${next}`, { scroll: false })];
+}
+
+/** "You": your calls, how they're doing, and your watchlist. */
 function Page({
+  header,
   intro,
   rows,
   loading = false,
   children,
 }: {
-  intro: React.ReactNode;
+  /** Above the tabs; a plain "You" heading when there's no account to show. */
+  header?: React.ReactNode;
+  intro?: React.ReactNode;
   rows: Row[];
   loading?: boolean;
+  /** Shown instead of the calls and the stats (e.g. "Sign in"). */
   children?: React.ReactNode;
 }) {
   const watching = useWatchlist().length;
-  const [tab, setTab] = useState<"calls" | "watchlist">("calls");
-  // /me#watchlist opens the watchlist.
-  useEffect(() => {
-    if (window.location.hash === "#watchlist") setTab("watchlist");
-  }, []);
+  const [tab, setTab] = useTab();
 
   return (
     <div className="pt-10 sm:pt-14">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My calls</h1>
-      <div className="mt-4 flex border-b border-border" role="tablist" aria-label="My calls">
-        {(["calls", "watchlist"] as const).map((t) => (
+      {header ?? <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">You</h1>}
+      <div className="mt-6 flex border-b border-border" role="tablist" aria-label="You">
+        {(Object.keys(TABS) as TabKey[]).map((t) => (
           <button
             key={t}
             type="button"
             role="tab"
             aria-selected={tab === t}
-            onClick={() => {
-              setTab(t);
-              history.replaceState(null, "", t === "watchlist" ? "#watchlist" : location.pathname);
-            }}
+            onClick={() => setTab(t)}
             className={clsx(
-              "relative mr-6 h-10 text-sm capitalize transition-colors",
+              "relative mr-6 h-10 text-sm transition-colors",
               tab === t ? "text-fg after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-fg" : "text-muted hover:text-fg",
             )}
           >
-            {t}
+            {TABS[t]}
             {t === "watchlist" && watching > 0 && <span className="ml-1.5 font-mono text-xs text-subtle">{watching}</span>}
           </button>
         ))}
@@ -202,6 +277,10 @@ function Page({
 
       {tab === "watchlist" ? (
         <Watchlist />
+      ) : children ? (
+        children
+      ) : tab === "stats" ? (
+        <Stats rows={rows} loading={loading} />
       ) : (
         <>
           <p className="mt-4 text-sm text-muted">
@@ -210,24 +289,44 @@ function Page({
               <span className="text-subtle"> Calls reset with the boards on {resetDay(nextResetAt())}, 00:00 UTC.</span>
             )}
           </p>
-
-          {children ?? (!rows.length && !loading ? (
-            <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
-              <ClipboardPaste className="mx-auto size-5 text-subtle" />
-              <p className="mt-3 font-medium">No calls yet</p>
-              <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Paste a CA and it lands here, tracked from your entry.</p>
-              <Link
-                href="/app#paste"
-                className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
-              >
-                Paste a CA
-              </Link>
-            </div>
-          ) : (
-            <CallsView rows={rows} loading={loading} />
-          ))}
+          {!rows.length && !loading ? <NoCalls /> : <CallsView rows={rows} loading={loading} />}
         </>
       )}
+    </div>
+  );
+}
+
+function NoCalls() {
+  return (
+    <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
+      <ClipboardPaste className="mx-auto size-5 text-subtle" />
+      <p className="mt-3 font-medium">No calls yet</p>
+      <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Paste a CA and it lands here, tracked from your entry.</p>
+      <Link
+        href="/app#paste"
+        className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
+      >
+        Paste a CA
+      </Link>
+    </div>
+  );
+}
+
+/** Where your calls are now and your last 10, the charts of your public page. */
+function Stats({ rows, loading }: { rows: Row[]; loading: boolean }) {
+  if (!rows.length) {
+    return loading ? (
+      <div className="mt-8 rounded-lg border border-border">
+        <ListSkeleton rows={4} />
+      </div>
+    ) : (
+      <NoCalls />
+    );
+  }
+  return (
+    <div className="mt-8 grid gap-3 sm:grid-cols-2">
+      <CallSpread rows={rows} />
+      <RecentForm rows={rows} />
     </div>
   );
 }

@@ -150,12 +150,19 @@ export type FeedParams = {
   scope?: FeedScope;
   kind?: FeedKind;
   chain?: string | null;
+  /** The signed-in account, for scope "you" (nothing to ask for without one). */
+  userId?: string | null;
 };
 
-/** SWR key for a feed query. */
-export function feedKey(p: FeedParams, limit: number, offset = 0): string {
+/** SWR key for a feed query, or null when there is nothing to ask for. */
+export function feedKey(p: FeedParams, limit: number, offset = 0): string | null {
   const qs = new URLSearchParams();
   if (p.scope && p.scope !== "all") qs.set("scope", p.scope);
+  // Your own entries: keyed by account, so switching accounts never shows the last one's.
+  if (p.scope === "you") {
+    if (!p.userId) return null;
+    qs.set("u", p.userId);
+  }
   if (p.kind && p.kind !== "all") qs.set("kind", p.kind);
   if (p.chain) qs.set("chain", p.chain);
   qs.set("limit", String(limit));
@@ -163,18 +170,21 @@ export function feedKey(p: FeedParams, limit: number, offset = 0): string {
   return `/api/feed?${qs}`;
 }
 
-/** The newest feed entries (the ticker). */
+/** The newest feed entries (the ticker). Sent with the session, which scope "you" needs. */
 export function useFeed(params: FeedParams, limit = 20) {
-  const { data, error, isLoading } = useSWR<FeedResponse>(feedKey(params, limit), fetcher, LIVE);
+  const { data, error, isLoading } = useSWR<FeedResponse>(feedKey(params, limit), authedFetcher, LIVE);
   return { items: data?.items ?? [], error, isLoading };
 }
 
-/** The feed in pages of `pageSize`; an entry that slides onto the next page as new ones arrive shows once. */
+/**
+ * The feed in pages of `pageSize`; an entry that slides onto the next page as new ones arrive shows once.
+ * Other filters start empty rather than showing the last ones' entries (the page tells new from seen).
+ */
 export function useFeedPages(params: FeedParams, pageSize = 30) {
   const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite<FeedResponse>(
     (i, prev: FeedResponse | null) => (prev && prev.items.length < pageSize ? null : feedKey(params, pageSize, i * pageSize)),
-    fetcher,
-    { ...LIVE, revalidateAll: true },
+    authedFetcher,
+    { refreshInterval: LIVE.refreshInterval, revalidateAll: true },
   );
   const seen = new Set<string>();
   const items = (data?.flatMap((p) => p.items) ?? []).filter((i) => !seen.has(i.id) && !!seen.add(i.id));

@@ -5,8 +5,35 @@ import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatMultiple, tokenHref } from "@/lib/format";
-import { useStats, useTokens } from "@/lib/hooks";
+import { useCallerPages, useFeed, useNow, useStats, useTokens } from "@/lib/hooks";
+import { monthLabel, nextResetAt, resetDay, untilLabel } from "@/lib/season";
+import { accountsAvailable } from "@/lib/supabase-browser";
+import { useAuth } from "./AuthProvider";
+import { CallerRateRow } from "./CallersBoard";
+import { FeedRow } from "./Feed";
+import { RankCard } from "./MyCalls";
+import { PasteBox } from "./PasteBox";
 import { ListSkeleton, TokenRow } from "./TokenList";
+
+const PANEL_ROWS = 5;
+
+/**
+ * The top of the app's home. Signed out: the hero (`hero`). Signed in: the paste box, then your place this
+ * month. Until the session is read it isn't known which, and a returning caller shouldn't see the hero flash,
+ * so the paste box shows (it works either way).
+ */
+export function HomeTop({ hero }: { hero: ReactNode }) {
+  const { ready, userId } = useAuth();
+  if (ready && !userId) return hero;
+  return (
+    <section className="mx-auto max-w-2xl pt-8 pb-10 sm:pt-12 sm:pb-12">
+      <div id="paste">
+        <PasteBox resumeFromUrl />
+      </div>
+      {userId && <RankCard userId={userId} href="/me" best className="mt-4" />}
+    </section>
+  );
+}
 
 /** "● 128 tokens tracked" above the hero headline. */
 export function LiveStatus() {
@@ -47,8 +74,8 @@ function Panel({ title, href, children }: { title: string; href: string; childre
   );
 }
 
-function Empty() {
-  return <div className="px-4 py-12 text-center text-sm text-muted">Nothing here yet. Paste the first CA above.</div>;
+function Empty({ children = "Nothing here yet. Paste the first CA above." }: { children?: ReactNode }) {
+  return <div className="px-4 py-12 text-center text-sm text-muted">{children}</div>;
 }
 
 /** Tracked / hit 2x+ / best run / in the red, for the whole board. */
@@ -87,10 +114,83 @@ function StatsGrid() {
   );
 }
 
+/** This month and when the boards reset (only with accounts: the reset runs in Supabase). */
+function MonthBar() {
+  const now = useNow(60_000);
+  const resetsAt = nextResetAt(now);
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <h2 className="text-sm font-medium">{monthLabel(new Date(now).toISOString())}</h2>
+      <p className="font-mono text-[11px] text-subtle">
+        boards reset {resetDay(resetsAt)}, 00:00 UTC · in <span className="text-fg">{untilLabel(resetsAt, now)}</span>
+      </p>
+    </div>
+  );
+}
+
+function TopCallers() {
+  const { callers, isLoading } = useCallerPages("rate", PANEL_ROWS);
+  return (
+    <Panel title="Top callers" href="/leaderboard?view=callers">
+      {isLoading ? (
+        <ListSkeleton rows={PANEL_ROWS} />
+      ) : callers.length ? (
+        callers.slice(0, PANEL_ROWS).map((c, i) => <CallerRateRow key={c.userId} c={c} rank={i + 1} />)
+      ) : (
+        <Empty>Nobody has the 5 calls a hit rate needs yet.</Empty>
+      )}
+    </Panel>
+  );
+}
+
+function TopRunners() {
+  const { tokens, isLoading } = useTokens({ sort: "top", limit: PANEL_ROWS });
+  return (
+    <Panel title="Top runners" href="/leaderboard">
+      {isLoading ? (
+        <ListSkeleton rows={PANEL_ROWS} />
+      ) : tokens.length ? (
+        tokens.map((t, i) => <TokenRow key={t.id} token={t} rank={i + 1} meta="peak" />)
+      ) : (
+        <Empty />
+      )}
+    </Panel>
+  );
+}
+
+function Milestones() {
+  const { items, isLoading } = useFeed({ kind: "milestone" }, PANEL_ROWS);
+  return (
+    <Panel title="Milestones" href="/feed?kind=milestone">
+      {isLoading ? (
+        <ListSkeleton rows={PANEL_ROWS} />
+      ) : items.length ? (
+        items.map((item) => <FeedRow key={item.id} item={item} />)
+      ) : (
+        <Empty>No call has hit 2x yet this month.</Empty>
+      )}
+    </Panel>
+  );
+}
+
+/** Without accounts there are no callers or calls: the newest pastes instead. */
+function JustPasted() {
+  const { tokens, isLoading } = useTokens({ sort: "new", limit: PANEL_ROWS });
+  return (
+    <Panel title="Just pasted" href="/leaderboard?sort=new">
+      {isLoading ? (
+        <ListSkeleton rows={PANEL_ROWS} />
+      ) : tokens.length ? (
+        tokens.map((t) => <TokenRow key={t.id} token={t} />)
+      ) : (
+        <Empty />
+      )}
+    </Panel>
+  );
+}
+
 export function HomeFeed() {
   const { stats, error } = useStats();
-  const top = useTokens({ sort: "top", limit: 6 });
-  const latest = useTokens({ sort: "new", limit: 6 });
 
   return (
     <div className="space-y-6">
@@ -100,28 +200,23 @@ export function HomeFeed() {
         </p>
       )}
 
-      <StatsGrid />
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Top runners" href="/leaderboard">
-          {top.isLoading ? (
-            <ListSkeleton />
-          ) : top.tokens.length ? (
-            top.tokens.map((t, i) => <TokenRow key={t.id} token={t} rank={i + 1} meta="peak" />)
-          ) : (
-            <Empty />
-          )}
-        </Panel>
-        <Panel title="Just pasted" href="/leaderboard?sort=new">
-          {latest.isLoading ? (
-            <ListSkeleton />
-          ) : latest.tokens.length ? (
-            latest.tokens.map((t) => <TokenRow key={t.id} token={t} />)
-          ) : (
-            <Empty />
-          )}
-        </Panel>
+      <div className="space-y-3">
+        {accountsAvailable && <MonthBar />}
+        <StatsGrid />
       </div>
+
+      {accountsAvailable ? (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <TopCallers />
+          <TopRunners />
+          <Milestones />
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TopRunners />
+          <JustPasted />
+        </div>
+      )}
     </div>
   );
 }

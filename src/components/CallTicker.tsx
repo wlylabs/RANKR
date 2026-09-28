@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useFeedScope } from "@/lib/feed-scope";
 import { useFeed } from "@/lib/hooks";
 import type { FeedItem } from "@/lib/types";
+import { useAuth } from "./AuthProvider";
 import { FeedSentence } from "./FeedLine";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 
-const SCOPE_LABEL = { all: null, top: "Top" } as const;
+const SCOPE_LABEL = { all: null, top: "Top", you: "You" } as const;
 
 /** One entry: the sentence, then the multiple now (for a call) and how long ago. */
 function Entry({ item, copy }: { item: FeedItem; copy?: boolean }) {
@@ -24,13 +25,14 @@ function Entry({ item, copy }: { item: FeedItem; copy?: boolean }) {
 const MIN_ENTRIES = 10;
 
 /**
- * The live feed as a ticker under the app header, filtered like the feed page (everyone or top callers).
+ * The live feed as a ticker under the app header, filtered like the feed page (everyone, top callers or yours).
  * It scrolls on its own and stops on hover or focus; with reduced motion it stays put
  * and scrolls by hand.
  */
 export function CallTicker() {
   const scope = useFeedScope();
-  const { items } = useFeed({ scope }, 20);
+  const { userId } = useAuth();
+  const { items } = useFeed({ scope, userId }, 20);
   if (!items.length) return null;
 
   // A short feed is repeated so one copy is wider than the screen and the loop never shows a gap.

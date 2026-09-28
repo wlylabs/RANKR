@@ -6,7 +6,7 @@ import { behind } from "@/lib/caller-stats";
 import { callerHref, formatMultiple, tokenHref } from "@/lib/format";
 import { useCallerPages, useMyRank } from "@/lib/hooks";
 import { MIN_CALLS_RANKED, minCallsFor, type CallerSort } from "@/lib/params";
-import type { CallerView } from "@/lib/types";
+import type { CallerView, MyRankResponse } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { MultipleBadge } from "./MultipleBadge";
@@ -22,7 +22,7 @@ export const CALLER_SORT_LABELS: Record<CallerSort, string> = {
 };
 
 /** Share of a caller's calls at 2x or more right now. */
-function hitRate(c: CallerView) {
+function hitRate(c: Pick<CallerView, "calls" | "hits">) {
   return `${Math.round((c.hits / Math.max(c.calls, 1)) * 100)}%`;
 }
 
@@ -56,10 +56,52 @@ function BestCall({ c }: { c: CallerView }) {
 
 const rankLabel = (rank: number) => String(rank).padStart(2, "0");
 
+/** A compact caller row by hit rate: rank, name, and share of calls at 2x+ (last month's board, the home page). */
+export function CallerRateRow({
+  c,
+  rank,
+}: {
+  c: Pick<CallerView, "userId" | "username" | "official" | "calls" | "hits">;
+  rank: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rankLabel(rank)}</span>
+      <Link href={callerHref(c.username)} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
+        <Avatar userId={c.userId} size={20} />
+        <span className="truncate font-mono text-[13px]">@{c.username}</span>
+        {c.official && <OfficialBadge />}
+      </Link>
+      <span className="text-right">
+        <span className="tabular block font-mono text-[13px] font-medium">{hitRate(c)}</span>
+        <span className="tabular block font-mono text-[10px] text-subtle">
+          {c.hits}/{c.calls} at 2x+
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /** The number on the right of a compact row. */
 function SortValue({ sort, c }: { sort: CallerSort; c: CallerView }) {
   if (sort === "rate") return <span className="tabular font-mono text-[13px] font-medium">{hitRate(c)}</span>;
   return <MultipleBadge multiple={sort === "best" ? c.bestMultiple : c.avgMultiple} />;
+}
+
+/**
+ * What to tell a caller about their place on the board for `sort`: how far the caller one place up is, or
+ * what they still need to get on it. Null when there is nothing to say.
+ */
+export function rankLine(sort: CallerSort, { rank, caller, ahead, calls, total }: MyRankResponse): string | null {
+  if (rank && caller) {
+    if (!ahead) return `top of the board · ${total} ${total === 1 ? "caller" : "callers"}`;
+    const gap = behind(sort, caller, ahead);
+    return `${gap ? `${gap} behind` : "level with"} @${ahead.username} at #${rank - 1}`;
+  }
+  if (calls === 0) return "no calls this month yet · paste a CA to get on the board";
+  const need = minCallsFor(sort) - calls;
+  if (need <= 0) return null;
+  return `${calls} ${calls === 1 ? "call" : "calls"} · ${need} more to be ranked by ${CALLER_SORT_LABELS[sort].toLowerCase()}`;
 }
 
 /**
@@ -69,23 +111,9 @@ function SortValue({ sort, c }: { sort: CallerSort; c: CallerView }) {
 function MyRank({ sort }: { sort: CallerSort }) {
   const { userId, username, official } = useAuth();
   const mine = useMyRank(sort, userId);
-  if (!userId || !username || !mine) return null;
-
-  const { rank, caller, ahead, calls, total } = mine;
-  const need = minCallsFor(sort) - calls;
-  let line: string;
-  if (rank && caller) {
-    const gap = ahead && behind(sort, caller, ahead);
-    line = !ahead
-      ? `top of the board · ${total} ${total === 1 ? "caller" : "callers"}`
-      : `${gap ? `${gap} behind` : "level with"} @${ahead.username} at #${rank - 1}`;
-  } else if (calls === 0) {
-    line = "no calls this month yet · paste a CA to get on the board";
-  } else if (need > 0) {
-    line = `${calls} ${calls === 1 ? "call" : "calls"} · ${need} more to be ranked by ${CALLER_SORT_LABELS[sort].toLowerCase()}`;
-  } else {
-    return null;
-  }
+  const line = mine && rankLine(sort, mine);
+  if (!userId || !username || !mine || !line) return null;
+  const { rank, caller, total } = mine;
 
   return (
     <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 mt-3 md:bottom-4">

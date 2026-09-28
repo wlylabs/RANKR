@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChange, formatMultiple, formatPrice, formatUsd, timeAgo } from "./format";
+import { dayLabel, formatChange, formatMultiple, formatPrice, formatUsd, timeAgo } from "./format";
 
 describe("formatMultiple", () => {
   it("shows gains as x and losses as %", () => {
@@ -52,5 +52,22 @@ describe("timeAgo", () => {
     expect(timeAgo(now - 2 * 86_400_000, now)).toBe("2d ago");
     expect(timeAgo(now - 10_000, now, true)).toBe("now");
     expect(timeAgo(now - 5 * 60_000, now, true)).toBe("5m");
+  });
+});
+
+describe("dayLabel", () => {
+  // Local times, like the labels.
+  const now = new Date(2026, 8, 28, 10, 30).getTime();
+
+  it("names today and yesterday by calendar day, not 24 hours", () => {
+    expect(dayLabel(new Date(2026, 8, 28, 0, 1).getTime(), now)).toBe("Today");
+    expect(dayLabel(new Date(2026, 8, 27, 23, 59).getTime(), now)).toBe("Yesterday");
+    expect(dayLabel(new Date(2026, 8, 27, 0, 0).getTime(), now)).toBe("Yesterday");
+    expect(dayLabel(now + 60_000, now)).toBe("Today"); // a clock slightly ahead
+  });
+
+  it("dates older days, with the year only when it isn't this one", () => {
+    expect(dayLabel(new Date(2026, 8, 25, 12).getTime(), now)).toBe("Sep 25");
+    expect(dayLabel(new Date(2025, 11, 31, 12).getTime(), now)).toBe("Dec 31, 2025");
   });
 });

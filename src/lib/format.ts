@@ -98,6 +98,18 @@ export function formatDay(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** A heading for a day of entries: "Today", "Yesterday", "Sep 25" (with the year if not this one), local time. */
+export function dayLabel(timestamp: number, now = Date.now()): string {
+  const midnight = (t: number) => new Date(t).setHours(0, 0, 0, 0);
+  // Rounded: a day with a DST change is 23 or 25 hours long.
+  const days = Math.round((midnight(now) - midnight(timestamp)) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  const d = new Date(timestamp);
+  const year = d.getFullYear() !== new Date(now).getFullYear();
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year && { year: "numeric" }) });
+}
+
 /** A caller's public page. */
 export function callerHref(username: string): string {
   return `/u/${encodeURIComponent(username)}`;

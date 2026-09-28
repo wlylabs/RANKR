@@ -378,7 +378,7 @@ function WatchSaved({ entry, onClose }: { entry: Watched; onClose: () => void })
       <span className="min-w-0 flex-1 truncate text-muted">
         <span className="font-medium text-fg">${entry.symbol}</span> saved to your watchlist at {formatUsd(entry.marketCap)} mc.
       </span>
-      <Link href="/me#watchlist" className="shrink-0 text-xs text-fg underline-offset-4 hover:underline">
+      <Link href="/me?tab=watchlist" className="shrink-0 text-xs text-fg underline-offset-4 hover:underline">
         Open
       </Link>
       <button
