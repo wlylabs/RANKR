@@ -13,6 +13,8 @@ export type MarketSnapshot = {
   liquidityUsd: number | null;
   volume24h: number | null;
   priceChange24h: number | null;
+  /** Buys and sells in the last 24 hours; null (or absent, in snapshots stored before it) when unknown. */
+  txns24h?: number | null;
   pairAddress: string;
   dexId: string;
   url: string;

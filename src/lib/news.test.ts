@@ -110,18 +110,24 @@ describe("isNamesake", () => {
 });
 
 describe("namesakes", () => {
-  const snap = (address: string, symbol: string, name: string, liquidityUsd: number | null) =>
-    ({ chainId: "solana", address, symbol, name, liquidityUsd }) as MarketSnapshot;
+  const snap = (address: string, symbol: string, name: string, volume24h: number | null, liquidityUsd: number | null) =>
+    ({ chainId: "solana", address, symbol, name, volume24h, liquidityUsd }) as MarketSnapshot;
 
-  it("searches as written and run together, keeps each namesake once, most liquid first", async () => {
+  it("searches as written and run together, keeps each namesake once, most traded first", async () => {
     const search = vi.mocked(searchTokens);
     search.mockImplementation(async (q: string) =>
       q === "Bukang-i"
-        ? [snap("A", "BUKANGI", "Bukangi", 5_000), snap("B", "BUKANGI", "Bukangi Inu", 90_000), snap("X", "SHARK", "Shark", 1e6)]
-        : [snap("A", "BUKANGI", "Bukangi", 5_000), snap("C", "BUKANG", "Bukang", null)],
+        ? [
+            snap("A", "BUKANGI", "Bukangi", 400_000, 5_000),
+            snap("B", "BUKANGI", "Bukangi Inu", 20_000, 90_000),
+            snap("D", "BUKANGI", "Bukangi Dog", 20_000, 150_000),
+            snap("X", "SHARK", "Shark", 9e6, 1e6),
+          ]
+        : [snap("A", "BUKANGI", "Bukangi", 400_000, 5_000), snap("C", "BUKANG", "Bukang", null, null)],
     );
     const tokens = await namesakes("Bukang-i");
-    expect(tokens.map((t) => t.address)).toEqual(["B", "A", "C"]);
+    // By 24h volume; the same volume goes to the more liquid; unknown last.
+    expect(tokens.map((t) => t.address)).toEqual(["A", "D", "B", "C"]);
     expect(search.mock.calls.map(([q]) => q)).toEqual(["Bukang-i", "Bukangi"]);
 
     await namesakes("Bukang-i");

@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
+import { capTier, passes, type CapTier } from "@/lib/token-filters";
 import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
 import { ChainTag } from "./Chain";
 import { Tab } from "./Leaderboard";
@@ -31,12 +32,28 @@ function inTab(items: NewsItem[], tab: TabKey): NewsItem[] {
   });
 }
 
+const TIER_LABELS: Record<CapTier, string> = { high: "high cap", mid: "mid cap", low: "low cap" };
+
 /** A token named after a story: who it is (chain, address, age) and its market, linking to its page on Rankr. */
 function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
+  const tier = capTier(m);
   return (
     <Link href={tokenHref(m)} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-2">
       <div className="min-w-0 flex-1">
-        <TokenName symbol={m.symbol} name={m.name} className="min-w-0" />
+        <div className="flex min-w-0 items-center gap-2">
+          <TokenName symbol={m.symbol} name={m.name} className="min-w-0" />
+          {tier && (
+            <span
+              className={clsx(
+                "shrink-0 rounded border px-1 font-mono text-[10px] leading-4",
+                tier === "high" ? "border-border-strong text-fg" : "border-border text-muted",
+              )}
+              title={tier === "high" ? "$1M and up" : tier === "mid" ? "$69K to $1M: past pump.fun's bonding curve" : "under $69K"}
+            >
+              {TIER_LABELS[tier]}
+            </span>
+          )}
+        </div>
         <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
           <ChainTag chainId={m.chainId} /> · {shortAddress(m.address)}
           {m.pairCreatedAt && (
@@ -48,7 +65,8 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
         </div>
         {/* Wraps rather than cuts: these are the numbers to pick by. */}
         <div className="tabular mt-0.5 font-mono text-[11px] text-muted">
-          mc {formatUsd(m.marketCap ?? m.fdv)} · vol {formatUsd(m.volume24h)} · liq {formatUsd(m.liquidityUsd)} · 24h{" "}
+          mc {formatUsd(m.marketCap ?? m.fdv)} · vol {formatUsd(m.volume24h)} · liq {formatUsd(m.liquidityUsd)}
+          {m.txns24h !== null && m.txns24h !== undefined && <> · {m.txns24h.toLocaleString("en-US")} txns</>} · 24h{" "}
           <span className={clsx((m.priceChange24h ?? 0) > 0 ? "text-up" : (m.priceChange24h ?? 0) < 0 && "text-down")}>
             {formatPercent(m.priceChange24h)}
           </span>
@@ -73,7 +91,13 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
 function Namesakes({ keywords }: { keywords: string[] }) {
   const [keyword, setKeyword] = useState(keywords[0] ?? "");
   const [draft, setDraft] = useState("");
-  const { items, error, isLoading } = useNamesakes(keyword);
+  const [showAll, setShowAll] = useState(false);
+  const found = useNamesakes(keyword);
+  const { error, isLoading } = found;
+  // Dead tokens stay out ($1K market cap, volume and liquidity), and can still be shown.
+  const kept = found.items.filter((n) => passes(n.market));
+  const items = showAll ? found.items : kept;
+  const hidden = found.items.length - kept.length;
 
   return (
     <div className="mt-3 overflow-hidden rounded-md border border-border bg-surface">
@@ -113,19 +137,30 @@ function Namesakes({ keywords }: { keywords: string[] }) {
         <p className="px-3 py-4 text-sm text-muted">Type a name to see the tokens named after it.</p>
       ) : (
         <>
-          <p className="px-3 pt-2 font-mono text-[11px] text-subtle">tokens named &ldquo;{keyword}&rdquo; · most liquid first</p>
+          <p className="px-3 pt-2 font-mono text-[11px] text-subtle">tokens named &ldquo;{keyword}&rdquo; · most traded first</p>
           {isLoading ? (
             <ListSkeleton rows={3} />
           ) : error && !items.length ? (
             <p className="px-3 py-4 text-sm text-down">Couldn&apos;t load the tokens. Try again in a moment.</p>
           ) : !items.length ? (
-            <p className="px-3 py-4 text-sm text-muted">No token named like this on DexScreener yet.</p>
+            <p className="px-3 py-4 text-sm text-muted">
+              {hidden ? "Every token named like this is below $1K market cap, volume or liquidity." : "No token named like this on DexScreener yet."}
+            </p>
           ) : (
             <div className="mt-1 divide-y divide-border">
               {items.map((n) => (
                 <Namesake key={`${n.market.chainId}:${n.market.address}`} {...n} />
               ))}
             </div>
+          )}
+          {hidden > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAll(!showAll)}
+              className="w-full border-t border-border px-3 py-2 text-left font-mono text-[11px] text-subtle transition-colors hover:text-fg"
+            >
+              {showAll ? "hide the ones below $1K" : `${hidden} more below $1K mc, vol or liq · show them`}
+            </button>
           )}
         </>
       )}
