@@ -41,8 +41,11 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   last 10 calls (each up or down from its entry, how many are up, and the streak in profit up to the newest).
 - **Feed** (`/feed`, and a live ticker under the header): every call as it lands ("@userx called $SHIB at
   $1.2B mc") and every call that reaches a milestone ("$PEPE hit 10x from @userx's call"), each from the caller's
-  own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone or top callers (the top 25 of
-  the caller board), by calls or milestones, and by chain. The ticker shows the filter picked on the feed page.
+  own entry, with the caller's hit rate once they have 5+ calls. Filter by everyone, top callers (the top 25 of
+  the caller board) or **you** (your own calls and milestones), by calls or milestones, and by chain; the filters
+  are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
+  land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
+  filter picked on the feed page.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
@@ -313,7 +316,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
-| `GET /api/feed?scope=all\|top&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first |
+| `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 
 ## How the numbers work
 
@@ -353,7 +356,7 @@ src/lib/avatar.ts            a caller's avatar: a mirrored 5x5 matrix from sha25
 src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and server)
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
-src/lib/feed-scope.ts        the feed filter, everyone or top callers (kept in the browser)
+src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

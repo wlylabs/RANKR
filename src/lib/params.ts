@@ -51,8 +51,8 @@ export function minCallsFor(sort: CallerSort): number {
  */
 export const PASTE_LIMITS = { ipPerMinute: 20, guestPerDay: 30, keyedPerDay: 200 } as const;
 
-/** Feed filters. "top": callers on the first page of the caller board. */
-export const FEED_SCOPES = ["all", "top"] as const;
+/** Feed filters. "top": callers on the first page of the caller board. "you": the signed-in caller's own. */
+export const FEED_SCOPES = ["all", "top", "you"] as const;
 export type FeedScope = (typeof FEED_SCOPES)[number];
 
 export const FEED_KINDS = ["all", "call", "milestone"] as const;

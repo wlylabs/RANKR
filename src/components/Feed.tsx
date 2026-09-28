@@ -1,21 +1,26 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronDown, Radio } from "lucide-react";
+import { ArrowUp, ChevronDown, Radio } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { chainMeta } from "@/lib/chains";
 import { setFeedScope, useFeedScope } from "@/lib/feed-scope";
-import { useFeedPages, useStats } from "@/lib/hooks";
-import { FEED_KINDS, FEED_SCOPES, parseFeedKind, type FeedKind, type FeedScope } from "@/lib/params";
+import { dayLabel } from "@/lib/format";
+import { useFeedPages, useNow, useStats } from "@/lib/hooks";
+import { loginHref } from "@/lib/login";
+import { FEED_KINDS, FEED_SCOPES, parseFeedKind, parseFeedScope, type FeedKind, type FeedScope } from "@/lib/params";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import type { FeedItem } from "@/lib/types";
+import { useAuth } from "./AuthProvider";
 import { FeedSentence } from "./FeedLine";
 import { Tab } from "./Leaderboard";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton } from "./TokenList";
 
-const SCOPE_LABELS: Record<FeedScope, string> = { all: "Everyone", top: "Top callers" };
+const SCOPE_LABELS: Record<FeedScope, string> = { all: "Everyone", top: "Top callers", you: "You" };
 const KIND_LABELS: Record<FeedKind, string> = { all: "All", call: "Calls", milestone: "Milestones" };
 
 /** One feed entry: the sentence, the multiple now, and how long ago. */
@@ -38,6 +43,18 @@ export function FeedRow({ item }: { item: FeedItem }) {
   );
 }
 
+/** Entries under a heading per day: Today, Yesterday, Sep 25... */
+function byDay(items: FeedItem[], now: number): { label: string; items: FeedItem[] }[] {
+  const days: { label: string; items: FeedItem[] }[] = [];
+  for (const item of items) {
+    const label = dayLabel(item.at, now);
+    const last = days[days.length - 1];
+    if (last?.label === label) last.items.push(item);
+    else days.push({ label, items: [item] });
+  }
+  return days;
+}
+
 function Empty({ title, body }: { title: string; body: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
@@ -48,13 +65,25 @@ function Empty({ title, body }: { title: string; body: React.ReactNode }) {
   );
 }
 
-/** Every call and every milestone, newest first, filtered by callers, kind and chain. */
+/**
+ * Every call and every milestone, newest first, by day, filtered by callers (everyone, top callers or your
+ * own), kind and chain. Entries that land while you read wait behind an "N new" button instead of pushing
+ * the list down.
+ */
 export function Feed() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const picked = useFeedScope();
-  const scope = accountsAvailable ? picked : "all";
+  const { ready, userId } = useAuth();
+  const now = useNow(60_000);
+  // The callers filter is in the URL; without one, the last one picked (the ticker shows it too).
+  const stored = useFeedScope();
+  const inUrl = params.get("scope");
+  const scope = accountsAvailable ? (inUrl ? parseFeedScope(inUrl) : stored) : "all";
+  // A link with a filter becomes the one picked, so the ticker shows what the page shows.
+  useEffect(() => {
+    if (accountsAvailable && inUrl && scope !== stored) setFeedScope(scope);
+  }, [inUrl, scope, stored]);
   const kind = parseFeedKind(params.get("kind"));
   const chain = params.get("chain") ?? "all";
   const chains = useStats().stats?.chains ?? [];
@@ -63,7 +92,25 @@ export function Feed() {
     scope,
     kind,
     chain: chain === "all" ? null : chain,
+    userId,
   });
+
+  // The newest entry shown for these filters; anything newer waits behind the "N new" button.
+  const filters = `${scope}:${kind}:${chain}:${userId}`;
+  const [seen, setSeen] = useState<{ filters: string; at: number } | null>(null);
+  const seenAt = seen?.filters === filters ? seen.at : null;
+  const newest = items[0]?.at;
+  useEffect(() => {
+    if (seenAt === null && newest !== undefined) setSeen({ filters, at: newest });
+  }, [seenAt, newest, filters]);
+  const fresh = seenAt === null ? 0 : items.filter((i) => i.at > seenAt).length;
+  const shown = seenAt === null ? items : items.filter((i) => i.at <= seenAt);
+
+  function showNew() {
+    if (newest !== undefined) setSeen({ filters, at: newest });
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+  }
 
   function setParam(key: string, value: string, fallback: string) {
     const next = new URLSearchParams(params.toString());
@@ -72,7 +119,13 @@ export function Feed() {
     router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   }
 
-  const loading = isLoading && !items.length;
+  function pickScope(s: FeedScope) {
+    setFeedScope(s);
+    setParam("scope", s, "all");
+  }
+
+  const signIn = scope === "you" && ready && !userId;
+  const loading = !signIn && isLoading && !items.length;
 
   return (
     <div className="pt-10 sm:pt-14">
@@ -88,7 +141,7 @@ export function Feed() {
           aria-label="Callers"
         >
           {FEED_SCOPES.map((s) => (
-            <Tab key={s} active={scope === s} onClick={() => setFeedScope(s)}>
+            <Tab key={s} active={scope === s} onClick={() => pickScope(s)}>
               {SCOPE_LABELS[s]}
             </Tab>
           ))}
@@ -130,21 +183,60 @@ export function Feed() {
         </div>
       </div>
 
+      {fresh > 0 && (
+        // No height of its own, so it never pushes the list; it stays under the header while you scroll.
+        <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top)+0.75rem)] z-30 flex h-0 justify-center">
+          <button
+            type="button"
+            onClick={showNew}
+            className="animate-fade-in mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg shadow-lg transition-opacity hover:opacity-85"
+          >
+            <ArrowUp className="size-3.5" />
+            {fresh} new
+          </button>
+        </div>
+      )}
+
       <div className="mt-4">
-        {loading ? (
+        {signIn ? (
+          <Empty
+            title="Sign in to see your calls"
+            body={
+              <>
+                Your calls and the milestones they reach show up here.{" "}
+                <Link href={loginHref("/feed?scope=you")} className="text-fg underline-offset-4 hover:underline">
+                  Sign in
+                </Link>
+              </>
+            }
+          />
+        ) : loading ? (
           <div className="rounded-lg border border-border">
             <ListSkeleton rows={8} />
           </div>
-        ) : !items.length ? (
+        ) : !shown.length ? (
           <Empty
             title="Nothing here yet"
-            body={kind !== "all" || chain !== "all" ? "Try another kind or chain." : "Calls show up here the moment someone pastes a CA."}
+            body={
+              kind !== "all" || chain !== "all"
+                ? "Try another kind or chain."
+                : scope === "you"
+                  ? "Paste a CA: your calls and the milestones they reach show up here."
+                  : "Calls show up here the moment someone pastes a CA."
+            }
           />
         ) : (
           <>
-            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {items.map((item) => (
-                <FeedRow key={item.id} item={item} />
+            <div className="space-y-6">
+              {byDay(shown, now).map((day) => (
+                <section key={day.label} aria-label={day.label}>
+                  <h2 className="label mb-2 text-subtle">{day.label}</h2>
+                  <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                    {day.items.map((item) => (
+                      <FeedRow key={item.id} item={item} />
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
             {hasMore && (

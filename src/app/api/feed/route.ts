@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { accountsEnabled, feed, topCallerIds } from "@/lib/accounts";
+import { requireAccount } from "@/lib/api-auth";
 import { pasteEvents } from "@/lib/feed";
 import { FEED_TOP_CALLERS, parseFeedKind, parseFeedScope } from "@/lib/params";
 import { queryTokens } from "@/lib/rankr";
@@ -13,8 +14,9 @@ function int(value: string | null, fallback: number, min: number, max: number) {
 }
 
 /**
- * GET /api/feed?scope=all|top&kind=all|call|milestone&chain=solana&limit=20&offset=0
+ * GET /api/feed?scope=all|top|you&kind=all|call|milestone&chain=solana&limit=20&offset=0
  * Newest calls ("@userx called $SHIB at $1.2B mc") and milestones ("$PEPE hit 10x from @userx's call").
+ * scope=you: the signed-in caller's own (`Authorization: Bearer <access token>`).
  * Without accounts (local dev) pastes stand in for calls, with no caller.
  */
 export async function GET(req: NextRequest) {
@@ -30,7 +32,13 @@ export async function GET(req: NextRequest) {
   try {
     let items: FeedItem[];
     if (accountsEnabled()) {
-      const users = scope === "top" ? await topCallerIds(FEED_TOP_CALLERS) : null;
+      let users: string[] | null = null;
+      if (scope === "top") users = await topCallerIds(FEED_TOP_CALLERS);
+      else if (scope === "you") {
+        const account = await requireAccount(req);
+        if (account instanceof NextResponse) return account;
+        users = [account.id];
+      }
       items = await feed({ limit, offset, users, chain, kind });
     } else if (scope !== "all") {
       items = []; // no callers without accounts
