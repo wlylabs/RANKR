@@ -159,27 +159,20 @@ function toItems(headlines: Tagged[]): NewsItem[] {
     .map(({ topic, ...h }) => ({ id: h.url, ...h, keywords: keywordsFor(h.title, topic) }));
 }
 
-/** A source's `PER_SOURCE` most searched (Google Trends), else newest, headlines at `url` (since `since`), in its category. */
-async function newest(source: Source, url: string, since = 0): Promise<Tagged[]> {
-  return (await readSource(source, url))
+/** A source's `PER_SOURCE` most searched (Google Trends), else newest, headlines since `since`, in its category. */
+async function top(source: Source, since: number): Promise<Tagged[]> {
+  return (await readSource(source, source.live))
     .filter((h) => h.publishedAt >= since)
     .sort((a, b) => (b.searches ?? -1) - (a.searches ?? -1) || b.publishedAt - a.publishedAt)
     .slice(0, PER_SOURCE)
     .map((h) => ({ ...h, category: source.category }));
 }
 
-/** What's in the news right now, from every source with a live list, most searched first, then newest. */
+/** What's in the news right now, from every source, most searched first, then newest. */
 export async function liveNews(): Promise<NewsItem[]> {
   if (MOCK) return toItems(mockHeadlines());
   const since = Date.now() - LIVE_WINDOW;
-  const lists = await Promise.all(newsSources().flatMap((s) => (s.live ? [newest(s, s.live, since)] : [])));
-  return toItems(lists.flat());
-}
-
-/** Headlines for a search, from every source that can search, newest first. */
-export async function searchNews(query: string): Promise<NewsItem[]> {
-  if (MOCK) return toItems(mockHeadlines().filter((h) => normalize(h.title).includes(normalize(query))));
-  const lists = await Promise.all(newsSources().flatMap((s) => (s.search ? [newest(s, s.search(query))] : [])));
+  const lists = await Promise.all(newsSources().map((s) => top(s, since)));
   return toItems(lists.flat());
 }
 

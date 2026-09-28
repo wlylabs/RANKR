@@ -93,10 +93,7 @@ describe("parseTrends", () => {
 describe("newsSources", () => {
   const keys = {
     GNEWS_API_KEY: "g-key",
-    NEWSDATA_API_KEY: "nd-key",
-    GUARDIAN_API_KEY: "gu-key",
     NEWSAPI_KEY: "na-key",
-    CURRENTS_API_KEY: "cu-key",
     THENEWSAPI_KEY: "tn-key",
   };
   const byName = (name: string) => {
@@ -110,15 +107,16 @@ describe("newsSources", () => {
     expect(free).toEqual(
       expect.arrayContaining([
         "Google Trends US", "Google Trends SG", "Google News", "Google News Asia", "Google News entertainment",
-        "Bing News", "GDELT", "UPI Odd News", "New York Post", "CoinDesk", "The Block", "Watcher Guru",
+        "UPI Odd News", "New York Post", "CoinDesk", "The Block", "Watcher Guru",
       ]),
     );
     // No world news or tech tab any more.
     expect(free.filter((n) => ["BBC News", "Yonhap News Agency", "Hacker News", "Google News world", "Google News technology"].includes(n))).toEqual([]);
+    // Nor a search: the sources only a search read are gone.
+    expect(free.filter((n) => ["Bing News", "GDELT"].includes(n))).toEqual([]);
     expect(free).not.toContain("GNews");
-    expect(newsSources(keys).length - free.length).toBe(6);
+    expect(newsSources(keys).map((s) => s.name).filter((n) => !free.includes(n))).toEqual(["GNews", "NewsAPI.org", "TheNewsAPI"]);
     expect(byName("GNews").live).toContain("apikey=g-key");
-    expect(byName("TheNewsAPI").search).toBeUndefined(); // 3 requests a day: the live list only
   });
 
   it("puts each source in a tab, trending or crypto, reads each feed once, over https", () => {
@@ -128,19 +126,14 @@ describe("newsSources", () => {
       "trending", "trending", "trending", "crypto", "trending",
     ]);
     expect(new Set(all.map((s) => s.category))).toEqual(new Set(["trending", "crypto"]));
-    // Lists of the latest news aren't trending: those APIs only search.
-    expect(["NewsData.io", "The Guardian API", "Currents"].map((n) => byName(n).live)).toEqual([undefined, undefined, undefined]);
-    const urls = all.flatMap((s) => [s.live, s.search?.("x")].filter((u): u is string => !!u));
+    const urls = all.map((s) => s.live);
     expect(new Set(urls).size).toBe(urls.length);
     expect(urls.filter((u) => !u.startsWith("https://"))).toEqual([]);
     expect(all.filter((s) => s.category === "crypto").length).toBeGreaterThanOrEqual(30);
   });
 
-  it("uses the feeds and searches as their references give them", () => {
+  it("uses the feeds as their references give them", () => {
     expect(byName("Google Trends US").live).toBe("https://trends.google.com/trending/rss?geo=US");
-    expect(byName("Bing News").search?.("bukangi")).toBe(
-      "https://www.bing.com/news/search?q=bukangi&qft=sortbydate%3D%221%22&format=rss",
-    );
     expect(byName("Google News entertainment").live).toBe("https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=en-US&gl=US&ceid=US:en");
   });
 
@@ -148,15 +141,11 @@ describe("newsSources", () => {
     const at = Date.parse("2026-09-28T03:40:00Z");
     const want = { title: "Busan shark Bukang-i", url: "https://news.test/a", publishedAt: at };
     expect(byName("GNews").parse(JSON.stringify({ articles: [{ title: want.title, url: want.url, publishedAt: "2026-09-28T03:40:00Z", source: { name: "Korea Times" } }] }))).toEqual([{ ...want, source: "Korea Times" }]);
-    expect(byName("NewsData.io").parse(JSON.stringify({ results: [{ title: want.title, link: want.url, pubDate: "2026-09-28 03:40:00", source_id: "yna" }] }))).toEqual([{ ...want, source: "yna" }]);
-    expect(byName("The Guardian API").parse(JSON.stringify({ response: { results: [{ webTitle: want.title, webUrl: want.url, webPublicationDate: "2026-09-28T03:40:00Z" }] } }))).toEqual([{ ...want, source: "The Guardian" }]);
     expect(byName("NewsAPI.org").parse(JSON.stringify({ articles: [
       { title: "[Removed]", url: "https://removed.test", publishedAt: "2026-09-28T03:40:00Z", source: { name: "x" } },
       { title: want.title, url: want.url, publishedAt: "2026-09-28T03:40:00Z", source: { name: "AP" } },
     ] }))).toEqual([{ ...want, source: "AP" }]);
-    expect(byName("Currents").parse(JSON.stringify({ news: [{ title: want.title, url: "https://www.news.test/a", published: "2026-09-28 03:40:00 +0000" }] }))).toEqual([{ ...want, url: "https://www.news.test/a", source: "news.test" }]);
     expect(byName("TheNewsAPI").parse(JSON.stringify({ data: [{ title: want.title, url: want.url, published_at: "2026-09-28T03:40:00.000000Z", source: "news.test" }] }))).toEqual([{ ...want, source: "news.test" }]);
-    expect(byName("GDELT").parse(JSON.stringify({ articles: [{ title: want.title, url: want.url, seendate: "20260928T034000Z", domain: "yna.co.kr" }] }))).toEqual([{ ...want, source: "yna.co.kr" }]);
     expect(byName("GNews").parse("Please limit requests")).toEqual([]); // not JSON: nothing, not an error
   });
 });
@@ -168,7 +157,7 @@ describe("readSource", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubGlobal("fetch", vi.fn(async () => new Response("quota", { status: 429 })));
     const gnews = newsSources({ GNEWS_API_KEY: "secret-key" }).find((s) => s.name === "GNews");
-    expect(await readSource(gnews!, gnews!.live!)).toEqual([]);
+    expect(await readSource(gnews!, gnews!.live)).toEqual([]);
     expect(warn.mock.calls.flat().join(" ")).toContain("GNews responded 429");
     expect(warn.mock.calls.flat().join(" ")).not.toContain("secret-key");
   });

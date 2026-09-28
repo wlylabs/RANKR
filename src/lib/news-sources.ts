@@ -1,7 +1,7 @@
 // Where the news comes from: every free source, for two tabs, trending and crypto. The ones without a key are
 // always read: Google Trends (what people search for right now, with the story behind each search), Google News
-// (top stories, and search), Bing News and GDELT (search), and publishers' own RSS. The ones with a free key are
-// read once their key is set, as often as their daily quota allows. Server only.
+// (top stories) and publishers' own RSS. The ones with a free key are read once their key is set, as often as
+// their daily quota allows. Server only.
 //
 // Feed URLs are taken from references, not guessed:
 // - Google Trends' "Trending now" RSS, trends.google.com/trending/rss?geo=<country>: each <item> is a search
@@ -10,9 +10,8 @@
 //   address in a real site's link (github.com/tmokmss/my-ambient-agents issue #728): those are dropped;
 // - github.com/nirholas/cryptocurrency.cv (an open-source crypto news aggregator; src/lib/crypto-news.ts, only
 //   feeds its health check left enabled);
-// - Google News RSS: its /rss, /rss/search and /rss/headlines/section/topic/<TOPIC> forms with hl, gl, ceid;
-//   Bing News: a news search with &format=rss (and qft=sortbydate="1" for newest first); GDELT DOC 2.0 API
-//   (one request per 5 seconds per IP); UPI Odd News and New York Post feeds as their sites list them.
+// - Google News RSS: its /rss and /rss/headlines/section/topic/<TOPIC> forms with hl, gl, ceid; UPI Odd News and
+//   New York Post feeds as their sites list them.
 import type { NewsCategory } from "./types";
 
 export type Headline = {
@@ -31,10 +30,8 @@ export type Source = {
   name: string;
   /** Which tab of the news page its headlines are in. */
   category: NewsCategory;
-  /** The live list, if the source has one. */
-  live?: string;
-  /** A search, if the source can (and its quota allows it). */
-  search?: (q: string) => string;
+  /** Its list of what's in the news now. */
+  live: string;
   parse: (body: string) => Headline[];
   /** How long a read is kept: minutes for free feeds, hours for keyed APIs with a small daily quota. */
   ttl: number;
@@ -64,8 +61,8 @@ function tag(item: string, name: string): string | null {
 }
 
 /**
- * A date as the sources write it: RFC 822 (RSS), ISO 8601, "2026-09-28 03:40:00" (UTC, NewsData),
- * "2026-09-28 03:40:00 +0000" (Currents) or "20260928T034000Z" (GDELT). NaN when it isn't one.
+ * A date as news sources write it: RFC 822 (RSS), ISO 8601, "2026-09-28 03:40:00" (UTC),
+ * "2026-09-28 03:40:00 +0000" or "20260928T034000Z". NaN when it isn't one.
  */
 export function parseDate(text: string | null | undefined): number {
   if (!text) return Number.NaN;
@@ -162,7 +159,6 @@ function json(list: (body: Json) => unknown, pick: (a: Json) => Headline | null)
 }
 
 const field = (o: unknown, key: string): unknown => (o && typeof o === "object" ? (o as Json)[key] : undefined);
-const domain = (url: unknown) => (typeof url === "string" ? url.replace(/^https?:\/\/(www\.)?/i, "").split("/")[0] : null);
 
 const GOOGLE = "https://news.google.com/rss";
 const EN_US = "hl=en-US&gl=US&ceid=US:en";
@@ -232,7 +228,6 @@ export function newsSources(env: Record<string, string | undefined> = process.en
       name: "Google News",
       category: "trending",
       live: `${GOOGLE}?${EN_US}`,
-      search: (s) => `${GOOGLE}/search?q=${q(s)}&${EN_US}`,
       parse: (b) => parseRss(b),
       ttl: 5 * MINUTE,
     },
@@ -250,25 +245,6 @@ export function newsSources(env: Record<string, string | undefined> = process.en
       parse: (b: string) => parseRss(b),
       ttl: 5 * MINUTE,
     })),
-    {
-      name: "Bing News",
-      category: "trending",
-      search: (s) => `https://www.bing.com/news/search?q=${q(s)}&qft=${q('sortbydate="1"')}&format=rss`,
-      parse: (b) => parseRss(b),
-      ttl: 15 * MINUTE,
-    },
-    {
-      // Free and keyless, about one request per 5 seconds: searches only.
-      name: "GDELT",
-      category: "trending",
-      search: (s) =>
-        `https://api.gdeltproject.org/api/v2/doc/doc?query=${q(`${s} sourcelang:english`)}&mode=artlist&format=json&sort=datedesc&maxrecords=50&timespan=3d`,
-      parse: json(
-        (b) => b.articles,
-        (a) => headline(a.title, a.url, a.domain, a.seendate),
-      ),
-      ttl: 15 * MINUTE,
-    },
     ...(
       [
         [TRENDING, "trending"],
@@ -279,46 +255,18 @@ export function newsSources(env: Record<string, string | undefined> = process.en
     ),
   ];
 
-  // Free keys. How often each is read keeps it inside its free daily quota, searches included. Top headlines are
-  // trending; a list of the latest news isn't, so those APIs only search.
+  // Free keys: their top headlines, read as often as each one's free daily quota allows.
   const gnews = env.GNEWS_API_KEY;
   if (gnews) {
     out.push({
       name: "GNews", // 100 requests a day
       category: "trending",
       live: `https://gnews.io/api/v4/top-headlines?lang=en&max=10&apikey=${q(gnews)}`,
-      search: (s) => `https://gnews.io/api/v4/search?q=${q(s)}&lang=en&sortby=publishedAt&max=10&apikey=${q(gnews)}`,
       parse: json(
         (b) => b.articles,
         (a) => headline(a.title, a.url, field(a.source, "name"), a.publishedAt),
       ),
       ttl: HOUR,
-    });
-  }
-  const newsdata = env.NEWSDATA_API_KEY;
-  if (newsdata) {
-    out.push({
-      name: "NewsData.io", // 200 credits a day
-      category: "trending",
-      search: (s) => `https://newsdata.io/api/1/latest?language=en&q=${q(s)}&apikey=${q(newsdata)}`,
-      parse: json(
-        (b) => b.results,
-        (a) => headline(a.title, a.link, a.source_name ?? a.source_id, a.pubDate),
-      ),
-      ttl: 30 * MINUTE,
-    });
-  }
-  const guardian = env.GUARDIAN_API_KEY;
-  if (guardian) {
-    out.push({
-      name: "The Guardian API", // 5,000 requests a day
-      category: "trending",
-      search: (s) => `https://content.guardianapis.com/search?q=${q(s)}&order-by=newest&page-size=30&api-key=${q(guardian)}`,
-      parse: json(
-        (b) => field(b.response, "results"),
-        (a) => headline(a.webTitle, a.webUrl, "The Guardian", a.webPublicationDate),
-      ),
-      ttl: 5 * MINUTE,
     });
   }
   const newsapi = env.NEWSAPI_KEY;
@@ -327,7 +275,6 @@ export function newsSources(env: Record<string, string | undefined> = process.en
       name: "NewsAPI.org", // 100 requests a day (its free plan is for development)
       category: "trending",
       live: `https://newsapi.org/v2/top-headlines?language=en&pageSize=50&apiKey=${q(newsapi)}`,
-      search: (s) => `https://newsapi.org/v2/everything?q=${q(s)}&language=en&sortBy=publishedAt&pageSize=50&apiKey=${q(newsapi)}`,
       parse: json(
         (b) => b.articles,
         (a) => (a.title === "[Removed]" ? null : headline(a.title, a.url, field(a.source, "name"), a.publishedAt)),
@@ -335,23 +282,10 @@ export function newsSources(env: Record<string, string | undefined> = process.en
       ttl: HOUR,
     });
   }
-  const currents = env.CURRENTS_API_KEY;
-  if (currents) {
-    out.push({
-      name: "Currents", // about 600 requests a day
-      category: "trending",
-      search: (s) => `https://api.currentsapi.services/v1/search?keywords=${q(s)}&language=en&apiKey=${q(currents)}`,
-      parse: json(
-        (b) => b.news,
-        (a) => headline(a.title, a.url, domain(a.url), a.published),
-      ),
-      ttl: 15 * MINUTE,
-    });
-  }
   const thenewsapi = env.THENEWSAPI_KEY;
   if (thenewsapi) {
     out.push({
-      name: "TheNewsAPI", // 3 requests a day on the free plan: the live list only, three times a day
+      name: "TheNewsAPI", // 3 requests a day on the free plan: three times a day
       category: "trending",
       live: `https://api.thenewsapi.com/v1/news/top?language=en&locale=us&api_token=${q(thenewsapi)}`,
       parse: json(
@@ -383,7 +317,7 @@ async function fetchSource(source: Source, url: string): Promise<Headline[]> {
 // Reads in flight or done, so parallel and repeated reads ask once per TTL.
 const cache = new Map<string, { headlines: Promise<Headline[]>; until: number }>();
 
-/** A source's headlines at `url` (its live list or a search), cached for its TTL. Nothing when it fails. */
+/** A source's headlines at `url`, cached for its TTL. Nothing when it fails. */
 export function readSource(source: Source, url: string): Promise<Headline[]> {
   const now = Date.now();
   const hit = cache.get(url);

@@ -56,21 +56,19 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   first. Tabs **All · Trending · Crypto** (`/news?category=trending`):
   trending is what people search for and read right now, where memes come from; All takes the newest 25 of each,
   so the many crypto outlets don't bury the trending stories. From every free source, each story once, today's
-  news only, at most 20 from any one source and 60 per tab; the page refreshes every 2 minutes. A search box
-  searches them all (`/news?q=shark`).
+  news only, at most 20 from any one source and 60 per tab; the page refreshes every 2 minutes.
   Sources (`src/lib/news-sources.ts`), with URLs taken from references rather than guessed:
   - no key, always on: Google Trends' "Trending now" RSS for the US, UK, Canada, Australia, India and Singapore
     (`trends.google.com/trending/rss?geo=`; each search people are making, with the story behind it: one story
     per search, and the search is the first name its Tokens button offers; read as
     [google-trends-bot](https://github.com/minodisk/google-trends-bot) reads it, and story links hiding another
     address are dropped, as [this report](https://github.com/tmokmss/my-ambient-agents/issues/728) found them);
-    Google News (US and Singapore top stories, Entertainment and Science; search), Bing News (search, newest
-    first), GDELT (search); UPI Odd News, New York Post; crypto: 35 news outlets (CoinDesk, The Block, Decrypt,
+    Google News (US and Singapore top stories, Entertainment and Science); UPI Odd News, New York Post; crypto:
+    35 news outlets (CoinDesk, The Block, Decrypt,
     Cointelegraph, Blockworks, Watcher Guru, ...), those
     [cryptocurrency.cv](https://github.com/nirholas/cryptocurrency.cv)'s feed health check keeps enabled;
-  - free key, on once set (`.env.example`): GNews, NewsAPI.org and TheNewsAPI (top headlines, and search) and
-    NewsData.io, The Guardian API and Currents (search only: their live lists are the latest news, not what's
-    trending), each read as often as its free daily quota allows. Keys never show in logs.
+  - free key, on once set (`.env.example`): GNews, NewsAPI.org and TheNewsAPI top headlines, each read as often
+    as its free daily quota allows. Keys never show in logs.
   Not included: Reddit (needs an OAuth app), CryptoPanic (paid since 2026), Mediastack (free plan is HTTP only).
   Each headline has a **Tokens** button: every token named after the story. The names in the headline are the
   choices ("Bukang-i", "Busan"; the likeliest is picked: a quoted name, a run of capitalised words like "Moo
@@ -354,7 +352,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
-| `GET /api/news`, `GET /api/news?q=` | what's in the news right now, or a search, newest first, each with the names a token would be called |
+| `GET /api/news` | what's in the news right now, most searched first, each with the names a token would be called |
 | `GET /api/news/tokens?q=` | every token named after a name from a story, most liquid first, with market data and Rankr's multiple |
 | `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 

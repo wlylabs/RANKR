@@ -1,10 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowUpRight, ChevronDown, ChevronRight, Coins, Newspaper, Search } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronRight, Coins, Newspaper } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { formatCount, formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
 import { capTier, type CapTier } from "@/lib/token-filters";
@@ -201,22 +201,16 @@ function Headline({ item }: { item: NewsItem }) {
   );
 }
 
-/**
- * What's in the news right now, most searched first, or a search: a headline and a link, and the tokens named
- * after it.
- */
+/** What's in the news right now, most searched first: a headline and a link, and the tokens named after it. */
 export function News() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const q = params.get("q") ?? "";
   const picked = params.get("category");
   const tab: TabKey = picked && picked in TABS ? (picked as TabKey) : "all";
-  const [draft, setDraft] = useState(q);
-  const news = useNews(q);
+  const news = useNews();
   const { error, isLoading } = news;
-  // A search spans every tab.
-  const items = q ? news.items : inTab(news.items, tab);
+  const items = inTab(news.items, tab);
 
   function setParam(key: string, value: string, fallback: string) {
     const next = new URLSearchParams(params.toString());
@@ -225,59 +219,31 @@ export function News() {
     router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   }
 
-  // The search goes in the URL after a pause in typing.
-  useEffect(() => {
-    const id = setTimeout(() => {
-      const next = draft.trim();
-      if (next === q) return;
-      const qs = new URLSearchParams(params.toString());
-      if (next) qs.set("q", next);
-      else qs.delete("q");
-      router.replace(`${pathname}${qs.size ? `?${qs}` : ""}`, { scroll: false });
-    }, 400);
-    return () => clearTimeout(id);
-  }, [draft, q, params, pathname, router]);
-
   return (
     <div className="pt-10 sm:pt-14">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">News</h1>
-        {!q && (
-          <span className="label inline-flex items-center gap-1.5 text-subtle">
-            <span className="relative flex size-1.5">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-50" />
-              <span className="relative inline-flex size-1.5 rounded-full bg-up" />
-            </span>
-            Live
+        <span className="label inline-flex items-center gap-1.5 text-subtle">
+          <span className="relative flex size-1.5">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-up opacity-50" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-up" />
           </span>
-        )}
+          Live
+        </span>
       </div>
       <p className="mt-1.5 text-sm text-muted">What&apos;s in the news right now, most searched first. Tokens shows every token named after a story.</p>
 
-      <label className="mt-6 flex h-9 w-full items-center gap-2 rounded-md border border-border px-3 transition-colors focus-within:border-border-strong sm:max-w-sm">
-        <Search className="size-3.5 text-subtle" />
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Search the news"
-          maxLength={100}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-subtle"
-        />
-      </label>
-
-      {!q && (
-        <div
-          className="scrollbar-none fade-end -mx-4 mt-4 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
-          role="tablist"
-          aria-label="Category"
-        >
-          {(Object.keys(TABS) as TabKey[]).map((key) => (
-            <Tab key={key} active={tab === key} onClick={() => setParam("category", key, "all")}>
-              {TABS[key]}
-            </Tab>
-          ))}
-        </div>
-      )}
+      <div
+        className="scrollbar-none fade-end -mx-4 mt-6 flex gap-6 overflow-x-auto border-b border-border pr-10 pl-4 sm:mx-0 sm:px-0"
+        role="tablist"
+        aria-label="Category"
+      >
+        {(Object.keys(TABS) as TabKey[]).map((key) => (
+          <Tab key={key} active={tab === key} onClick={() => setParam("category", key, "all")}>
+            {TABS[key]}
+          </Tab>
+        ))}
+      </div>
 
       <div className="mt-4">
         {isLoading && !items.length ? (
@@ -288,10 +254,10 @@ export function News() {
           <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
             <Newspaper className="mx-auto size-5 text-subtle" />
             <p className="mt-3 font-medium">
-              {q ? `No headlines for “${q}”` : tab === "all" ? "No headlines right now" : `No ${TABS[tab].toLowerCase()} headlines right now`}
+              {tab === "all" ? "No headlines right now" : `No ${TABS[tab].toLowerCase()} headlines right now`}
             </p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-              {error ? "Couldn't reach the news. Trying again shortly." : q ? "Try other words." : "Check back in a minute."}
+              {error ? "Couldn't reach the news. Trying again shortly." : "Check back in a minute."}
             </p>
           </div>
         ) : (

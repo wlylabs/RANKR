@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchTokens } from "./dexscreener";
-import { isNamesake, keywordsOf, liveNews, namesakes, normalize, searchNews } from "./news";
+import { isNamesake, keywordsOf, liveNews, namesakes, normalize } from "./news";
 import type { MarketSnapshot } from "./types";
 
 vi.mock("./dexscreener", () => ({ MOCK: false, searchTokens: vi.fn() }));
@@ -37,11 +37,14 @@ describe("keywordsOf", () => {
   });
 });
 
-describe("liveNews and searchNews", () => {
-  afterEach(() => vi.unstubAllGlobals());
+describe("liveNews", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
   const hours = (h: number) => new Date(Date.now() - h * 3_600_000).toUTCString();
 
-  it("brings every source together: each story once, today's news only, newest first", async () => {
+  it("brings every source together: each story once, today's news only, most searched then newest first", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const fetchMock = vi.fn(async (url: string) => {
       if (url.startsWith("https://news.google.com/rss?hl=en-US")) {
@@ -101,18 +104,15 @@ describe("liveNews and searchNews", () => {
     const reads = fetchMock.mock.calls.length;
     await liveNews();
     expect(fetchMock).toHaveBeenCalledTimes(reads); // read again only after a few minutes
-
-    await searchNews("bukangi");
-    const searched = fetchMock.mock.calls.slice(reads).map(([u]) => String(u));
-    expect(searched.some((u) => u.includes("news.google.com/rss/search?q=bukangi"))).toBe(true);
-    expect(searched.some((u) => u.includes("bing.com/news/search?q=bukangi"))).toBe(true);
-    expect(searched.some((u) => u.includes("api.gdeltproject.org"))).toBe(true);
   });
 
   it("is empty, not an error, when the news can't be reached", async () => {
+    // A day on, so no read above is still kept.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 24 * 3_600_000);
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await searchNews("nothing here at all")).toEqual([]);
+    expect(await liveNews()).toEqual([]);
   });
 });
 

@@ -201,13 +201,9 @@ export function useFeedPages(params: FeedParams, pageSize = 30) {
   };
 }
 
-/** What's in the news right now (every 2 minutes), or the headlines for a search. */
-export function useNews(q: string) {
-  const { data, error, isLoading } = useSWR<NewsResponse>(
-    q ? `/api/news?q=${encodeURIComponent(q)}` : "/api/news",
-    fetcher,
-    { refreshInterval: q ? 5 * 60_000 : 2 * 60_000, keepPreviousData: true },
-  );
+/** What's in the news right now, every 2 minutes. */
+export function useNews() {
+  const { data, error, isLoading } = useSWR<NewsResponse>("/api/news", fetcher, { refreshInterval: 2 * 60_000 });
   return { items: data?.items ?? [], error, isLoading };
 }
 
