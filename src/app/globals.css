@@ -28,8 +28,8 @@
   --chart-mid: #8f8f8f;
   --chart-up: #116329;
   /* Cap tiers (src/lib/token-filters.ts): Primer's attention (yellow: the riskiest), accent (blue) and done
-     (purple) colors, one step darker than its light theme's (yellow-5, blue-5, purple-5) so 10px text stays at
-     4.5:1 or more on a hovered row too. */
+     (purple) colors, one step darker than its light theme's (yellow-5, blue-5, purple-5). Tags are filled with
+     them, with text in --bg: 7:1 or more here, 6.4:1 or more in the dark theme. */
   --tier-low: #7d4e00;
   --tier-mid: #0550ae;
   --tier-high: #6639ba;

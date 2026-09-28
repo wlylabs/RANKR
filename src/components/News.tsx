@@ -34,13 +34,13 @@ function inTab(items: NewsItem[], tab: TabKey): NewsItem[] {
 
 const TIER_LABELS: Record<CapTier, string> = { high: "high cap", mid: "mid cap", low: "low cap" };
 /**
- * Each tier's color (globals.css), on an outline like Rankr's other tags ("you") and GitHub Primer's Label:
- * colored text and border, no fill.
+ * Each tier's color (globals.css), solid like the official check badge (OfficialBadge): filled with the color,
+ * the text cut out in the page's background color.
  */
 const TIER_COLORS: Record<CapTier, string> = {
-  high: "border-tier-high/50 text-tier-high",
-  mid: "border-tier-mid/50 text-tier-mid",
-  low: "border-tier-low/50 text-tier-low",
+  high: "border-tier-high bg-tier-high text-bg",
+  mid: "border-tier-mid bg-tier-mid text-bg",
+  low: "border-tier-low bg-tier-low text-bg",
 };
 
 /** A token named after a story: who it is (chain, address, age) and its market, linking to its page on Rankr. */
