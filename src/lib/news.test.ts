@@ -1,95 +1,100 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchTokens } from "./dexscreener";
-import { isNamesake, mentions, namesakes, newsFor, normalize, parseRss } from "./news";
-import type { MarketSnapshot, TokenView } from "./types";
+import { isNamesake, keywordsOf, liveNews, namesakes, normalize, searchNews } from "./news";
+import type { MarketSnapshot } from "./types";
 
 vi.mock("./dexscreener", () => ({ MOCK: false, searchTokens: vi.fn() }));
 
-const token = (symbol: string, name: string) =>
-  ({ id: `solana:${symbol}`, chainId: "solana", address: symbol, symbol, name }) as TokenView;
-
-// The shape of a Google News RSS search.
+// The shape of a Google News RSS feed.
 const rss = (items: string[]) => `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items.join("")}</channel></rss>`;
 const item = (title: string, link: string, date: string, source = "Yonhap News Agency") =>
   `<item><title>${title} - ${source}</title><link>${link}</link><guid isPermaLink="false">x</guid>` +
   `<pubDate>${date}</pubDate><description>&lt;a href="${link}"&gt;${title}&lt;/a&gt;</description>` +
   `<source url="https://en.yna.co.kr">${source}</source></item>`;
 
-describe("mentions", () => {
-  it("finds the name however it's spelled", () => {
-    const bukangi = token("BUKANGI", "Bukangi");
+describe("keywordsOf", () => {
+  it("finds what a token named after the story would be called, best first", () => {
     expect(normalize("Bukang-i")).toBe("bukangi");
-    expect(mentions("Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", bukangi)).toBe(true);
-    expect(mentions("Shark fever hits Busan as 102,000 rush to see 'Bukangi'", bukangi)).toBe(true);
-    expect(mentions("Busan port reopens after the holiday", bukangi)).toBe(false);
-  });
-
-  it("needs the $ticker for short names, and a whole one", () => {
-    const cat = token("CAT", "Cat");
-    expect(mentions("Cat rescued from a tree", cat)).toBe(false);
-    expect(mentions("$CAT doubles overnight", cat)).toBe(true);
-    expect(mentions("$CATS doubles overnight", cat)).toBe(false);
-  });
-});
-
-describe("parseRss", () => {
-  it("reads headline, publisher, link and time, without the ' - Publisher' ending", () => {
-    const xml = rss([
-      item("Shark &#39;Bukang-i&#39; that drew 400,000 people &amp; more", "https://news.google.com/rss/articles/A?oc=5", "Sun, 28 Sep 2026 03:40:00 GMT"),
-      item("<![CDATA[A CDATA headline]]>", "https://news.google.com/rss/articles/B", "Sat, 27 Sep 2026 10:00:00 GMT", "Korea Times"),
-      item("Not a web link", "javascript:alert(1)", "Sat, 27 Sep 2026 10:00:00 GMT"),
-      item("No date", "https://news.google.com/rss/articles/C", "soon"),
-    ]);
-    expect(parseRss(rss([item("Odd &#99999999; entity", "https://x.test/a", "Sat, 27 Sep 2026 10:00:00 GMT")]))[0].title).toBe(
-      "Odd &#99999999; entity",
+    expect(keywordsOf("Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i")).toEqual(["Bukang-i", "Busan"]);
+    expect(keywordsOf("Shark fever hits Busan as 102,000 rush to see 'Bukangi' at start of Chuseok break")[0]).toBe("Bukangi");
+    expect(keywordsOf(`Shark 'Bukang-i' that drew 400,000 people... "Time to return to the sea" response meeting tomorrow`)[0]).toBe(
+      "Bukang-i",
     );
-    expect(parseRss(xml)).toEqual([
-      {
-        title: "Shark 'Bukang-i' that drew 400,000 people & more",
-        url: "https://news.google.com/rss/articles/A?oc=5",
-        source: "Yonhap News Agency",
-        publishedAt: Date.parse("2026-09-28T03:40:00Z"),
-      },
-      { title: "A CDATA headline", url: "https://news.google.com/rss/articles/B", source: "Korea Times", publishedAt: Date.parse("2026-09-27T10:00:00Z") },
+    expect(keywordsOf("Moo Deng turns two: Thailand's famous pygmy hippo celebrates with a fruit cake").slice(0, 2)).toEqual([
+      "Moo Deng",
+      "Thailand",
     ]);
+    expect(keywordsOf("Peanut the Squirrel's owner opens animal sanctuary a year later")[0]).toBe("Peanut the Squirrel");
+  });
+
+  it("copes with Title Case headlines and with none at all", () => {
+    const k = keywordsOf("470,000 Flock to See Shark 'Bukangi' in Busan Canal");
+    expect(k[0]).toBe("Bukangi");
+    expect(k).toContain("Busan Canal");
+    expect(k).not.toContain("Flock");
+    expect(keywordsOf("the market is quiet today")).toEqual([]);
+    expect(keywordsOf("Memecoin named after Busan's shark Bukangi jumps 300% in a day")).toEqual(["Busan", "Bukangi"]);
   });
 });
 
-describe("newsFor", () => {
+describe("liveNews and searchNews", () => {
   afterEach(() => vi.unstubAllGlobals());
+  const hours = (h: number) => new Date(Date.now() - h * 3_600_000).toUTCString();
 
-  it("keeps headlines naming the token, newest first, each once, and asks again only after a while", async () => {
-    const fetchMock = vi.fn(async (_url: string) =>
-      new Response(
-        rss([
-          item("Shark fever hits Busan as 102,000 rush to see 'Bukangi'", "https://news.google.com/rss/articles/old", "Thu, 25 Sep 2026 09:00:00 GMT", "Korea Times"),
-          item("Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "https://news.google.com/rss/articles/new", "Sun, 28 Sep 2026 03:40:00 GMT"),
-          item("Busan weather: sunny", "https://news.google.com/rss/articles/other", "Sun, 28 Sep 2026 05:00:00 GMT"),
-        ]),
-      ),
-    );
+  it("brings every source together: each story once, today's news only, newest first", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("https://news.google.com/rss?hl=en-US")) {
+        return new Response(
+          rss([
+            item("Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i", "https://news.google.com/rss/articles/busan", hours(1)),
+            ...Array.from({ length: 25 }, (_, i) => item(`Filler story ${i}`, `https://news.google.com/rss/articles/f${i}`, hours(2 + i / 10), "AP")),
+          ]),
+        );
+      }
+      if (url === "https://feeds.bbci.co.uk/news/world/rss.xml") {
+        return new Response(
+          rss([
+            // The same story, as the BBC links it: shown once.
+            `<item><title>Over 560,000 visitors flock to Busan to see canal-trapped shark Bukang-i</title><link>https://bbc.co.uk/busan</link><pubDate>${hours(1)}</pubDate></item>`,
+            `<item><title>Moo Deng turns two</title><link>https://bbc.co.uk/moo</link><pubDate>${hours(3)}</pubDate></item>`,
+            `<item><title>Old news</title><link>https://bbc.co.uk/old</link><pubDate>${hours(72)}</pubDate></item>`,
+          ]),
+        );
+      }
+      if (url.startsWith("https://hn.algolia.com/")) {
+        return Response.json({ hits: [{ title: "Show HN: a shark tracker", url: "https://hn.test/shark", created_at: new Date(Date.now() - 1_800_000).toISOString() }] });
+      }
+      return new Response("not found", { status: 404 });
+    });
     vi.stubGlobal("fetch", fetchMock);
-    const bukangi = token("BUKANGI", "Bukangi");
-    const news = await newsFor([bukangi, bukangi]);
-    expect(news.map((n) => n.url)).toEqual(["https://news.google.com/rss/articles/new", "https://news.google.com/rss/articles/old"]);
-    expect(news[0]).toMatchObject({ source: "Yonhap News Agency", token: { symbol: "BUKANGI" } });
-    expect(String(fetchMock.mock.calls[0][0])).toContain("q=%22Bukangi%22");
 
-    await newsFor([bukangi]);
-    expect(fetchMock).toHaveBeenCalledTimes(1); // the parallel and the later lookups share one search
-  });
+    const news = await liveNews();
+    const titles = news.map((n) => n.title);
+    expect(titles[0]).toBe("Show HN: a shark tracker");
+    expect(titles.filter((t) => t.includes("Bukang-i"))).toHaveLength(1);
+    expect(titles).toContain("Moo Deng turns two");
+    expect(titles).not.toContain("Old news");
+    expect(titles.filter((t) => t.startsWith("Filler"))).toHaveLength(19); // 20 from Google News, one of them Busan
+    expect(news.find((n) => n.title.includes("Bukang-i"))).toMatchObject({ keywords: ["Bukang-i", "Busan"], category: "world" });
+    expect(news.find((n) => n.title.startsWith("Show HN"))?.category).toBe("tech");
 
-  it("searches short names by $ticker", async () => {
-    const fetchMock = vi.fn(async (_url: string) => new Response(rss([])));
-    vi.stubGlobal("fetch", fetchMock);
-    await newsFor([token("CAT", "Cat")]);
-    expect(String(fetchMock.mock.calls[0][0])).toContain("q=%22%24CAT%22");
+    const reads = fetchMock.mock.calls.length;
+    await liveNews();
+    expect(fetchMock).toHaveBeenCalledTimes(reads); // read again only after a few minutes
+
+    await searchNews("bukangi");
+    const searched = fetchMock.mock.calls.slice(reads).map(([u]) => String(u));
+    expect(searched.some((u) => u.includes("news.google.com/rss/search?q=bukangi"))).toBe(true);
+    expect(searched.some((u) => u.includes("bing.com/news/search?q=bukangi"))).toBe(true);
+    expect(searched.some((u) => u.includes("api.gdeltproject.org"))).toBe(true);
+    expect(searched.some((u) => u.includes("hn.algolia.com/api/v1/search_by_date?query=bukangi"))).toBe(true);
   });
 
   it("is empty, not an error, when the news can't be reached", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await newsFor([token("ZZZZ", "Nothing Here")])).toEqual([]);
+    expect(await searchNews("nothing here at all")).toEqual([]);
   });
 });
 
@@ -108,19 +113,18 @@ describe("namesakes", () => {
   const snap = (address: string, symbol: string, name: string, liquidityUsd: number | null) =>
     ({ chainId: "solana", address, symbol, name, liquidityUsd }) as MarketSnapshot;
 
-  it("searches by ticker and name, keeps each namesake once, most liquid first", async () => {
+  it("searches as written and run together, keeps each namesake once, most liquid first", async () => {
     const search = vi.mocked(searchTokens);
     search.mockImplementation(async (q: string) =>
-      q === "BUKANGI"
+      q === "Bukang-i"
         ? [snap("A", "BUKANGI", "Bukangi", 5_000), snap("B", "BUKANGI", "Bukangi Inu", 90_000), snap("X", "SHARK", "Shark", 1e6)]
         : [snap("A", "BUKANGI", "Bukangi", 5_000), snap("C", "BUKANG", "Bukang", null)],
     );
-    const tokens = await namesakes("Bukangi Coin", "BUKANGI");
+    const tokens = await namesakes("Bukang-i");
     expect(tokens.map((t) => t.address)).toEqual(["B", "A", "C"]);
-    expect(search.mock.calls.map(([q]) => q)).toEqual(["BUKANGI", "Bukangi Coin"]);
+    expect(search.mock.calls.map(([q]) => q)).toEqual(["Bukang-i", "Bukangi"]);
 
-    await namesakes("Bukangi Coin", "BUKANGI");
+    await namesakes("Bukang-i");
     expect(search).toHaveBeenCalledTimes(2); // kept for a minute
   });
 });
-

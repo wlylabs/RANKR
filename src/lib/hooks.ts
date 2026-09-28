@@ -201,20 +201,23 @@ export function useFeedPages(params: FeedParams, pageSize = 30) {
   };
 }
 
-/** Headlines naming a token (`token` is its id), or the month's most pasted and top tokens. Every 5 minutes. */
-export function useNews(token: string | null) {
+/** What's in the news right now (every 2 minutes), or the headlines for a search. */
+export function useNews(q: string) {
   const { data, error, isLoading } = useSWR<NewsResponse>(
-    token ? `/api/news?token=${encodeURIComponent(token)}` : "/api/news",
+    q ? `/api/news?q=${encodeURIComponent(q)}` : "/api/news",
     fetcher,
-    { refreshInterval: 5 * 60_000 },
+    { refreshInterval: q ? 5 * 60_000 : 2 * 60_000, keepPreviousData: true },
   );
-  return { items: data?.items ?? [], tokens: data?.tokens ?? [], error, isLoading };
+  return { items: data?.items ?? [], error, isLoading };
 }
 
-/** Every token named like a story's token (see /api/news/tokens), refreshed every minute. */
-export function useNamesakes(name: string, symbol: string) {
-  const key = `/api/news/tokens?${new URLSearchParams({ name, symbol })}`;
-  const { data, error, isLoading } = useSWR<NamesakesResponse>(key, fetcher, { refreshInterval: 60_000 });
+/** Every token named after `keyword` (a name from a story, see /api/news/tokens), refreshed every minute. */
+export function useNamesakes(keyword: string) {
+  const { data, error, isLoading } = useSWR<NamesakesResponse>(
+    keyword ? `/api/news/tokens?q=${encodeURIComponent(keyword)}` : null,
+    fetcher,
+    { refreshInterval: 60_000 },
+  );
   return { items: data?.items ?? [], error, isLoading };
 }
 

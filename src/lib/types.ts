@@ -169,7 +169,10 @@ export type StatsResponse = {
   updatedAt: number;
 };
 
-/** A headline that names a token (src/lib/news.ts): only the headline, the publisher and the link. */
+/** The news page's tabs: world news, viral and odd stories (what memes come from), crypto, tech. */
+export type NewsCategory = "world" | "viral" | "crypto" | "tech";
+
+/** A headline (src/lib/news.ts): only the headline, the publisher and the link. */
 export type NewsItem = {
   id: string;
   title: string;
@@ -178,15 +181,16 @@ export type NewsItem = {
   /** The publisher, e.g. "Yonhap News Agency". */
   source: string | null;
   publishedAt: number;
-  token: { id: string; chainId: string; address: string; symbol: string; name: string };
+  /** What a token named after the story would be called, best first: "Bukang-i", "Busan". */
+  keywords: string[];
+  category: NewsCategory;
 };
 
-/** Headlines, and the tokens they were looked up for. */
-export type NewsResponse = { items: NewsItem[]; tokens: NewsItem["token"][]; updatedAt: number };
+export type NewsResponse = { items: NewsItem[]; updatedAt: number };
 
 /**
- * Tokens named like a story's token, most liquid first, for the reader to pick from: live DEX data, and
- * Rankr's multiple since the first paste for the ones it tracks.
+ * Tokens named after a story, most liquid first, for the reader to pick from: live DEX data, and Rankr's
+ * multiple since the first paste for the ones it tracks.
  */
 export type NamesakesResponse = { items: { market: MarketSnapshot; multiple: number | null }[]; updatedAt: number };
 

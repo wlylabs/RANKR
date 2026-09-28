@@ -12,16 +12,12 @@ const MINUTE = 60_000;
 const SEARCHES_PER_MINUTE = 30;
 
 /**
- * GET /api/news/tokens?name=Bukangi&symbol=BUKANGI -> every token named like a story's token (by name and by
- * ticker), most liquid first, with market cap, volume, liquidity and Rankr's multiple for tracked ones.
+ * GET /api/news/tokens?q=Bukang-i -> every token named after a name from a story, most liquid first, with
+ * market cap, volume, liquidity and Rankr's multiple for tracked ones.
  */
 export async function GET(req: NextRequest) {
-  const p = req.nextUrl.searchParams;
-  const name = p.get("name")?.trim() ?? "";
-  const symbol = p.get("symbol")?.trim() ?? "";
-  if ((!name && !symbol) || name.length > 64 || symbol.length > 32) {
-    return NextResponse.json({ error: "Name a token." }, { status: 400 });
-  }
+  const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
+  if (!q || q.length > 64) return NextResponse.json({ error: "Name a token." }, { status: 400 });
 
   // Every search asks DexScreener, shared by everyone.
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
@@ -31,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const markets = await namesakes(name, symbol);
+    const markets = await namesakes(q);
     const ids = markets.map((m) => tokenId(m.chainId, m.address));
     const tracked = ids.length ? (await queryTokens({ sort: "new", ids, limit: ids.length, offset: 0 })).tokens : [];
     const multiples = new Map(tracked.map((t) => [t.id, t.multiple]));

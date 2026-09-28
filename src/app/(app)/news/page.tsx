@@ -4,7 +4,7 @@ import { News } from "@/components/News";
 
 export const metadata: Metadata = {
   title: "News",
-  description: "Headlines that name the tokens tracked on Rankr, each linking to the article.",
+  description: "What's in the news right now, and every token named after a story.",
 };
 
 export default function NewsPage() {
