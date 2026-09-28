@@ -12,6 +12,7 @@ import type {
   MarketSnapshot,
   MyCallsResponse,
   MyRankResponse,
+  NewsResponse,
   SeasonResponse,
   StatsResponse,
   TokenView,
@@ -197,6 +198,16 @@ export function useFeedPages(params: FeedParams, pageSize = 30) {
     isValidating,
     loadMore: () => setSize(size + 1),
   };
+}
+
+/** Headlines naming a token (`token` is its id), or the month's most pasted and top tokens. Every 5 minutes. */
+export function useNews(token: string | null) {
+  const { data, error, isLoading } = useSWR<NewsResponse>(
+    token ? `/api/news?token=${encodeURIComponent(token)}` : "/api/news",
+    fetcher,
+    { refreshInterval: 5 * 60_000 },
+  );
+  return { items: data?.items ?? [], tokens: data?.tokens ?? [], error, isLoading };
 }
 
 export function useStats() {

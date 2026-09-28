@@ -169,6 +169,21 @@ export type StatsResponse = {
   updatedAt: number;
 };
 
+/** A headline that names a token (src/lib/news.ts): only the headline, the publisher and the link. */
+export type NewsItem = {
+  id: string;
+  title: string;
+  /** The article (through Google News). */
+  url: string;
+  /** The publisher, e.g. "Yonhap News Agency". */
+  source: string | null;
+  publishedAt: number;
+  token: { id: string; chainId: string; address: string; symbol: string; name: string };
+};
+
+/** Headlines, and the tokens they were looked up for. */
+export type NewsResponse = { items: NewsItem[]; tokens: NewsItem["token"][]; updatedAt: number };
+
 /** A month that ended: its top 10 callers and tokens, kept when the boards reset (public.seasons). */
 export type Season = {
   /** The month's first day, "2026-09-01". */
