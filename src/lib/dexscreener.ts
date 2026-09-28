@@ -16,6 +16,7 @@ export type Pair = {
   quoteToken: { address: string; name: string; symbol: string };
   priceUsd?: string;
   volume?: { h24?: number };
+  txns?: { h24?: { buys?: number; sells?: number } };
   priceChange?: { h24?: number };
   liquidity?: { usd?: number };
   fdv?: number;
@@ -87,6 +88,7 @@ export function toSnapshot(p: Pair): MarketSnapshot {
     liquidityUsd: num(p.liquidity?.usd),
     volume24h: num(p.volume?.h24),
     priceChange24h: num(p.priceChange?.h24),
+    txns24h: p.txns?.h24 ? (num(p.txns.h24.buys) ?? 0) + (num(p.txns.h24.sells) ?? 0) : null,
     pairAddress: p.pairAddress,
     dexId: p.dexId,
     url: p.url,

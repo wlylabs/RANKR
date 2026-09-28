@@ -10,6 +10,7 @@ const pair = (chainId: string, address: string, symbol: string, liquidity: numbe
   priceUsd: "0.001",
   liquidity: { usd: liquidity },
   volume: { h24: 1_000 },
+  txns: { h24: { buys: 30, sells: 12 } },
 });
 
 describe("searchTokens", () => {
@@ -29,6 +30,7 @@ describe("searchTokens", () => {
     vi.stubGlobal("fetch", fetchMock);
     const tokens = await searchTokens("BUKANGI");
     expect(String(fetchMock.mock.calls[0][0])).toContain("/latest/dex/search?q=BUKANGI");
+    expect(tokens[0].txns24h).toBe(42); // buys and sells in the last 24 hours
     expect(tokens.map((t) => [t.chainId, t.address, t.dexId, t.liquidityUsd])).toEqual([
       ["solana", "AAA", "raydium", 50_000],
       ["solana", "BBB", "raydium", 7_000],

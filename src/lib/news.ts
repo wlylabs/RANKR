@@ -172,7 +172,8 @@ export function isNamesake(token: Pick<MarketSnapshot, "name" | "symbol">, keywo
   );
 }
 
-const NAMESAKES = 12;
+// More than a page shows by default: the minimums (src/lib/token-filters.ts) leave the dead ones out.
+const NAMESAKES = 20;
 const found = new Map<string, { tokens: Promise<MarketSnapshot[]>; until: number }>();
 
 /** DexScreener's tokens for a search, for a minute (market numbers move). A failed search isn't kept. */

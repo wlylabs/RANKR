@@ -44,6 +44,7 @@ export function mockSnapshot(address: string, chainHint: string | null): MarketS
     liquidityUsd: marketCap * (0.08 + (h % 7) / 100),
     volume24h: marketCap * (0.5 + (h % 30) / 10),
     priceChange24h: Math.round((Math.exp(swing) - 1) * 1000) / 10,
+    txns24h: h % 900,
     pairAddress: `mockpair${h.toString(16)}`,
     dexId: DEX[chainId] ?? "uniswap",
     url: `https://dexscreener.com/${chainId}/${address}`,

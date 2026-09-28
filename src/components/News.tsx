@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPercent, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { useNamesakes, useNews } from "@/lib/hooks";
+import { passes, setTokenFilters, TXNS_STEPS, USD_STEPS, useTokenFilters, type TokenFilters } from "@/lib/token-filters";
 import type { NamesakesResponse, NewsCategory, NewsItem } from "@/lib/types";
 import { ChainTag } from "./Chain";
 import { Tab } from "./Leaderboard";
@@ -48,7 +49,8 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
         </div>
         {/* Wraps rather than cuts: these are the numbers to pick by. */}
         <div className="tabular mt-0.5 font-mono text-[11px] text-muted">
-          mc {formatUsd(m.marketCap ?? m.fdv)} · vol {formatUsd(m.volume24h)} · liq {formatUsd(m.liquidityUsd)} · 24h{" "}
+          mc {formatUsd(m.marketCap ?? m.fdv)} · vol {formatUsd(m.volume24h)} · liq {formatUsd(m.liquidityUsd)}
+          {m.txns24h !== null && m.txns24h !== undefined && <> · {m.txns24h.toLocaleString("en-US")} txns</>} · 24h{" "}
           <span className={clsx((m.priceChange24h ?? 0) > 0 ? "text-up" : (m.priceChange24h ?? 0) < 0 && "text-down")}>
             {formatPercent(m.priceChange24h)}
           </span>
@@ -66,6 +68,45 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
   );
 }
 
+/** "any", "$1K", "$10K", "$100K", "$1M" (or a count, for transactions). */
+function stepLabel(value: number, usd: boolean): string {
+  if (!value) return "any";
+  const short = value >= 1_000_000 ? `${value / 1_000_000}M` : value >= 1_000 ? `${value / 1_000}K` : String(value);
+  return usd ? `$${short}` : short;
+}
+
+/** The minimums a token must meet to be listed, the same for every story (kept in this browser). */
+function Minimums({ filters }: { filters: TokenFilters }) {
+  const fields: [keyof TokenFilters, readonly number[], boolean][] = [
+    ["mc", USD_STEPS, true],
+    ["vol", USD_STEPS, true],
+    ["liq", USD_STEPS, true],
+    ["txns", TXNS_STEPS, false],
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-3 py-2 font-mono text-[11px] text-subtle">
+      <span>min</span>
+      {fields.map(([key, steps, usd]) => (
+        <label key={key} className="inline-flex items-center gap-1">
+          {key}
+          <select
+            value={filters[key]}
+            onChange={(e) => setTokenFilters({ ...filters, [key]: Number(e.target.value) })}
+            aria-label={`Minimum ${key}`}
+            className="h-6 cursor-pointer rounded border border-border bg-bg px-1 text-[11px] text-fg outline-none hover:bg-surface-2 focus-visible:border-border-strong"
+          >
+            {steps.map((v) => (
+              <option key={v} value={v}>
+                {stepLabel(v, usd)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Every token named after a story: pick one of the names in the headline (the likeliest is picked) or type
  * another, then pick a token by its numbers. Many tokens share a name or a ticker.
@@ -73,7 +114,13 @@ function Namesake({ market: m, multiple }: NamesakesResponse["items"][number]) {
 function Namesakes({ keywords }: { keywords: string[] }) {
   const [keyword, setKeyword] = useState(keywords[0] ?? "");
   const [draft, setDraft] = useState("");
-  const { items, error, isLoading } = useNamesakes(keyword);
+  const [showAll, setShowAll] = useState(false);
+  const found = useNamesakes(keyword);
+  const { error, isLoading } = found;
+  const filters = useTokenFilters();
+  const kept = found.items.filter((n) => passes(n.market, filters));
+  const items = showAll ? found.items : kept;
+  const hidden = found.items.length - kept.length;
 
   return (
     <div className="mt-3 overflow-hidden rounded-md border border-border bg-surface">
@@ -109,6 +156,7 @@ function Namesakes({ keywords }: { keywords: string[] }) {
           />
         </form>
       </div>
+      <Minimums filters={filters} />
       {!keyword ? (
         <p className="px-3 py-4 text-sm text-muted">Type a name to see the tokens named after it.</p>
       ) : (
@@ -119,13 +167,24 @@ function Namesakes({ keywords }: { keywords: string[] }) {
           ) : error && !items.length ? (
             <p className="px-3 py-4 text-sm text-down">Couldn&apos;t load the tokens. Try again in a moment.</p>
           ) : !items.length ? (
-            <p className="px-3 py-4 text-sm text-muted">No token named like this on DexScreener yet.</p>
+            <p className="px-3 py-4 text-sm text-muted">
+              {hidden ? "Every token named like this is below the minimums." : "No token named like this on DexScreener yet."}
+            </p>
           ) : (
             <div className="mt-1 divide-y divide-border">
               {items.map((n) => (
                 <Namesake key={`${n.market.chainId}:${n.market.address}`} {...n} />
               ))}
             </div>
+          )}
+          {hidden > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAll(!showAll)}
+              className="w-full border-t border-border px-3 py-2 text-left font-mono text-[11px] text-subtle transition-colors hover:text-fg"
+            >
+              {showAll ? "hide the ones below the minimums" : `${hidden} more below the minimums · show them`}
+            </button>
           )}
         </>
       )}
