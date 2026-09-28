@@ -90,6 +90,15 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Official accounts**: a check badge next to the name (e.g. `@rankr`), given by the project owner only.
 - **Token page**: big multiple, milestone ladder (2x → 1000x with target market caps), SHA-256 entry seal, stats,
   DexScreener chart, share to X / native share, and a generated social card per token.
+- **Call share card**: every call has its own page, `/u/<username>/<chain>/<address>` (who called it, at what
+  market cap, and how far it has moved since *their* entry, live), and a card image drawn from it (1200x630 PNG,
+  `/api/callers/<username>/<chain>/<address>/card`): the caller's avatar and name, the ticker, the multiple lit
+  green or red, entry and market cap now. The card is the page's link preview on X, Telegram and Discord. **Share**
+  opens it as it is right now, then: the phone's share sheet with the image itself, a post on X, the link, or the
+  image saved (`rankr-<username>-<TICKER>.png`). The words say "I called $PEPE at $80.2K mc. 12.4x since, sealed on
+  Rankr." for your own call, and name someone else's by their Rankr name, without an @ (on X that would tag
+  whoever holds the handle there). Share is right after posting a call, next to Your call on the token page, and
+  on every call on You and on caller profiles. Calls go with the monthly reset, and so do their pages.
 - **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, the board's top 5
   runners live (the product itself, no copy), three steps and a five-question FAQ. English only: Rankr is for DEX
   traders everywhere.
@@ -396,6 +405,7 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/stats                  GET home page totals
   api/cron/refresh           background price refresh
   api/callers, api/me/*      caller board, your account, username, profile, calls and rank
+  api/callers/[u]/[chain]/[addr]  GET one caller's call; .../card its share card (PNG)
   api/feed                   GET the feed: calls and milestones
   api/news, api/news/tokens  GET the live news, and the tokens named after a story
   login, account             guest / key sign-in, save or replace a key, rename
@@ -418,6 +428,7 @@ src/lib/news-sources.ts      every free news source (RSS and JSON APIs, keyed on
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names
+src/lib/share.ts             what a shared call says, and its card's file name
 public/sw.js, offline.html   service worker and the offline page
 supabase/                    migrations, setup.sql (all of them in one file), smoke test, cron jobs (refresh, monthly reset)
 ```

@@ -22,6 +22,7 @@ import { rankLine } from "./CallersBoard";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { PageHeader } from "./PageHeader";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
+import { ShareCall } from "./ShareCall";
 import { Segmented, TabBar } from "./Tabs";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
@@ -168,6 +169,7 @@ function AccountCalls({
       }
       rows={rows}
       loading={isLoading}
+      shareAs={username}
     />
   );
 }
@@ -245,6 +247,7 @@ function Page({
   intro,
   rows,
   loading = false,
+  shareAs,
   children,
 }: {
   /** Above the tabs; a plain "You" heading when there's no account to show. */
@@ -252,6 +255,8 @@ function Page({
   intro?: React.ReactNode;
   rows: Row[];
   loading?: boolean;
+  /** The account the calls are under, so each can be shared (calls on this device only can't). */
+  shareAs?: string;
   /** Shown instead of the calls and the stats (e.g. "Sign in"). */
   children?: React.ReactNode;
 }) {
@@ -291,7 +296,7 @@ function Page({
               <span className="text-subtle"> Calls reset with the boards on {resetDay(nextResetAt())}, 00:00 UTC.</span>
             )}
           </p>
-          {!rows.length && !loading ? <NoCalls /> : <CallsView rows={rows} loading={loading} />}
+          {!rows.length && !loading ? <NoCalls /> : <CallsView rows={rows} loading={loading} shareAs={shareAs} />}
         </>
       )}
     </div>
@@ -337,7 +342,16 @@ function Stats({ rows, loading }: { rows: Row[]; loading: boolean }) {
  * Summary tiles, a sort switch and the list of calls, each measured from the caller's own entry.
  * Used by My calls and by public caller profiles. Calls can't be removed: they all go with the monthly reset.
  */
-export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; loading?: boolean }) {
+export function CallsView({
+  rows: unsorted,
+  loading = false,
+  shareAs,
+}: {
+  rows: Row[];
+  loading?: boolean;
+  /** Whose calls these are: each row gets its share card. */
+  shareAs?: string;
+}) {
   const [sort, setSort] = useState<keyof typeof SORTS>("new");
   const rows = useMemo(() => [...unsorted].sort(SORTS[sort]), [unsorted, sort]);
   const withData = rows.filter((r) => r.token);
@@ -379,8 +393,11 @@ export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; lo
 
       <Cascade as="ul" className="mt-3 divide-y divide-border overflow-hidden card">
         {rows.map((row) => (
-          <li key={row.id} className="transition-colors hover:bg-surface-2">
-            <Link href={tokenHref(row)} className="flex min-w-0 items-center gap-3 px-4 py-3">
+          <li key={row.id} className="flex items-center transition-colors hover:bg-surface-2">
+            <Link
+              href={tokenHref(row)}
+              className={clsx("flex min-w-0 flex-1 items-center gap-3 py-3 pl-4", shareAs && row.token ? "pr-1" : "pr-4")}
+            >
               <div className="min-w-0 flex-1">
                 <TokenName symbol={row.symbol} name={row.name} className="min-w-0" />
                 <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
@@ -401,6 +418,13 @@ export function CallsView({ rows: unsorted, loading = false }: { rows: Row[]; lo
                 )}
               </div>
             </Link>
+            {shareAs && row.token && (
+              <ShareCall
+                variant="icon"
+                className="mr-2"
+                call={{ username: shareAs, token: row, entryMarketCap: row.entryMarketCap, multiple: row.multiple }}
+              />
+            )}
           </li>
         ))}
       </Cascade>

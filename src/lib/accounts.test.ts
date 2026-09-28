@@ -378,6 +378,72 @@ describe("callerProfile", () => {
   });
 });
 
+describe("callerCall", () => {
+  const EVM = `0x${"ab".repeat(20)}`;
+  let callArgs: Record<string, unknown> | null;
+  const tokenRow = (id: string, symbol: string, price: number) => {
+    const now = new Date().toISOString(); // just checked: no market refresh
+    const [chain_id, address] = id.split(":");
+    return {
+      id, chain_id, address, name: `${symbol} Token`, symbol, image_url: null,
+      entry_price_usd: 1, entry_market_cap: 1_000_000, first_pasted_at: now, last_pasted_at: now, paste_count: 1,
+      peak_price_usd: price, peak_at: now, low_price_usd: 1, low_at: now, last_price_usd: price,
+      market: { priceUsd: price, marketCap: price * 1_000_000 }, last_checked_at: now,
+    };
+  };
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("SUPABASE_URL", "https://x.supabase.co");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
+    callArgs = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("/rest/v1/profiles?")) return new Response(JSON.stringify([{ user_id: "u1", username: "nonce_7f3a", official: true }]));
+        if (url.endsWith("/rest/v1/rpc/rankr_my_calls")) {
+          callArgs = JSON.parse(String(init?.body));
+          const calledAt = "2026-09-27T12:00:00Z";
+          return new Response(
+            JSON.stringify([
+              { user_id: "u1", token_id: "solana:PEPEaddr", entry_price_usd: 2, entry_market_cap: 2_000_000, called_at: calledAt, token: tokenRow("solana:PEPEaddr", "PEPE", 5) },
+              { user_id: "u1", token_id: `base:${EVM}`, entry_price_usd: 1, entry_market_cap: 1_000_000, called_at: calledAt, token: tokenRow(`base:${EVM}`, "BASED", 1) },
+            ]),
+          );
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("finds one call of a caller, measured from their own entry", async () => {
+    const { callerCall } = await import("./accounts");
+    const out = await callerCall("NONCE_7F3A", "solana", "PEPEaddr");
+    expect(out?.caller).toEqual({ userId: "u1", username: "nonce_7f3a", official: true });
+    expect(out?.call).toMatchObject({ tokenId: "solana:PEPEaddr", entryMarketCap: 2_000_000, multiple: 2.5 });
+    expect(out?.call.calledAt).toBe(Date.parse("2026-09-27T12:00:00Z"));
+    expect(out?.call.token.symbol).toBe("PEPE");
+    expect(callArgs).toEqual({ p_user: "u1" });
+  });
+
+  it("matches EVM addresses in any case", async () => {
+    const { callerCall } = await import("./accounts");
+    expect((await callerCall("nonce_7f3a", "base", EVM.toUpperCase().replace("0X", "0x")))?.call.token.symbol).toBe("BASED");
+  });
+
+  it("is null for a token the caller hasn't called, or a caller who doesn't exist", async () => {
+    const { callerCall } = await import("./accounts");
+    expect(await callerCall("nonce_7f3a", "solana", "OTHER")).toBeNull();
+    expect(await callerCall("someone_else", "solana", "PEPEaddr")).toBeNull();
+    expect(await callerCall("no spaces!", "solana", "PEPEaddr")).toBeNull();
+  });
+});
+
 describe("lastSeason", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

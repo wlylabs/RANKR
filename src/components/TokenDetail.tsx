@@ -26,6 +26,7 @@ import { useAuth } from "./AuthProvider";
 import { CopyButton } from "./CopyButton";
 import { DecryptText } from "./DecryptText";
 import { ChangeText, Flash, MultipleBadge } from "./MultipleBadge";
+import { ShareCall } from "./ShareCall";
 import { TimeAgo } from "./TimeAgo";
 import { WatchButton } from "./Watchlist";
 
@@ -133,13 +134,25 @@ function tone(multiple: number) {
   return multiple > 1.005 ? "text-up" : multiple < 0.995 ? "text-down" : "text-fg";
 }
 
-/** Your own entry on the token: from your account, or from this device when accounts are off. */
+/**
+ * Your own entry on the token: from your account, or from this device when accounts are off. `username`: the
+ * account it's under, so it can be shared (a call on this device only has no page of its own).
+ */
 function useYourCall(tokenId: string) {
-  const { available, userId } = useAuth();
+  const { available, userId, username } = useAuth();
   const account = useAccountCalls(available ? userId : null).data?.calls.find((c) => c.tokenId === tokenId);
   const device = useMyCalls().find((c) => c.id === tokenId);
-  if (available) return account && { entryPriceUsd: account.entryPriceUsd, entryMarketCap: account.entryMarketCap, at: account.calledAt };
-  return device && { entryPriceUsd: device.entryPriceUsd, entryMarketCap: device.entryMarketCap, at: device.pastedAt };
+  if (available) {
+    return (
+      account && {
+        entryPriceUsd: account.entryPriceUsd,
+        entryMarketCap: account.entryMarketCap,
+        at: account.calledAt,
+        username,
+      }
+    );
+  }
+  return device && { entryPriceUsd: device.entryPriceUsd, entryMarketCap: device.entryMarketCap, at: device.pastedAt, username: null };
 }
 
 function Tracked({ token: t }: { token: TokenView }) {
@@ -223,7 +236,21 @@ function Tracked({ token: t }: { token: TokenView }) {
                 <div className="tabular font-mono text-xs text-muted">
                   entry {formatUsd(myCall.entryMarketCap)} · <TimeAgo at={myCall.at} />
                 </div>
-                <MultipleBadge multiple={ratio(m?.priceUsd ?? t.entryPriceUsd, myCall.entryPriceUsd)} />
+                <div className="flex items-center gap-1">
+                  <MultipleBadge multiple={ratio(m?.priceUsd ?? t.entryPriceUsd, myCall.entryPriceUsd)} />
+                  {myCall.username && (
+                    <ShareCall
+                      variant="icon"
+                      className="-mr-2"
+                      call={{
+                        username: myCall.username,
+                        token: t,
+                        entryMarketCap: myCall.entryMarketCap,
+                        multiple: ratio(m?.priceUsd ?? t.entryPriceUsd, myCall.entryPriceUsd),
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             </Section>
           )}
