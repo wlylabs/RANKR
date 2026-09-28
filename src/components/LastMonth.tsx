@@ -2,13 +2,12 @@
 
 import { Trophy } from "lucide-react";
 import Link from "next/link";
-import { callerHref, formatUsd, tokenHref } from "@/lib/format";
+import { formatUsd, tokenHref } from "@/lib/format";
 import { useLastSeason, useNow } from "@/lib/hooks";
 import { monthLabel, nextResetAt, resetDay } from "@/lib/season";
-import { Avatar } from "./Avatar";
+import { CallerRateRow } from "./CallersBoard";
 import { ChainTag } from "./Chain";
 import { MultipleBadge } from "./MultipleBadge";
-import { OfficialBadge } from "./OfficialBadge";
 import { ListSkeleton, TokenName } from "./TokenList";
 
 const rank = (i: number) => String(i + 1).padStart(2, "0");
@@ -60,22 +59,7 @@ export function LastMonth({ board }: { board: "tokens" | "callers" }) {
         {board === "callers" ? (
           <List title="Top callers" empty="Nobody had the 5 calls a hit rate needs.">
             {season.callers.map((c, i) => (
-              <div key={c.userId} className="flex items-center gap-3 px-4 py-3">
-                <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rank(i)}</span>
-                <Link href={callerHref(c.username)} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
-                  <Avatar userId={c.userId} size={20} />
-                  <span className="truncate font-mono text-[13px]">@{c.username}</span>
-                  {c.official && <OfficialBadge />}
-                </Link>
-                <span className="text-right">
-                  <span className="tabular block font-mono text-[13px] font-medium">
-                    {Math.round((c.hits / Math.max(c.calls, 1)) * 100)}%
-                  </span>
-                  <span className="tabular block font-mono text-[10px] text-subtle">
-                    {c.hits}/{c.calls} at 2x+
-                  </span>
-                </span>
-              </div>
+              <CallerRateRow key={c.userId} c={c} rank={i + 1} />
             ))}
           </List>
         ) : (

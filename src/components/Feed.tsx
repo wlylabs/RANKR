@@ -18,7 +18,8 @@ import { ListSkeleton } from "./TokenList";
 const SCOPE_LABELS: Record<FeedScope, string> = { all: "Everyone", top: "Top callers" };
 const KIND_LABELS: Record<FeedKind, string> = { all: "All", call: "Calls", milestone: "Milestones" };
 
-function Row({ item }: { item: FeedItem }) {
+/** One feed entry: the sentence, the multiple now, and how long ago. */
+export function FeedRow({ item }: { item: FeedItem }) {
   return (
     <div className="flex items-start gap-3 px-4 py-3">
       <span
@@ -143,7 +144,7 @@ export function Feed() {
           <>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {items.map((item) => (
-                <Row key={item.id} item={item} />
+                <FeedRow key={item.id} item={item} />
               ))}
             </div>
             {hasMore && (

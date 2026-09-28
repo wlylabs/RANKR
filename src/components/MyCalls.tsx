@@ -147,7 +147,7 @@ function AccountCalls({
               </>
             }
           />
-          <RankCard userId={userId} />
+          <RankCard userId={userId} className="mt-6" />
         </>
       }
       intro={
@@ -167,15 +167,30 @@ function AccountCalls({
   );
 }
 
-/** Your place on the caller board (by hit rate, its default), linking to it. */
-function RankCard({ userId }: { userId: string }) {
+/**
+ * Your place on the caller board (by hit rate, its default) as a link, to the board unless `href` says
+ * otherwise. `best` adds your best call.
+ */
+export function RankCard({
+  userId,
+  href = "/leaderboard?view=callers",
+  best = false,
+  className,
+}: {
+  userId: string;
+  href?: string;
+  best?: boolean;
+  className?: string;
+}) {
   const mine = useMyRank("rate", userId);
   if (!mine) return null;
-  const line = rankLine("rate", mine);
+  const bestCall =
+    best && mine.caller?.bestToken ? `best $${mine.caller.bestToken.symbol} ${formatMultiple(mine.caller.bestMultiple)}` : null;
+  const line = [rankLine("rate", mine), bestCall].filter(Boolean).join(" · ");
   return (
     <Link
-      href="/leaderboard?view=callers"
-      className="mt-6 flex items-center gap-4 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-surface-2"
+      href={href}
+      className={clsx("flex items-center gap-4 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-surface-2", className)}
     >
       <span className="tabular font-mono text-2xl font-medium tracking-tight">{mine.rank ? `#${mine.rank}` : "—"}</span>
       <span className="min-w-0 flex-1">

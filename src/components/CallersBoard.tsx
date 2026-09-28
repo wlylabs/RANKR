@@ -22,7 +22,7 @@ export const CALLER_SORT_LABELS: Record<CallerSort, string> = {
 };
 
 /** Share of a caller's calls at 2x or more right now. */
-function hitRate(c: CallerView) {
+function hitRate(c: Pick<CallerView, "calls" | "hits">) {
   return `${Math.round((c.hits / Math.max(c.calls, 1)) * 100)}%`;
 }
 
@@ -55,6 +55,32 @@ function BestCall({ c }: { c: CallerView }) {
 }
 
 const rankLabel = (rank: number) => String(rank).padStart(2, "0");
+
+/** A compact caller row by hit rate: rank, name, and share of calls at 2x+ (last month's board, the home page). */
+export function CallerRateRow({
+  c,
+  rank,
+}: {
+  c: Pick<CallerView, "userId" | "username" | "official" | "calls" | "hits">;
+  rank: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rankLabel(rank)}</span>
+      <Link href={callerHref(c.username)} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
+        <Avatar userId={c.userId} size={20} />
+        <span className="truncate font-mono text-[13px]">@{c.username}</span>
+        {c.official && <OfficialBadge />}
+      </Link>
+      <span className="text-right">
+        <span className="tabular block font-mono text-[13px] font-medium">{hitRate(c)}</span>
+        <span className="tabular block font-mono text-[10px] text-subtle">
+          {c.hits}/{c.calls} at 2x+
+        </span>
+      </span>
+    </div>
+  );
+}
 
 /** The number on the right of a compact row. */
 function SortValue({ sort, c }: { sort: CallerSort; c: CallerView }) {

@@ -53,7 +53,10 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   DexScreener chart, share to X / native share, and a generated social card per token.
 - **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, three steps and a
   four-question FAQ. English only: Rankr is for DEX traders everywhere.
-  The app itself (paste box + live board) is at **`/app`**.
+  The app itself is at **`/app`**.
+- **Home** (`/app`): signed out, the headline and the paste box; signed in, the paste box and your place on the
+  caller board (with your best call), without the headline. Then this month (the countdown to the reset and the
+  board's totals) and three panels: top callers, top runners and the latest milestones.
 - **Settings menu** (the gear in the header): theme (switching cross-fades the page), milestone alerts, About
   Rankr (the landing page) or Open app, Install app and the app link. It keeps pages free of app buttons.
 - **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
