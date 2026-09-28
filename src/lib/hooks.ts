@@ -12,6 +12,7 @@ import type {
   MarketSnapshot,
   MyCallsResponse,
   MyRankResponse,
+  NamesakesResponse,
   NewsResponse,
   SeasonResponse,
   StatsResponse,
@@ -208,6 +209,13 @@ export function useNews(token: string | null) {
     { refreshInterval: 5 * 60_000 },
   );
   return { items: data?.items ?? [], tokens: data?.tokens ?? [], error, isLoading };
+}
+
+/** Every token named like a story's token (see /api/news/tokens), refreshed every minute. */
+export function useNamesakes(name: string, symbol: string) {
+  const key = `/api/news/tokens?${new URLSearchParams({ name, symbol })}`;
+  const { data, error, isLoading } = useSWR<NamesakesResponse>(key, fetcher, { refreshInterval: 60_000 });
+  return { items: data?.items ?? [], error, isLoading };
 }
 
 export function useStats() {

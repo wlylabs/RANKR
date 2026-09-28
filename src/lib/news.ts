@@ -1,7 +1,7 @@
 // News: headlines that name a token, from Google News (its RSS search needs no key). Only the headline, the
 // publisher and a link are kept; the article stays on the publisher's page. Server only.
-import { MOCK } from "./dexscreener";
-import type { NewsItem, TokenView } from "./types";
+import { MOCK, searchTokens } from "./dexscreener";
+import type { MarketSnapshot, NewsItem, TokenView } from "./types";
 
 const TTL = 15 * 60_000;
 const PER_TOKEN = 20;
@@ -123,3 +123,44 @@ export async function newsFor(tokens: TokenView[]): Promise<NewsItem[]> {
     .filter((n) => !seen.has(n.url) && !!seen.add(n.url))
     .sort((a, b) => b.publishedAt - a.publishedAt);
 }
+
+/**
+ * Whether a token is a namesake of a story's token: its ticker or name is one of the `keywords` (normalized),
+ * holds one or is held by one, 4+ letters each ("Bukang" and "Bukangi Inu" for Bukangi).
+ */
+export function isNamesake(token: Pick<MarketSnapshot, "name" | "symbol">, keywords: string[]): boolean {
+  const own = [normalize(token.symbol), normalize(token.name)].filter(Boolean);
+  return keywords.some((k) =>
+    own.some((x) => x === k || (x.length >= 4 && k.length >= 4 && (x.includes(k) || k.includes(x)))),
+  );
+}
+
+const NAMESAKES = 12;
+const found = new Map<string, { tokens: Promise<MarketSnapshot[]>; until: number }>();
+
+/** DexScreener's tokens for a search, for a minute (market numbers move). A failed search isn't kept. */
+function searchCached(query: string): Promise<MarketSnapshot[]> {
+  const now = Date.now();
+  const hit = found.get(query);
+  if (hit && hit.until > now) return hit.tokens;
+  if (found.size > 500) for (const [k, v] of found) if (v.until <= now) found.delete(k);
+  const tokens = searchTokens(query);
+  found.set(query, { tokens, until: now + 60_000 });
+  tokens.catch(() => found.get(query)?.tokens === tokens && found.delete(query));
+  return tokens;
+}
+
+/**
+ * Every token named like a story's token (by its name and by its ticker), most liquid first: many tokens
+ * share a ticker, and the reader picks. Throws UpstreamError when DexScreener can't be reached.
+ */
+export async function namesakes(name: string, symbol: string): Promise<MarketSnapshot[]> {
+  const keywords = [...new Set([normalize(name), normalize(symbol)])].filter(Boolean);
+  const queries = [...new Set([symbol.trim(), name.trim()])].filter(Boolean);
+  const byId = new Map<string, MarketSnapshot>();
+  for (const tokens of await Promise.all(queries.map(searchCached))) {
+    for (const t of tokens) if (isNamesake(t, keywords)) byId.set(`${t.chainId}:${t.address}`, t);
+  }
+  return [...byId.values()].sort((a, b) => (b.liquidityUsd ?? -1) - (a.liquidityUsd ?? -1)).slice(0, NAMESAKES);
+}
+

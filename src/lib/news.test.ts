@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mentions, newsFor, normalize, parseRss } from "./news";
-import type { TokenView } from "./types";
+import { searchTokens } from "./dexscreener";
+import { isNamesake, mentions, namesakes, newsFor, normalize, parseRss } from "./news";
+import type { MarketSnapshot, TokenView } from "./types";
+
+vi.mock("./dexscreener", () => ({ MOCK: false, searchTokens: vi.fn() }));
 
 const token = (symbol: string, name: string) =>
   ({ id: `solana:${symbol}`, chainId: "solana", address: symbol, symbol, name }) as TokenView;
@@ -89,3 +92,35 @@ describe("newsFor", () => {
     expect(await newsFor([token("ZZZZ", "Nothing Here")])).toEqual([]);
   });
 });
+
+describe("isNamesake", () => {
+  const keywords = ["bukangi"];
+  it("takes the same name or ticker, and ones holding it or held by it", () => {
+    expect(isNamesake({ symbol: "BUKANGI", name: "Bukangi" }, keywords)).toBe(true);
+    expect(isNamesake({ symbol: "BKG", name: "Bukang-i the Shark" }, keywords)).toBe(true);
+    expect(isNamesake({ symbol: "BUKANG", name: "Busan shark" }, keywords)).toBe(true);
+    expect(isNamesake({ symbol: "SHARK", name: "Busan Shark" }, keywords)).toBe(false);
+    expect(isNamesake({ symbol: "BUK", name: "Buk" }, keywords)).toBe(false); // too short to count as part
+  });
+});
+
+describe("namesakes", () => {
+  const snap = (address: string, symbol: string, name: string, liquidityUsd: number | null) =>
+    ({ chainId: "solana", address, symbol, name, liquidityUsd }) as MarketSnapshot;
+
+  it("searches by ticker and name, keeps each namesake once, most liquid first", async () => {
+    const search = vi.mocked(searchTokens);
+    search.mockImplementation(async (q: string) =>
+      q === "BUKANGI"
+        ? [snap("A", "BUKANGI", "Bukangi", 5_000), snap("B", "BUKANGI", "Bukangi Inu", 90_000), snap("X", "SHARK", "Shark", 1e6)]
+        : [snap("A", "BUKANGI", "Bukangi", 5_000), snap("C", "BUKANG", "Bukang", null)],
+    );
+    const tokens = await namesakes("Bukangi Coin", "BUKANGI");
+    expect(tokens.map((t) => t.address)).toEqual(["B", "A", "C"]);
+    expect(search.mock.calls.map(([q]) => q)).toEqual(["BUKANGI", "Bukangi Coin"]);
+
+    await namesakes("Bukangi Coin", "BUKANGI");
+    expect(search).toHaveBeenCalledTimes(2); // kept for a minute
+  });
+});
+
