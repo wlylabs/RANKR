@@ -9,6 +9,7 @@ import { useAuth } from "./AuthProvider";
 import { CallSpread, RecentForm } from "./CallerCharts";
 import { CallsView, callRow } from "./MyCalls";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
+import { SaveAvatar } from "./SaveAvatar";
 
 function Message({ title, body }: { title: string; body: string }) {
   return (
@@ -42,9 +43,12 @@ export function CallerProfile({ username }: { username: string }) {
         you={mine}
         actions={
           mine && (
-            <Link href="/account" className={PROFILE_ACTION}>
-              Edit profile
-            </Link>
+            <>
+              <Link href="/account" className={PROFILE_ACTION}>
+                Edit profile
+              </Link>
+              <SaveAvatar userId={c.userId} username={c.username} />
+            </>
           )
         }
       />
