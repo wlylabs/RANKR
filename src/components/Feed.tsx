@@ -131,7 +131,7 @@ export function Feed() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <PageHeader title="Feed" live>
+      <PageHeader title="Feed">
         Every call as it lands, and every call that hits 2x, 5x, 10x and up, each from the caller&apos;s own entry.
       </PageHeader>
 

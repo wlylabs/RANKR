@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!found) return { title: "Call not found", robots: { index: false } };
   const { caller, call } = found;
   const title = `@${caller.username} called $${call.token.symbol}: ${formatMultiple(call.multiple)}`;
-  const description = `@${caller.username} called $${call.token.symbol} at ${formatUsd(call.entryMarketCap)} market cap on Rankr: ${formatMultiple(call.multiple)} since, from their own sealed entry.`;
+  const description = `@${caller.username} called $${call.token.symbol} at ${formatUsd(call.entryMarketCap)} market cap on Rankr: ${formatMultiple(call.multiple)} since, from their own entry.`;
   // The share card is the link preview (X, Telegram, Discord...).
   const image = {
     url: `/api/callers/${encodeURIComponent(caller.username)}/${chain}/${encodeURIComponent(decode(address))}/card`,

@@ -1,11 +1,10 @@
 "use client";
 
-import { CircleAlert, Lock } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import useSWR from "swr";
-import { chainMeta } from "@/lib/chains";
-import { callerHref, formatDate, formatMultiple, formatUsd, shortAddress, tokenHref } from "@/lib/format";
+import { callerHref, formatMultiple, formatUsd, shortAddress, tokenHref } from "@/lib/format";
 import { fetcher } from "@/lib/hooks";
 import { delay } from "@/lib/motion";
 import type { CallResponse } from "@/lib/types";
@@ -15,7 +14,6 @@ import { DecryptText } from "./DecryptText";
 import { ChangeText, Flash, toneOf } from "./MultipleBadge";
 import { OfficialBadge } from "./OfficialBadge";
 import { ShareCall } from "./ShareCall";
-import { TimeAgo } from "./TimeAgo";
 
 const GHOST =
   "inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-4 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg";
@@ -100,20 +98,11 @@ export function CallDetail({
           </div>
         </div>
 
-        <dl className="grid gap-x-6 gap-y-2 border-t border-border px-5 py-4 font-mono text-[11px] sm:grid-cols-[auto_1fr] sm:px-8">
-          <dt className="text-subtle">called</dt>
-          <dd className="text-muted">
-            <span suppressHydrationWarning>{formatDate(call.calledAt)}</span> (<TimeAgo at={call.calledAt} />)
-          </dd>
-          <dt className="text-subtle">token</dt>
-          <dd className="flex min-w-0 items-center gap-1.5 text-muted">
-            {chainMeta(t.chainId).name.toLowerCase()} / <CopyButton value={t.address} label={shortAddress(t.address)} />
-          </dd>
-          <dt className="flex items-center gap-1.5 text-subtle">
-            <Lock className="size-3" /> entry
-          </dt>
-          <dd className="text-muted">sealed at the call: the price then, from live market data, and it can&apos;t change</dd>
-        </dl>
+        {/* The contract address, to copy: the one thing here to act on. */}
+        <div className="flex items-center gap-3 border-t border-border px-5 py-3 font-mono text-[11px] sm:px-8">
+          <span className="text-subtle">ca</span>
+          <CopyButton value={t.address} label={shortAddress(t.address)} />
+        </div>
       </section>
 
       <div className="cine-in mt-4 flex flex-wrap gap-2" style={delay(150)}>
