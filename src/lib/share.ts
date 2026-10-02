@@ -12,17 +12,16 @@ export type SharedCall = {
 };
 
 /**
- * "I called $PEPE at $80.2K mc. 12.4x since, sealed on Rankr." Someone else's call names them as on Rankr,
- * without an @ (on X that would tag whoever owns the handle there). A call that hasn't moved yet just says
- * when it was called; a loss says so too.
+ * "I called $PEPE at $80.2K mc on Rankr. 12.4x since." Someone else's call names them as on Rankr, without an
+ * @ (on X that would tag whoever owns the handle there). A call that hasn't moved yet just says it was called;
+ * a loss says so too.
  */
 export function callShareText({ username, symbol, entryMarketCap, multiple, mine }: SharedCall): string {
   const who = mine ? "I" : username;
   const at = entryMarketCap !== null ? ` at ${formatUsd(entryMarketCap)} mc` : "";
+  const called = `${who} called $${symbol}${at} on Rankr.`;
   const moved = multiple > 1.005 || multiple < 0.995;
-  return moved
-    ? `${who} called $${symbol}${at}. ${formatMultiple(multiple)} since, sealed on Rankr.`
-    : `${who} called $${symbol}${at}, sealed on Rankr.`;
+  return moved ? `${called} ${formatMultiple(multiple)} since.` : called;
 }
 
 /** The card's file name when saved: rankr-nonce_7f3a-PEPE.png */

@@ -100,8 +100,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   is flat fills and vector shapes only, no glow. The card is the page's link preview on X, Telegram and Discord.
   **Share**
   opens it as it is right now, then: the phone's share sheet with the image itself, a post on X, the link, or the
-  image saved (`rankr-<username>-<TICKER>.png`). The words say "I called $PEPE at $80.2K mc. 12.4x since, sealed on
-  Rankr." for your own call, and name someone else's by their Rankr name, without an @ (on X that would tag
+  image saved (`rankr-<username>-<TICKER>.png`). The words say "I called $PEPE at $80.2K mc on Rankr. 12.4x since."
+  for your own call, and name someone else's by their Rankr name, without an @ (on X that would tag
   whoever holds the handle there). Share is right after posting a call, next to Your call on the token page, and
   on every call on You and on caller profiles. Calls go with the monthly reset, and so do their pages.
 - **Landing page** at `/`: kept short on purpose: the headline, a "Start tracking" button, the board's top 5
