@@ -1,6 +1,10 @@
-// Solana over JSON-RPC: the public endpoint by default (free, no key, rate-limited), or any RPC you set in
+// Solana over JSON-RPC: free public endpoints by default (no key, rate-limited), or any RPC you set in
 // SOLANA_RPC_URL (Helius, QuickNode... free plans read more history, faster). One wallet costs one
 // getAccountInfo, one to three getSignaturesForAddress pages and one getTransaction per transaction read.
+//
+// The public endpoint allows about 40 calls of one method per 10 seconds per IP, and a server on a shared host
+// shares its IP with every other site there. So calls are paced, a 429 moves on to the next endpoint, and a
+// read that runs out of quota halfway returns what it has (scanned.limited) rather than nothing.
 import { fetchSnapshots } from "../dexscreener";
 import { tokenId } from "../address";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
@@ -8,13 +12,29 @@ import { labelOf, solanaBridge, solanaDeposits, solanaDex } from "./labels";
 import { TraceError } from "./errors";
 import type { TraceResponse } from "./types";
 
-const PUBLIC_RPC = "https://api.mainnet-beta.solana.com";
-const rpcUrl = () => process.env.SOLANA_RPC_URL || PUBLIC_RPC;
-const custom = () => !!process.env.SOLANA_RPC_URL;
+/** Free, keyless: Solana's own, then PublicNode's (Allnodes), taken in turn when one says 429. */
+const PUBLIC_RPCS = ["https://api.mainnet-beta.solana.com", "https://solana-rpc.publicnode.com"];
+/** SOLANA_RPC_URL: one RPC, or several separated by commas (tried in turn). */
+const endpoints = () => {
+  const own = (process.env.SOLANA_RPC_URL ?? "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+  return own.length ? own : PUBLIC_RPCS;
+};
+const custom = () => !!process.env.SOLANA_RPC_URL?.trim();
 
-/** Transactions read per wallet, and at once: the public RPC allows about 40 calls per 10 seconds. */
-const txLimit = () => (custom() ? 80 : 30);
+/** Transactions read per wallet, and at once. */
+const txLimit = () => (custom() ? 80 : 20);
 const concurrency = () => (custom() ? 8 : 3);
+/**
+ * Calls per second per endpoint: under the public endpoint's 40 per method per 10 seconds, and Helius's free
+ * 10 per second. SOLANA_RPC_RPS raises it for a paid plan.
+ */
+const rps = () => Number(process.env.SOLANA_RPC_RPS) || (custom() ? 9 : 3.5);
+
+/** Waits between retries (tests make them short). */
+export const RPC_TIMING = { backoffMs: 700 };
 
 const LAMPORTS = 1e9;
 /** Below this, an account creation only pays rent. */
@@ -38,6 +58,9 @@ export const MAX_TX_VERSION = 1;
 /** The RPC's answer to a transaction in a newer format than asked for. */
 const UNSUPPORTED_VERSION = -32015;
 
+/** Every endpoint kept saying 429 (or 403, flagged): the free quota is used up for now. */
+const BUSY = "Solana's RPC is busy right now (rate limit). Try again in a minute.";
+
 /** An error the RPC answered with (not a rate limit, not the network): about this one call. */
 class RpcError extends TraceError {
   constructor(
@@ -50,53 +73,78 @@ class RpcError extends TraceError {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** When each endpoint may be called next: calls queue up behind one another at its pace. */
+const gates = new Map<string, number>();
+async function pace(url: string) {
+  const now = Date.now();
+  const at = Math.max(now, gates.get(url) ?? 0);
+  gates.set(url, at + 1000 / rps());
+  if (at > now) await sleep(at - now);
+}
+
+/**
+ * One JSON-RPC call. A 429, 403 or 5xx moves on to the next endpoint; after a full round of them, a pause
+ * (Retry-After when given). Three rounds and it gives up with "busy". Errors in the answer itself are RpcError.
+ */
 async function rpc<T>(method: string, params: unknown[]): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
+  const urls = endpoints();
+  const tries = urls.length * 3;
+  let unreachable = 0;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const url = urls[attempt % urls.length];
+    const roundEnd = (attempt + 1) % urls.length === 0;
+    await pace(url);
     let res: Response;
     try {
-      res = await fetch(rpcUrl(), {
+      res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
         cache: "no-store",
         signal: AbortSignal.timeout(15_000),
       });
-    } catch (err) {
-      if (attempt < 2) {
-        await sleep(500 * 2 ** attempt);
-        continue;
-      }
-      // Never the URL: a custom one carries its API key.
-      throw new TraceError("upstream", `Solana RPC unreachable (${(err as Error).name})`);
+    } catch {
+      unreachable++;
+      if (roundEnd) await sleep(RPC_TIMING.backoffMs);
+      continue;
     }
-    const limited = res.status === 429 || res.status >= 500;
-    if (limited) {
-      if (attempt < 3) {
+    if (res.status === 429 || res.status === 403 || res.status >= 500) {
+      if (roundEnd) {
         const after = Number(res.headers.get("retry-after"));
-        await sleep(Number.isFinite(after) && after > 0 ? Math.min(after, 5) * 1000 : 700 * 2 ** attempt);
-        continue;
+        const round = Math.floor(attempt / urls.length);
+        await sleep(
+          Number.isFinite(after) && after > 0 ? Math.min(after, 5) * 1000 : RPC_TIMING.backoffMs * 2 ** round,
+        );
       }
-      throw new TraceError("upstream", `Solana RPC responded ${res.status}`);
+      continue;
     }
     const body = (await res.json()) as { result?: T; error?: { code?: number; message?: string } };
     if (body.error) {
-      if (attempt < 3 && /rate|too many/i.test(body.error.message ?? "")) {
-        await sleep(700 * 2 ** attempt);
+      if (/rate|too many/i.test(body.error.message ?? "")) {
+        if (roundEnd) await sleep(RPC_TIMING.backoffMs);
         continue;
       }
       throw new RpcError(body.error.code, `Solana RPC: ${body.error.message ?? "error"}`);
     }
     return body.result as T;
   }
+  // Never the URL: a custom one carries its API key.
+  if (unreachable === tries) throw new TraceError("upstream", "Couldn't reach Solana's RPC. Try again.");
+  throw new TraceError("busy", BUSY);
 }
 
-/** Runs `fn` over `items`, `n` at a time, in order. */
-async function mapLimit<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
+/** Runs `fn` over `items`, `n` at a time, in order; once `stop()` says so, the rest aren't started. */
+async function mapLimit<T, R>(
+  items: T[],
+  n: number,
+  fn: (item: T) => Promise<R>,
+  stop: () => boolean = () => false,
+): Promise<(R | undefined)[]> {
+  const out: (R | undefined)[] = new Array(items.length);
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(n, items.length) }, async () => {
-      while (next < items.length) {
+      while (next < items.length && !stop()) {
         const i = next++;
         out[i] = await fn(items[i]);
       }
@@ -271,18 +319,32 @@ async function signatures(address: string): Promise<{ sigs: Signature[]; complet
 }
 
 /**
+ * Transactions already read, by signature. A transfer is in both wallets' histories, so opening the next wallet
+ * down reads it again: from here, not the RPC. A confirmed transaction never changes.
+ */
+const txCache = new Map<string, ParsedTx>();
+const TX_CACHE_MAX = 5000;
+
+/**
  * One transaction, jsonParsed; null when the RPC can't give it (it's counted as skipped, and the trail goes on
  * without it). A format newer than MAX_TX_VERSION is asked for again in the version the RPC names: jsonParsed
- * reads every version alike.
+ * reads every version alike. "busy" (rate-limited for good) is thrown to the caller, which stops reading.
  */
 export async function getTx(signature: string): Promise<ParsedTx | null> {
+  const cached = txCache.get(signature);
+  if (cached) return cached;
   let version = MAX_TX_VERSION;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await rpc<ParsedTx | null>("getTransaction", [
+      const tx = await rpc<ParsedTx | null>("getTransaction", [
         signature,
         { encoding: "jsonParsed", maxSupportedTransactionVersion: version, commitment: "confirmed" },
       ]);
+      if (tx) {
+        if (txCache.size >= TX_CACHE_MAX) txCache.delete(txCache.keys().next().value!);
+        txCache.set(signature, tx);
+      }
+      return tx;
     } catch (err) {
       if (!(err instanceof RpcError)) throw err;
       const asked = Number(/maxSupportedTransactionVersion\W+(\d+)/.exec(err.message)?.[1]);
@@ -317,7 +379,22 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
   const recent = ok.slice(0, txLimit());
   // Its first transactions, for who funded it: read too when the history is in reach and they aren't recent.
   const oldest = history.complete ? ok.slice(-3).filter((s) => !recent.includes(s)) : [];
-  const txs = await mapLimit([...recent, ...oldest], concurrency(), (s) => getTx(s.signature));
+  // Rate-limited for good halfway: stop asking, and draw what was read.
+  const progress = { limited: false };
+  const txs = await mapLimit(
+    [...recent, ...oldest],
+    concurrency(),
+    (s) =>
+      getTx(s.signature).catch((err) => {
+        if (err instanceof TraceError && err.code === "busy") {
+          progress.limited = true;
+          return undefined;
+        }
+        throw err;
+      }),
+    () => progress.limited,
+  );
+  if (progress.limited && txs.every((tx) => !tx)) throw new TraceError("busy", BUSY);
 
   const read = txs
     .filter((tx): tx is ParsedTx => !!tx && !tx.meta?.err)
@@ -350,11 +427,13 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
     funder: funder && labelFlows([funder], label)[0],
     ...summarize(legs, label, (tx) => swapTxs.has(tx)),
     scanned: {
-      txs: recent.length,
+      // Cut short by the rate limit: only what was read counts.
+      txs: progress.limited ? txs.slice(0, recent.length).filter((tx) => tx !== undefined).length : recent.length,
       from: times.length ? Math.min(...times) : null,
       to: times.length ? Math.max(...times) : null,
-      complete: history.complete && ok.length <= recent.length,
-      skipped: txs.filter((tx) => !tx).length,
+      complete: !progress.limited && history.complete && ok.length <= recent.length,
+      skipped: txs.filter((tx) => tx === null).length,
+      ...(progress.limited ? { limited: true } : {}),
     },
     updatedAt: Date.now(),
   };

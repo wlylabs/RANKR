@@ -7,6 +7,7 @@ const STATUS: Record<TraceErrorCode, number> = {
   invalid: 400,
   nokey: 501,
   upstream: 502,
+  busy: 503,
   limit: 429,
 };
 
