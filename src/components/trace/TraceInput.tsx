@@ -6,9 +6,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { parseWallet, traceHref } from "@/lib/trace/chains";
 
+/** With a mouse, the box can take focus for free; on a phone, focusing it pops the keyboard up over the page. */
+const withMouse = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
 /**
  * The wallet box: paste an address or an explorer link, and its trail opens. Empty, Trace pastes what's on the
- * clipboard and goes, like Paste on the CA box.
+ * clipboard and goes, like Paste on the CA box. `autoFocus` only with a mouse: on a phone the keyboard stays down
+ * until the box is tapped.
  */
 export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; size?: "md" | "lg" }) {
   const router = useRouter();
@@ -21,7 +25,8 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
 
   useEffect(() => {
     setCanReadClipboard(typeof navigator !== "undefined" && !!navigator.clipboard?.readText);
-  }, []);
+    if (autoFocus && withMouse()) inputRef.current?.focus();
+  }, [autoFocus]);
 
   const go = (raw: string) => {
     const wallet = parseWallet(raw);
@@ -38,14 +43,15 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
       const text = (await navigator.clipboard.readText()).trim();
       if (!text) {
         setError("The clipboard is empty. Copy a wallet address first.");
-        inputRef.current?.focus();
+        if (withMouse()) inputRef.current?.focus();
         return;
       }
       setValue(text);
       go(text);
     } catch {
       // The browser said no to reading the clipboard: paste by hand.
-      inputRef.current?.focus();
+      setError("Couldn't read the clipboard. Tap the box and paste the address.");
+      if (withMouse()) inputRef.current?.focus();
     }
   }
 
@@ -62,7 +68,6 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
       >
         <input
           ref={inputRef}
-          autoFocus={autoFocus}
           value={value}
           onChange={(e) => {
             setValue(e.target.value);

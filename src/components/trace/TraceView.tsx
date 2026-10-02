@@ -14,6 +14,7 @@ import { DecryptText } from "../DecryptText";
 import { CaseFile } from "./CaseFile";
 import { Inspector } from "./Inspector";
 import { FullAddress } from "./TraceCard";
+import { CaseBoot } from "./TraceCinema";
 import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
 import { TraceInput } from "./TraceInput";
@@ -185,6 +186,9 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
             onFollow={follow}
             onPick={pick}
             onRetry={(a) => void load(a)}
+            loading={
+              <CaseBoot caseId={caseId} chainName={chain.id === "solana" ? "Solana" : chain.id} address={address} />
+            }
             header={
               <>
                 <span className="label min-w-0 flex-1 truncate text-subtle">Case #{caseId} · following the money</span>

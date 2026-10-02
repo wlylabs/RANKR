@@ -12,11 +12,21 @@ export function LiveDot() {
 }
 
 /**
- * The top of an app page: the title and a line under it, arriving one after the other.
+ * The top of an app page: the title and a line under it, arriving one after the other, over the page's own
+ * backdrop when it has one (Backdrops.tsx).
  */
-export function PageHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
+export function PageHeader({
+  title,
+  backdrop,
+  children,
+}: {
+  title: ReactNode;
+  backdrop?: ReactNode;
+  children?: ReactNode;
+}) {
   return (
-    <header>
+    <header className={backdrop ? "relative isolate" : undefined}>
+      {backdrop}
       <h1 className="cine-in text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">{title}</h1>
       {children && (
         <p className="cine-in mt-2 max-w-2xl text-sm text-pretty text-muted sm:text-[15px]" style={delay(90)}>

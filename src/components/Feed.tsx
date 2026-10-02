@@ -14,10 +14,11 @@ import { parseFeedKind, parseFeedScope, type FeedKind, type FeedScope } from "@/
 import { accountsAvailable } from "@/lib/supabase-browser";
 import type { FeedItem } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
+import { SignalField } from "./Backdrops";
 import { Cascade } from "./Cinema";
 import { FeedSentence } from "./FeedLine";
 import { MultipleBadge } from "./MultipleBadge";
-import { PageHeader } from "./PageHeader";
+import { LiveDot, PageHeader } from "./PageHeader";
 import { Segmented, TabBar } from "./Tabs";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton } from "./TokenList";
@@ -27,8 +28,13 @@ const KIND_LABELS: Record<FeedKind, string> = { all: "All", call: "Calls", miles
 
 /** One feed entry: the sentence, the multiple now, and how long ago. */
 export function FeedRow({ item }: { item: FeedItem }) {
+  // A milestone just hit: a band of green light passes over it as it lands.
+  const hit = item.kind === "milestone";
   return (
-    <div className="flex items-start gap-3 px-4 py-3">
+    <div
+      className={clsx("flex items-start gap-3 px-4 py-3", hit && "sweep")}
+      style={hit ? ({ "--sweep": "var(--up)" } as React.CSSProperties) : undefined}
+    >
       <span
         aria-hidden
         className={clsx("mt-[7px] size-1.5 shrink-0 rounded-full", item.kind === "milestone" ? "bg-up" : "bg-border-strong")}
@@ -131,7 +137,19 @@ export function Feed() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <PageHeader title="Feed">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-3">
+            Feed
+            {/* On air: calls come in live. */}
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 font-mono text-[10px] font-normal tracking-[0.2em] text-muted uppercase">
+              <LiveDot />
+              On air
+            </span>
+          </span>
+        }
+        backdrop={<SignalField />}
+      >
         Every call as it lands, and every call that hits 2x, 5x, 10x and up, each from the caller&apos;s own entry.
       </PageHeader>
 
@@ -173,8 +191,10 @@ export function Feed() {
           <button
             type="button"
             onClick={showNew}
-            className="animate-fade-in mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg shadow-float transition-opacity hover:opacity-85"
+            className="animate-fade-in relative mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-fg px-3.5 text-xs font-medium text-bg shadow-float transition-opacity hover:opacity-85"
           >
+            {/* New signal coming in. */}
+            <span aria-hidden className="absolute inset-0 -z-10 animate-ping rounded-full bg-fg/40" />
             <ArrowUp className="size-3.5" />
             {fresh} new
           </button>

@@ -491,6 +491,325 @@ body {
 }
 .trace-stop {
   animation: trace-stop-in 0.55s var(--ease-enter) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* The intro's backdrop: money dripping down the ledger, a packet of light falling down a few of its columns,
+   each on its own clock (after Magic UI's Animated Beam and Aceternity's Tracing Beam, in CSS). */
+@keyframes trail-drip {
+  0% {
+    transform: translateY(-120px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--h, 420px));
+    opacity: 0;
+  }
+}
+.trail-drip {
+  animation: trail-drip var(--t, 4s) cubic-bezier(0.55, 0, 0.75, 0.6) infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Opening a case, while the target is read: a log of what's being done, a line at a time. */
+@keyframes boot-line {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+    filter: blur(4px);
+  }
+}
+.boot-line {
+  animation: boot-line 0.45s var(--ease-enter) backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+.caret {
+  animation: caret 1s steps(1) infinite;
+}
+
+/* Target acquired: the brackets around the target close in on it, once. */
+@keyframes lock-on {
+  from {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+  60% {
+    opacity: 1;
+  }
+}
+.lock-on {
+  animation: lock-on 0.7s var(--ease-emphasized) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Where the trail ends: a stamp coming down on the case file. */
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.9) rotate(-14deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-3deg);
+  }
+}
+.stamp {
+  transform: rotate(-4deg);
+  animation: stamp 0.55s var(--ease-emphasized) backwards;
+  animation-delay: 0.35s;
+}
+
+/* The nav's Trace icon, on its page: a packet drops down the line into the dot, now and then. */
+@keyframes nav-drip {
+  0% {
+    transform: translateY(-7px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  28%,
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.nav-drip circle {
+  animation: nav-drip 4s var(--ease-enter) infinite;
+}
+
+/* ---- Each app page's own cinema (Backdrops.tsx), and the moments that belong to it ---- */
+
+/* Feed: rings of signal going out, one after another. */
+@keyframes signal-ring {
+  from {
+    transform: scale(0.08);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+.signal-ring {
+  animation: signal-ring 3.9s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Leaderboard: spotlights swaying over the stage. */
+@keyframes spot {
+  0%,
+  100% {
+    transform: rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: rotate(calc(var(--r, 0deg) * -0.35));
+  }
+}
+.spot {
+  transform: rotate(var(--r, 0deg));
+  animation: spot 9s ease-in-out infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+/* You: your glyph's cells come in as a scan passes down them, and the scan comes back now and then. */
+@keyframes glyph-cell {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+.glyph-cell {
+  animation: glyph-cell 0.5s var(--ease-enter) backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes id-scan {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  18% {
+    transform: translateY(110px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(110px);
+    opacity: 0;
+  }
+}
+.id-scan {
+  animation: id-scan 7s linear 0.25s infinite;
+}
+
+/* A row that just hit (a milestone, the board's #1): a band of light passes over it once. */
+.sweep {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 1;
+  }
+}
+.sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--sweep, var(--fg)) 14%, transparent) 50%,
+    transparent 80%
+  );
+  animation: sweep 1.3s var(--ease-enter) 0.5s;
+}
+
+/* The board's top three: their rank catches the light once. */
+@keyframes rank-shine {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+.rank-shine {
+  color: transparent;
+  background: linear-gradient(100deg, var(--fg) 35%, var(--subtle) 50%, var(--fg) 65%) 0 0 / 300% 100%;
+  background-clip: text;
+  animation: rank-shine 1.6s var(--ease-enter) 0.4s backwards;
+}
+
+/* Home: a call sealed. Its hash decrypts and a SEALED stamp comes down (.stamp, as at the end of a trail). */
+
+/* The nav's icons, each on its own page, now and then. Home: the door draws itself, lights on. */
+@keyframes nav-door {
+  from {
+    stroke-dashoffset: 26;
+  }
+  30%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+.nav-home path:first-of-type {
+  stroke-dasharray: 26;
+  animation: nav-door 5s var(--ease-enter) infinite;
+}
+/* Feed: the waves go out, inner then outer. */
+@keyframes nav-wave {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  15% {
+    opacity: 0.2;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+.nav-wave path {
+  animation: nav-wave 2.8s ease-in-out infinite;
+}
+.nav-wave path:nth-of-type(2),
+.nav-wave path:nth-of-type(3) {
+  animation-delay: 0.25s;
+}
+/* Leaderboard: the cup is raised. */
+@keyframes nav-raise {
+  0%,
+  30%,
+  100% {
+    transform: none;
+  }
+  8% {
+    transform: translateY(-2px) rotate(-10deg);
+  }
+  16% {
+    transform: translateY(-2px) rotate(8deg);
+  }
+  24% {
+    transform: rotate(-3deg);
+  }
+}
+.nav-raise {
+  transform-origin: 50% 90%;
+  animation: nav-raise 4.5s var(--ease-enter) infinite;
+}
+/* You: the head lifts, as if called. */
+@keyframes nav-you {
+  0%,
+  30%,
+  100% {
+    transform: none;
+  }
+  12% {
+    transform: translateY(-1.5px) scale(1.12);
+  }
+}
+.nav-you circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nav-you 5s var(--ease-enter) infinite;
+}
+
+/* Scrolling down a trail, the camera follows the money: each line between two cards draws itself down as it
+   comes into view, and each card comes up into focus (scroll-driven; elsewhere they simply stand). */
+@keyframes beam-draw {
+  from {
+    transform: scaleY(0);
+  }
+}
+/* A line just followed draws itself down to the new card, which arrives as it lands (.trace-stop's delay). */
+.beam-in {
+  transform-origin: 50% 0;
+  animation: beam-draw 0.45s var(--ease-enter) backwards;
+}
+@keyframes trace-focus {
+  from {
+    opacity: 0.25;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .trace-beam {
+      transform-origin: 50% 0;
+      animation: beam-draw linear both;
+      animation-timeline: view();
+      /* Done by the time it's wholly on screen, so a line at the foot of a page never stays half drawn. */
+      animation-range: entry 10% entry 100%;
+    }
+    .trace-focus {
+      animation: trace-focus linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -508,6 +827,17 @@ body {
   .twinkle,
   .ticker,
   .trace-flow,
+  .trail-drip,
+  .caret,
+  .nav-drip circle,
+  .signal-ring,
+  .spot,
+  .id-scan,
+  .sweep::after,
+  .nav-home path,
+  .nav-wave path,
+  .nav-raise,
+  .nav-you circle,
   .skeleton {
     animation: none !important;
   }

@@ -47,9 +47,19 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
+- **Cinema, page by page.** Each tab of the app has its own backdrop and moments, about what it is (Backdrops.tsx,
+  globals.css; CSS only, still with reduced motion). **Home**: the landing's hash field behind the paste box
+  (entries are SHA-256 sealed), and a call sealed gets a **SEALED** stamp as its hash decrypts. **Feed**: **On air**
+  next to the title, rings of signal going out behind it, a band of green light over a milestone as it lands, and a
+  ripple on the "N new" button. **Trace**: below. **Leaderboard**: two spotlights swaying over the stage, the top
+  three ranks catching the light and a band of light over #1 as the board comes in. **You**: your own glyph, large
+  and faint behind the page's top, its cells coming in under a scan; your rank on the caller board climbs to its
+  place from the foot of the board. In the bottom nav, each icon moves now and then on its own page: Home's door
+  draws itself, Feed's waves go out, Trace drops money down its line, Leaderboard raises the cup, You lifts its head.
 - **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
   Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and its trail opens at `/trace/<chain>/<address>`;
-  with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. The trail is
+  with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. On a phone the
+  box isn't focused when the page opens, so the keyboard stays down until you tap it. The trail is
   one line of cards, top to bottom, the way the share image draws it: who funded the wallet (its first money,
   **1ST**), the wallet, and the wallets its money went through, each arrow between two cards carrying what moved
   and when, with the money running down it. **Follow the money** under the last card reads that wallet and goes a
@@ -64,6 +74,14 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   lives) are left out. Every wallet gets a matrix glyph from its address (like the avatars), addresses decrypt
   into place, the line sits on a dotted ledger; flagged addresses are drawn in red. The example on `/trace` is a
   made-up trail to try it on.
+  It moves like the rest of Rankr, in its own key (after Aceternity's Tracing Beam and Magic UI's Animated Beam,
+  written in CSS): behind the intro, money drips down a few columns of the ledger; while a wallet is read, the case
+  opens as a log, a line at a time ("Case #0317aa0d · Solana", "Target …", "Reading its newest transactions"…);
+  the trail then comes in top to bottom, a card at a time, and brackets close in on the target; scrolling down, each
+  line draws itself as it comes into view and each card comes up into focus (scroll-driven, Chrome and Safari 26+);
+  a wallet followed has its line draw down to it before it lands; where the trail ends, a **TRAIL ENDS · EXCHANGE**
+  (or MIXER, in red) stamp comes down; and on its page, the nav's Trace icon drops a packet into its dot now and
+  then. With reduced motion, all of it stands still.
   Under the path: the card you tapped in full (whole address, label and its source, what moved, links to the
   transaction and the explorer, and **Trace from here**), and the **case file**: who the wallet is, who funded it,
   money in and out, where the money ended up (exchanges, bridges, mixers, with the hop they were reached at), what

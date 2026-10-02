@@ -10,7 +10,7 @@ import { monthLabel, nextResetAt, resetDay, untilLabel } from "@/lib/season";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
 import { CallerRateRow } from "./CallersBoard";
-import { Cascade } from "./Cinema";
+import { Cascade, HashField } from "./Cinema";
 import { CountUp } from "./CountUp";
 import { FeedRow } from "./Feed";
 import { RankCard } from "./MyCalls";
@@ -29,7 +29,8 @@ export function HomeTop({ hero }: { hero: ReactNode }) {
   const { ready, userId } = useAuth();
   if (ready && !userId) return hero;
   return (
-    <section className="mx-auto max-w-2xl pt-8 pb-10 sm:pt-12 sm:pb-12">
+    <section className="relative isolate mx-auto max-w-2xl pt-8 pb-10 sm:pt-12 sm:pb-12">
+      <HashField />
       <div id="paste">
         <PasteBox resumeFromUrl />
       </div>

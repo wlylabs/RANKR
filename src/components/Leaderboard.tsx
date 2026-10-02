@@ -10,6 +10,7 @@ import { parseCallerSort, parseRange, parseSort, type RangeKey, type SortKey } f
 import { nextResetAt, resetDay, untilLabel } from "@/lib/season";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { CALLER_SORT_LABELS, CallersBoard } from "./CallersBoard";
+import { StageLights } from "./Backdrops";
 import { Cascade } from "./Cinema";
 import { LastMonth } from "./LastMonth";
 import { PageHeader } from "./PageHeader";
@@ -97,7 +98,9 @@ export function Leaderboard() {
 
   return (
     <div className="pt-10 sm:pt-14">
-      <PageHeader title="Leaderboard">{DESCRIPTIONS[month][board]}</PageHeader>
+      <PageHeader title="Leaderboard" backdrop={<StageLights />}>
+        {DESCRIPTIONS[month][board]}
+      </PageHeader>
 
       {accountsAvailable && (
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
