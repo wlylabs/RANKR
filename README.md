@@ -72,7 +72,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   on the case file (DEX pools are no one to follow). Dust under $1 and tokens with no price (where airdropped spam
   lives) are left out. Every wallet gets a matrix glyph from its address (like the avatars), addresses decrypt
   into place, the line sits on a dotted ledger; flagged addresses are drawn in red. The example on `/trace` is a
-  made-up trail to try it on.
+  made-up trail to try it on. A trail link that isn't one (a chain Trace doesn't read, or not a wallet) opens
+  **No trail here**, still on the Trace tab, with the box to paste the wallet again (not a bare 404).
   It moves like the rest of Rankr, in its own key (after Aceternity's Tracing Beam and Magic UI's Animated Beam,
   written in CSS): behind the intro, money drips down a few columns of the ledger; while a wallet is read, the case
   opens as a log, a line at a time ("Case #0317aa0d · Solana", "Target …", "Reading its newest transactions"…);
@@ -160,7 +161,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   bottom on phones and a dialog from sm up.
 - **Settings menu** (the gear in the header): theme (switching cross-fades the page), milestone alerts, About
   Rankr (the landing page) or Open app, Install app and the app link. It keeps pages free of app buttons.
-- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, leaderboard, my calls) and an
+- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, feed, trace, leaderboard) and an
   offline page (next section).
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme.
 

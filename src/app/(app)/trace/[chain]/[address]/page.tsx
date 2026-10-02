@@ -15,8 +15,12 @@ function decode(value: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { address } = await params;
-  const short = shortAddress(decode(address));
+  const { chain, address: raw } = await params;
+  const address = decode(raw).trim();
+  const meta = traceChain(chain);
+  // The page shows not-found.tsx for these, under the same title.
+  if (!meta || !validWallet(meta, address)) return { title: "No trail here" };
+  const short = shortAddress(address);
   return {
     title: `Trace ${short}`,
     description: `Where ${short}'s money came from and where it went, hop by hop, on Rankr.`,
