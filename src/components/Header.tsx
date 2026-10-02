@@ -184,18 +184,6 @@ export function Header() {
   );
 }
 
-/**
- * What each nav icon does on its own page, now and then (globals.css): Home's door draws itself (lights on),
- * Feed's waves go out, Trace drops money down its line into the dot, Leaderboard raises the cup, You lifts its head.
- */
-const NAV_MOTION: Record<string, string> = {
-  [APP_HOME]: "nav-home",
-  "/feed": "nav-wave",
-  "/trace": "nav-drip",
-  "/leaderboard": "nav-raise",
-  "/me": "nav-you",
-};
-
 export function BottomNav() {
   const pathname = usePathname();
   return (
@@ -225,10 +213,7 @@ export function BottomNav() {
                     active ? "opacity-100" : "scale-x-50 opacity-0",
                   )}
                 />
-                <Icon
-                  className={clsx("relative size-[18px]", active && NAV_MOTION[href])}
-                  strokeWidth={active ? 2.2 : 1.7}
-                />
+                <Icon className="relative size-[18px]" strokeWidth={active ? 2.2 : 1.7} />
               </span>
               {label}
             </Link>

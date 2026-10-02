@@ -54,8 +54,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   ripple on the "N new" button. **Trace**: below. **Leaderboard**: two spotlights swaying over the stage, the top
   three ranks catching the light and a band of light over #1 as the board comes in. **You**: your own glyph, large
   and faint behind the page's top, its cells coming in under a scan; your rank on the caller board climbs to its
-  place from the foot of the board. In the bottom nav, each icon moves now and then on its own page: Home's door
-  draws itself, Feed's waves go out, Trace drops money down its line, Leaderboard raises the cup, You lifts its head.
+  place from the foot of the board. The nav itself stays still: its icons don't move.
 - **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
   Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and its trail opens at `/trace/<chain>/<address>`;
   with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. On a phone the
@@ -80,8 +79,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   the trail then comes in top to bottom, a card at a time, and brackets close in on the target; scrolling down, each
   line draws itself as it comes into view and each card comes up into focus (scroll-driven, Chrome and Safari 26+);
   a wallet followed has its line draw down to it before it lands; where the trail ends, a **TRAIL ENDS · EXCHANGE**
-  (or MIXER, in red) stamp comes down; and on its page, the nav's Trace icon drops a packet into its dot now and
-  then. With reduced motion, all of it stands still.
+  (or MIXER, in red) stamp comes down. With reduced motion, all of it stands still.
   Under the path: the card you tapped in full (whole address, label and its source, what moved, links to the
   transaction and the explorer, and **Trace from here**), and the **case file**: who the wallet is, who funded it,
   money in and out, where the money ended up (exchanges, bridges, mixers, with the hop they were reached at), what
