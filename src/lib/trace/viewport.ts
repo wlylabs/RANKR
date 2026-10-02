@@ -22,12 +22,20 @@ export function zoomAt(v: View, factor: number, cx: number, cy: number): View {
   return { k, x: cx - (cx - v.x) * f, y: cy - (cy - v.y) * f };
 }
 
-/** The whole tree in the frame, centered, never bigger than life. */
-export function fitView(content: Size, frame: Size, margin = MARGIN): View {
-  const k = clampK(
-    Math.min(1, (frame.width - 2 * margin) / content.width, (frame.height - 2 * margin) / content.height),
-  );
-  return { k, x: (frame.width - content.width * k) / 2, y: (frame.height - content.height * k) / 2 };
+/** Parts of the frame covered by something drawn over it (the buttons, the strip along the bottom). */
+export type Insets = { top: number; right: number; bottom: number; left: number };
+const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/** The whole tree in the frame (less what covers it), centered, never bigger than life. */
+export function fitView(content: Size, frame: Size, margin = MARGIN, insets: Insets = NO_INSETS): View {
+  const width = frame.width - insets.left - insets.right - 2 * margin;
+  const height = frame.height - insets.top - insets.bottom - 2 * margin;
+  const k = clampK(Math.min(1, width / content.width, height / content.height));
+  return {
+    k,
+    x: insets.left + margin + (width - content.width * k) / 2,
+    y: insets.top + margin + (height - content.height * k) / 2,
+  };
 }
 
 /**

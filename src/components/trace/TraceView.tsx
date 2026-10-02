@@ -174,7 +174,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
             title={
               <span className="flex items-baseline gap-2">
                 <span className="font-mono text-sm">{root?.label?.name ?? shortAddress(address)}</span>
-                <span className="label text-subtle">Case #{caseId}</span>
+                <span className="label hidden text-subtle sm:inline">Case #{caseId}</span>
               </span>
             }
             footer={

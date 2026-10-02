@@ -56,9 +56,12 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   its row into one **+N others** card (tap to unfold), so the tree only widens along the trail you follow and
   stays narrow enough for a phone. The tree sits in a frame that works like a map: drag to move it, pinch (or
   Ctrl / ⌘ + scroll, or a trackpad pinch) to zoom, sideways scroll to pan, and buttons to zoom, fit the whole
-  trail, go back to the target and go **fullscreen** (the picked wallet in a strip along the bottom, its details
-  a tap away; Esc or ✕ to leave). The card you tapped stays put while the tree reshapes around it, and what it
-  opened slides into view. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
+  trail, go back to the target and go **fullscreen**. Fullscreen fits the whole trail to the screen and keeps it
+  fitted as wallets open and fold, so there's nothing to zoom; zooming or dragging it yourself stops that until
+  you press Fit again. Zoomed out that far (a whole trail on a phone), each card turns to a compact face, its
+  glyph and name, with type sized to stay readable. The picked wallet sits in a strip along the bottom, its
+  details a tap away; Esc or ✕ leaves, back to the view the page had. Outside fullscreen, the card you tapped
+  stays put while the tree reshapes around it, and what it opened slides into view. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
   already higher up its branch isn't opened again (the money went round). Trades aren't followed: a transaction
   where the wallet sends one asset and gets another back is a swap, summed on a **Swaps** card (DEX pools are no
   one to follow). Dust under $1 and tokens with no price (where airdropped spam lives) are left out. Every

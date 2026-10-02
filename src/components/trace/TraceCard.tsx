@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { Repeat, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { formatAmount, formatUsd, shortAddress } from "@/lib/format";
 import { DANGER } from "@/lib/trace/kinds";
 import { NODE_H, NODE_W, type Placed } from "@/lib/trace/tree";
@@ -110,6 +110,25 @@ function FlowLine({ placed }: { placed: Placed }) {
   );
 }
 
+/** "7xKX…": short enough for a card's compact face at a phone's fit (its glyph tells wallets apart). */
+const tiny = (address: string) => (address.length > 6 ? `${address.slice(0, 4)}…` : address);
+
+/**
+ * A card's two faces: the full one (address, label, amounts), and a compact one for when the tree is zoomed out
+ * too far to read the full one (fullscreen fits the whole trail to a phone). CSS cross-fades them by the zoom,
+ * and sizes the compact face's type against it, so it stays readable on screen.
+ */
+function Faces({ full, mini, className }: { full: ReactNode; mini: ReactNode; className?: string }) {
+  return (
+    <>
+      <span className={clsx("trace-full flex h-full flex-col justify-center px-3", className)}>{full}</span>
+      <span className="trace-mini" aria-hidden>
+        {mini}
+      </span>
+    </>
+  );
+}
+
 type CardProps = {
   placed: Placed;
   selected: boolean;
@@ -132,51 +151,66 @@ export function TraceCard({ placed, selected, root, onPress, onRetry }: CardProp
 
   if (item.type === "pending") {
     return (
-      <div
-        {...at}
-        className={clsx(base, "skeleton flex flex-col justify-center gap-1 border border-border px-3")}
-        role="status"
-      >
-        <span className="font-mono text-[12px] text-muted">
-          <Scramble />
-        </span>
-        <span className="label text-subtle">Reading chain…</span>
+      <div {...at} className={clsx(base, "skeleton border border-border")} role="status">
+        <Faces
+          className="gap-1"
+          full={
+            <>
+              <span className="font-mono text-[12px] text-muted">
+                <Scramble />
+              </span>
+              <span className="label text-subtle">Reading chain…</span>
+            </>
+          }
+          mini={
+            <span className="text-muted">
+              <Scramble length={3} />
+            </span>
+          }
+        />
       </div>
     );
   }
   if (item.type === "error") {
     return (
-      <div
-        {...at}
-        className={clsx(base, "flex flex-col justify-center gap-1 border border-dashed border-down/50 px-3")}
-      >
-        <span className="truncate text-[12px] text-down">{item.error ?? "Couldn't read this wallet"}</span>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="inline-flex w-fit items-center gap-1 font-mono text-[11px] text-muted hover:text-fg"
-        >
-          <RotateCcw className="size-3" /> Try again
-        </button>
+      <div {...at} className={clsx(base, "border border-dashed border-down/50")}>
+        <Faces
+          className="gap-1"
+          full={
+            <>
+              <span className="truncate text-[12px] text-down">{item.error ?? "Couldn't read this wallet"}</span>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex w-fit items-center gap-1 font-mono text-[11px] text-muted hover:text-fg"
+              >
+                <RotateCcw className="size-3" /> Try again
+              </button>
+            </>
+          }
+          mini={<span className="text-down">! error</span>}
+        />
       </div>
     );
   }
   if (item.type === "swaps") {
     return (
-      <div
-        {...at}
-        className={clsx(
-          base,
-          "flex flex-col justify-center gap-0.5 border border-dashed border-border-strong bg-bg/80 px-3",
-        )}
-      >
-        <span className="flex items-center gap-1.5 text-[13px] font-medium">
-          <Repeat className="size-3.5 text-muted" /> Swaps
-        </span>
-        <span className="tabular font-mono text-[11px] text-muted">
-          {item.swaps!.txs} trades{item.swaps!.usd !== null && <> · {formatUsd(item.swaps!.usd)}</>}
-        </span>
-        <span className="label text-subtle">On DEXes, not followed</span>
+      <div {...at} className={clsx(base, "border border-dashed border-border-strong bg-bg/80")}>
+        <Faces
+          className="gap-0.5"
+          full={
+            <>
+              <span className="flex items-center gap-1.5 text-[13px] font-medium">
+                <Repeat className="size-3.5 text-muted" /> Swaps
+              </span>
+              <span className="tabular font-mono text-[11px] text-muted">
+                {item.swaps!.txs} trades{item.swaps!.usd !== null && <> · {formatUsd(item.swaps!.usd)}</>}
+              </span>
+              <span className="label text-subtle">On DEXes, not followed</span>
+            </>
+          }
+          mini={<span className="text-muted">⇄ {item.swaps!.txs}</span>}
+        />
       </div>
     );
   }
@@ -186,15 +220,20 @@ export function TraceCard({ placed, selected, root, onPress, onRetry }: CardProp
         type="button"
         {...at}
         onClick={() => onPress(placed)}
-        className={clsx(
-          base,
-          "flex flex-col justify-center gap-0.5 border border-dashed border-border px-3 transition-colors hover:border-fg",
-        )}
+        className={clsx(base, "border border-dashed border-border transition-colors hover:border-fg")}
       >
-        <span className="font-mono text-[13px]">
-          +{item.count} {item.count === 1 ? "other" : "others"}
-        </span>
-        <span className="label text-subtle">Folded · tap to show</span>
+        <Faces
+          className="gap-0.5"
+          full={
+            <>
+              <span className="font-mono text-[13px]">
+                +{item.count} {item.count === 1 ? "other" : "others"}
+              </span>
+              <span className="label text-subtle">Folded · tap to show</span>
+            </>
+          }
+          mini={<span>+{item.count}</span>}
+        />
       </button>
     );
   }
@@ -207,12 +246,20 @@ export function TraceCard({ placed, selected, root, onPress, onRetry }: CardProp
         onClick={item.expandable ? () => onPress(placed) : undefined}
         className={clsx(
           base,
-          "flex flex-col justify-center gap-0.5 border border-dashed border-border px-3",
+          "border border-dashed border-border",
           item.expandable && "transition-colors hover:border-fg",
         )}
       >
-        <span className="font-mono text-[13px]">+{item.count} more</span>
-        <span className="label text-subtle">{item.expandable ? "Show all" : "Smaller, not shown"}</span>
+        <Faces
+          className="gap-0.5"
+          full={
+            <>
+              <span className="font-mono text-[13px]">+{item.count} more</span>
+              <span className="label text-subtle">{item.expandable ? "Show all" : "Smaller, not shown"}</span>
+            </>
+          }
+          mini={<span className="text-muted">+{item.count}</span>}
+        />
       </Tag>
     );
   }
@@ -230,7 +277,7 @@ export function TraceCard({ placed, selected, root, onPress, onRetry }: CardProp
       aria-label={`${label?.name ?? shortAddress(item.address!)}${item.expandable ? (open ? ", close" : ", open") : ""}`}
       className={clsx(
         base,
-        "group flex flex-col justify-center gap-[3px] border px-3 transition-[border-color,box-shadow]",
+        "group border transition-[border-color,box-shadow]",
         isRoot
           ? "border-fg bg-fg text-bg shadow-float"
           : clsx(
@@ -245,40 +292,64 @@ export function TraceCard({ placed, selected, root, onPress, onRetry }: CardProp
         selected && "ring-1 ring-fg ring-offset-2 ring-offset-bg",
       )}
     >
-      <span className="flex min-w-0 items-center gap-2">
-        <Avatar userId={item.address!} size={20} className={clsx("rounded-[5px]", isRoot && "bg-bg/15 text-bg")} />
-        <DecryptText
-          text={shortAddress(item.address!)}
-          className="min-w-0 truncate font-mono text-[12.5px] tracking-tight"
-          duration={700}
-        />
-        {item.funder && (
-          <span
-            className="ml-auto shrink-0 rounded-[3px] border border-current px-1 font-mono text-[8.5px] leading-[14px] tracking-widest text-muted"
-            title="Its first money came from here"
-          >
-            1ST
-          </span>
-        )}
-      </span>
-      <span className={clsx("min-w-0 text-[12px]", isRoot ? "text-bg/70" : "text-muted")}>
-        {label ? (
-          <LabelTag label={label} />
-        ) : item.loop ? (
-          <span className="font-mono text-[11px]">↺ already on this trail</span>
-        ) : (
-          <span className="font-mono text-[11px] text-subtle">{isRoot ? "Target · holds" : "Wallet"}</span>
-        )}
-      </span>
-      {isRoot ? (
-        <span className="tabular truncate font-mono text-[11px] text-bg/70">
-          {root?.balance ? `${formatAmount(root.balance.amount)} ${root.balance.symbol}` : <Scramble length={8} />}
-          {root?.balance?.usd != null && <> · {formatUsd(root.balance.usd)}</>}
-        </span>
-      ) : (
-        <FlowLine placed={placed} />
-      )}
-      {!isRoot && <Joint placed={placed} open={open} />}
+      <Faces
+        className="gap-[3px]"
+        full={
+          <>
+            <span className="flex min-w-0 items-center gap-2">
+              <Avatar
+                userId={item.address!}
+                size={20}
+                className={clsx("rounded-[5px]", isRoot && "bg-bg/15 text-bg")}
+              />
+              <DecryptText
+                text={shortAddress(item.address!)}
+                className="min-w-0 truncate font-mono text-[12.5px] tracking-tight"
+                duration={700}
+              />
+              {item.funder && (
+                <span
+                  className="ml-auto shrink-0 rounded-[3px] border border-current px-1 font-mono text-[8.5px] leading-[14px] tracking-widest text-muted"
+                  title="Its first money came from here"
+                >
+                  1ST
+                </span>
+              )}
+            </span>
+            <span className={clsx("min-w-0 text-[12px]", isRoot ? "text-bg/70" : "text-muted")}>
+              {label ? (
+                <LabelTag label={label} />
+              ) : item.loop ? (
+                <span className="font-mono text-[11px]">↺ already on this trail</span>
+              ) : (
+                <span className="font-mono text-[11px] text-subtle">{isRoot ? "Target · holds" : "Wallet"}</span>
+              )}
+            </span>
+            {isRoot ? (
+              <span className="tabular truncate font-mono text-[11px] text-bg/70">
+                {root?.balance ? (
+                  `${formatAmount(root.balance.amount)} ${root.balance.symbol}`
+                ) : (
+                  <Scramble length={8} />
+                )}
+                {root?.balance?.usd != null && <> · {formatUsd(root.balance.usd)}</>}
+              </span>
+            ) : (
+              <FlowLine placed={placed} />
+            )}
+            {!isRoot && <Joint placed={placed} open={open} />}
+          </>
+        }
+        mini={
+          <>
+            <Avatar userId={item.address!} size={14} className={clsx("rounded-[3px]", isRoot && "bg-bg/15 text-bg")} />
+            <span className={clsx("mini-text", danger && "text-down")}>
+              {item.loop ? "↺ " : ""}
+              {label?.name ?? tiny(item.address!)}
+            </span>
+          </>
+        }
+      />
     </button>
   );
 }

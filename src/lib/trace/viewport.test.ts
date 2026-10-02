@@ -20,6 +20,14 @@ describe("viewport", () => {
     expect(fitView({ width: 100, height: 100 }, phone).k).toBe(1);
   });
 
+  it("fits in what the buttons and the bottom strip leave free", () => {
+    const v = fitView({ width: 1000, height: 400 }, phone, 20, { top: 0, right: 56, bottom: 80, left: 0 });
+    expect(v.k).toBeCloseTo((360 - 56 - 40) / 1000);
+    // Centered between the left edge and the buttons, and above the strip.
+    expect(v.x + (1000 * v.k) / 2).toBeCloseTo((360 - 56) / 2);
+    expect(v.y + (400 * v.k) / 2).toBeCloseTo((520 - 80) / 2);
+  });
+
   it("opens on the target, about two and a half cards across a phone", () => {
     const v = startView({ width: 1200, height: 420 }, phone, { x: 600, y: 210 });
     expect(v.k).toBeCloseTo(360 / 520);

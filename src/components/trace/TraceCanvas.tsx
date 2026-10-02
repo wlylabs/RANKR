@@ -1,8 +1,8 @@
 "use client";
 
 import clsx from "clsx";
-import { LocateFixed, Maximize2, Minimize2, Minus, Plus, Scan, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { LocateFixed, Maximize2, Minus, Plus, Scan, X } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { NODE_H, NODE_W, rowLabel, strokeFor, type Edge, type Layout, type Placed } from "@/lib/trace/tree";
 import { bound, fitView, reveal, startView, zoomAt, type Box, type Size, type View } from "@/lib/trace/viewport";
@@ -59,14 +59,29 @@ type Props = {
   className?: string;
 };
 
-function Control({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+function Control({
+  label,
+  onClick,
+  pressed,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  /** A switch that's on (fit to screen, kept). */
+  pressed?: boolean;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
+      aria-pressed={pressed}
       title={label}
-      className="grid size-9 place-items-center text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+      className={clsx(
+        "grid size-9 place-items-center transition-colors hover:bg-surface-2 hover:text-fg",
+        pressed ? "bg-surface-2 text-fg" : "text-muted",
+      )}
     >
       {children}
     </button>
@@ -100,6 +115,12 @@ export function TraceCanvas({
   const latest = useRef({ layout, fullscreen });
   latest.current = { layout, fullscreen };
   const glide = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Fullscreen fits the whole trail to the screen and keeps it fitted as it changes ("auto"), until you zoom or
+  // drag it yourself; Fit turns that back on. Leaving fullscreen puts the page's view back as it was.
+  const auto = useRef(false);
+  const [autoOn, setAutoOn] = useState(false);
+  const inlineView = useRef<View | null>(null);
+  const wasFullscreen = useRef(fullscreen);
 
   /** Moves the camera: three variables on the frame, nothing re-rendered. */
   const apply = useCallback((v: View, animate = false) => {
@@ -118,6 +139,18 @@ export function TraceCanvas({
 
   const content = (l: Layout): Size => ({ width: l.width, height: l.height });
   const insets = () => ({ top: 0, bottom: latest.current.fullscreen ? (footerRef.current?.offsetHeight ?? 0) : 0 });
+  /** The whole trail in what the strip along the bottom leaves free. */
+  const fitted = useCallback(
+    // Reads only refs (the strip's height), so it never changes.
+    (l: Layout, s: Size) => fitView(content(l), s, undefined, { right: 0, left: 0, ...insets() }),
+    [],
+  );
+  /** You moved or zoomed it yourself: it stops refitting. */
+  const manual = useCallback(() => {
+    if (!auto.current) return;
+    auto.current = false;
+    setAutoOn(false);
+  }, []);
 
   /** Where it opens, and where "back to the target" goes: the target, at a size cards can be read at. */
   const home = useCallback((l: Layout, s: Size) => {
@@ -132,6 +165,19 @@ export function TraceCanvas({
     if (!el) return;
     // Going fullscreen moves the frame to a new element: it takes the camera along.
     if (placed.current) apply(view.current);
+    let leaving = false;
+    if (fullscreen !== wasFullscreen.current) {
+      wasFullscreen.current = fullscreen;
+      if (fullscreen) {
+        inlineView.current = view.current;
+        auto.current = true;
+        setAutoOn(true);
+      } else {
+        leaving = true;
+        auto.current = false;
+        setAutoOn(false);
+      }
+    }
     const measure = () => {
       const next = { width: el.clientWidth, height: el.clientHeight };
       if (!next.width || !next.height) return;
@@ -141,6 +187,11 @@ export function TraceCanvas({
       if (!placed.current) {
         placed.current = true;
         apply(home(l, next));
+      } else if (auto.current && latest.current.fullscreen) {
+        apply(fitted(l, next), true);
+      } else if (leaving && inlineView.current) {
+        leaving = false;
+        apply(bound(inlineView.current, content(l), next));
       } else if (prev && (prev.width !== next.width || prev.height !== next.height)) {
         const v = view.current;
         apply(
@@ -156,7 +207,7 @@ export function TraceCanvas({
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [apply, home, fullscreen]);
+  }, [apply, home, fitted, fullscreen]);
 
   // The tree reshaped (a wallet opened, folded, or read): the card last pressed stays where it was on screen,
   // gliding with its cards, and then what it opened comes into view.
@@ -167,6 +218,10 @@ export function TraceCanvas({
     before.current = layout;
     const s = size.current;
     if (!prev || !s || !placed.current || prev === layout) return;
+    if (auto.current && latest.current.fullscreen) {
+      apply(fitted(layout, s), true);
+      return;
+    }
     const was = prev.nodes.find((n) => n.item.id === keep);
     const now = layout.nodes.find((n) => n.item.id === keep);
     let v = view.current;
@@ -177,7 +232,7 @@ export function TraceCanvas({
       v = reveal(v, box, s, now.item.side === "in" ? "bottom" : "top", insets());
     }
     apply(bound(v, content(layout), s), true);
-  }, [layout, keep, apply]);
+  }, [layout, keep, apply, fitted]);
 
   // Drag to pan (a finger or the mouse), pinch to zoom, Ctrl / ⌘ + scroll (and trackpad pinches) to zoom, sideways
   // scroll to pan; in fullscreen any scroll pans. A drag never counts as a tap on the card it started on.
@@ -213,6 +268,7 @@ export function TraceCanvas({
       } else if (points.size === 2) {
         moved = true;
         pinch = two();
+        manual();
       }
     };
     const move = (e: PointerEvent) => {
@@ -229,6 +285,7 @@ export function TraceCanvas({
             /* the pointer is already gone */
           }
           el.classList.add("is-grabbing");
+          manual();
         }
         points.set(e.pointerId, p);
         const v = view.current;
@@ -263,6 +320,7 @@ export function TraceCanvas({
       // On the page, an ordinary scroll scrolls the page.
       if (!zoom && !sideways && !latest.current.fullscreen) return;
       e.preventDefault();
+      manual();
       const unit = e.deltaMode === 1 ? 16 : 1;
       const v = view.current;
       const s = size.current;
@@ -291,7 +349,7 @@ export function TraceCanvas({
       el.removeEventListener("click", click, true);
       el.removeEventListener("wheel", wheel);
     };
-  }, [apply, fullscreen]);
+  }, [apply, manual, fullscreen]);
 
   // Fullscreen: the page behind stays put, and Esc leaves.
   useEffect(() => {
@@ -309,14 +367,40 @@ export function TraceCanvas({
 
   const zoomBy = (factor: number) => {
     const s = size.current;
+    manual();
     if (s) apply(bound(zoomAt(view.current, factor, s.width / 2, s.height / 2), content(layout), s), true);
   };
   const fit = () => {
-    if (size.current) apply(fitView(content(layout), size.current), true);
+    if (fullscreen) {
+      auto.current = true;
+      setAutoOn(true);
+    }
+    if (size.current) apply(fitted(layout, size.current), true);
   };
   const toTarget = () => {
+    manual();
     if (size.current) apply(home(layout, size.current), true);
   };
+  const controls = (
+    <>
+      <Control label="Zoom in" onClick={() => zoomBy(1.25)}>
+        <Plus className="size-4" />
+      </Control>
+      <Control label="Zoom out" onClick={() => zoomBy(0.8)}>
+        <Minus className="size-4" />
+      </Control>
+      <Control
+        label={fullscreen ? "Fit to screen, and keep it fitted" : "Fit the whole trail"}
+        onClick={fit}
+        pressed={fullscreen ? autoOn : undefined}
+      >
+        <Scan className="size-4" />
+      </Control>
+      <Control label="Back to the target" onClick={toTarget}>
+        <LocateFixed className="size-4" />
+      </Control>
+    </>
+  );
 
   // A card reached with Tab comes into view (the frame never scrolls itself: the camera does).
   const onFocus = (e: React.FocusEvent) => {
@@ -336,12 +420,14 @@ export function TraceCanvas({
       aria-label={fullscreen ? "Trail, fullscreen" : undefined}
     >
       {fullscreen && (
-        <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
+        // The buttons sit up here, off the tree, so fitting it to the screen uses all of the screen.
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-4">
           <div className="min-w-0 flex-1 truncate">{title}</div>
+          <div className="flex shrink-0 overflow-hidden rounded-lg">{controls}</div>
           <button
             type="button"
             onClick={() => onFullscreen(false)}
-            className="grid size-8 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
             aria-label="Leave fullscreen"
           >
             <X className="size-4" />
@@ -384,21 +470,24 @@ export function TraceCanvas({
                   <path
                     className="trace-edge"
                     d={d}
-                    // Inline, so it wins over the class: the line glides with its cards where CSS can move a path.
-                    style={{ d: `path("${d}")`, ...(e.tone === "faint" && { strokeDasharray: "0.012 0.014" }) }}
+                    // Inline, so it wins over the class: the line glides with its cards where CSS can move a path,
+                    // and keeps its weight on screen however far the tree is zoomed out.
+                    style={{
+                      d: `path("${d}")`,
+                      strokeWidth: `calc(${w}px / var(--k, 1))`,
+                      ...(e.tone === "faint" && { strokeDasharray: "0.012 0.014" }),
+                    }}
                     pathLength={1}
                     stroke={tone.line}
-                    strokeWidth={w}
                     strokeLinecap="round"
                   />
                   {tone.packets && (
                     <path
                       className="trace-packets"
                       d={d}
-                      style={{ d: `path("${d}")` }}
+                      style={{ d: `path("${d}")`, strokeWidth: `calc(${Math.max(1.5, w)}px / var(--k, 1))` }}
                       stroke={tone.packets}
                       strokeOpacity={e.tone === "plain" ? 0.45 : 0.7}
-                      strokeWidth={Math.max(1.5, w)}
                       strokeLinecap="round"
                     />
                   )}
@@ -434,26 +523,17 @@ export function TraceCanvas({
           ))}
         </div>
 
-        <div
-          data-no-pan
-          className="absolute top-2 right-2 flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-bg/90 shadow-float backdrop-blur-sm"
-        >
-          <Control label="Zoom in" onClick={() => zoomBy(1.25)}>
-            <Plus className="size-4" />
-          </Control>
-          <Control label="Zoom out" onClick={() => zoomBy(0.8)}>
-            <Minus className="size-4" />
-          </Control>
-          <Control label="Fit the whole trail" onClick={fit}>
-            <Scan className="size-4" />
-          </Control>
-          <Control label="Back to the target" onClick={toTarget}>
-            <LocateFixed className="size-4" />
-          </Control>
-          <Control label={fullscreen ? "Leave fullscreen" : "Fullscreen"} onClick={() => onFullscreen(!fullscreen)}>
-            {fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </Control>
-        </div>
+        {!fullscreen && (
+          <div
+            data-no-pan
+            className="absolute top-2 right-2 flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-bg/90 shadow-float backdrop-blur-sm"
+          >
+            {controls}
+            <Control label="Fullscreen" onClick={() => onFullscreen(true)}>
+              <Maximize2 className="size-4" />
+            </Control>
+          </div>
+        )}
 
         {fullscreen && footer && (
           <div ref={footerRef} data-no-pan className="absolute inset-x-0 bottom-0 cursor-auto select-text">
