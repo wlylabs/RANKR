@@ -356,10 +356,11 @@ body {
   animation: twinkle var(--t, 5s) ease-in-out infinite;
   animation-delay: var(--d, 0ms);
 }
+/* Only a fade: a backdrop is as wide as the screen, and scaling it up would make the page wider than the screen
+   for a moment, which on a phone shifts everything pinned to it (the bottom nav dropped on every tap). */
 @keyframes field-in {
   from {
     opacity: 0;
-    transform: scale(1.04);
   }
 }
 .field-in {
