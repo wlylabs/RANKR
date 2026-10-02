@@ -93,10 +93,12 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Call share card**: every call has its own page, `/u/<username>/<chain>/<address>` (who called it, at what
   market cap, and how far it has moved since *their* entry, live), and a card image drawn from it (a 4K PNG,
   3840x2016, `/api/callers/<username>/<chain>/<address>/card`): the caller's avatar and name, the ticker, the
-  multiple lit green or red, entry and market cap now, nothing else. It stays sharp wherever it's shown or saved:
+  multiple in green or red, entry and market cap now, nothing else. It stays sharp wherever it's shown or saved:
   next/og rasterizes at exactly the size it's given (resvg, no pixel ratio), so the card is laid out at 1200x630
-  and scaled up as vectors, text included, before it becomes pixels (~400 KB). The card is the page's link
-  preview on X, Telegram and Discord. **Share**
+  and scaled up as vectors, text included, before it becomes pixels (~300 KB). And it stays clean once posted:
+  X and Telegram re-encode images as JPEG, which breaks soft dark gradients into bands and blocks, so the card
+  is flat fills and vector shapes only, no glow. The card is the page's link preview on X, Telegram and Discord.
+  **Share**
   opens it as it is right now, then: the phone's share sheet with the image itself, a post on X, the link, or the
   image saved (`rankr-<username>-<TICKER>.png`). The words say "I called $PEPE at $80.2K mc. 12.4x since, sealed on
   Rankr." for your own call, and name someone else's by their Rankr name, without an @ (on X that would tag

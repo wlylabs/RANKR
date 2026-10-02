@@ -14,6 +14,9 @@ type Params = { params: Promise<{ username: string; chain: string; address: stri
  *
  * Sharp at 4K: next/og rasterizes at exactly the width it's given (resvg, fitTo width), with no pixel ratio, so
  * the card is laid out at 1200x630 and scaled up as vectors (text is drawn as glyph paths) before it's rasterized.
+ * Clean after it's posted: X and Telegram re-encode images as JPEG (X at roughly 72-82%, 4:2:0), which breaks a
+ * soft dark gradient into bands and blocks. So the card has flat fills and vector shapes only, no glow: the
+ * multiple carries the color.
  */
 export async function GET(_req: Request, { params }: Params) {
   if (!accountsEnabled()) return new Response("Calls need accounts.", { status: 404 });
@@ -29,7 +32,6 @@ export async function GET(_req: Request, { params }: Params) {
   const up = call.multiple > 1.005;
   const down = call.multiple < 0.995;
   const color = up ? OG.up : down ? OG.down : OG.fg;
-  const glow = up ? "rgba(63, 185, 80, 0.16)" : "rgba(248, 81, 73, 0.14)";
 
   return new ImageResponse(
     (
@@ -47,20 +49,6 @@ export async function GET(_req: Request, { params }: Params) {
             fontFamily: "Geist",
           }}
         >
-          {/* The number lights the card in its own color, as on the token page. */}
-          {(up || down) && (
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                backgroundImage: `radial-gradient(circle at 22% 62%, ${glow}, transparent 45%)`,
-              }}
-            />
-          )}
           {/* The caller's matrix, large and faint: the card is theirs. */}
           <div style={{ position: "absolute", right: -70, top: 96, display: "flex", opacity: 0.05 }}>
             <OgAvatar userId={caller.userId} size={500} tile="transparent" />
