@@ -33,12 +33,14 @@ export function mockTokenFacts(chain: TraceChain, address: string, now = Date.no
 
   // Trades: a crowd of wallets, and for a token with warning signs a few wallets trading back and forth.
   const crowd = Array.from({ length: 60 }, (_, i) => at(`wallet/${i}`));
-  const churners = mood === 2 ? crowd.slice(0, 4) : [];
+  const churners = mood === 2 ? [0, 1, 2, 3].map((i) => at(`churner/${i}`)) : [];
   const trades: RawTrade[] = [];
   for (let i = 0; i < 240; i++) {
     const churn = churners.length && i % 2 === 0;
-    const wallet = churn ? churners[i % churners.length] : crowd[Math.floor(r() * crowd.length)];
-    const side = churn ? (Math.floor(i / 2) % 2 ? "sell" : "buy") : r() < 0.55 ? "buy" : "sell";
+    // Each churner in turn, buying then selling the same amount, over and over.
+    const k = i / 2;
+    const wallet = churn ? churners[k % churners.length] : crowd[Math.floor(r() * crowd.length)];
+    const side = churn ? (Math.floor(k / churners.length) % 2 ? "sell" : "buy") : r() < 0.55 ? "buy" : "sell";
     const usd = churn ? 900 : Math.round(20 + r() ** 3 * 4_000);
     trades.push({ wallet, side, usd, amount: churn ? 250_000 : usd * 300, time: now - i * 40_000, tx: at(`tx/${i}`) });
   }
@@ -67,7 +69,7 @@ export function mockTokenFacts(chain: TraceChain, address: string, now = Date.no
       funder: mood === 2 && i >= 1 && i <= 4 ? dev : mood === 1 && i >= 1 && i <= 5 ? funder : at(`f/${i}`),
     }));
 
-  return {
+  const facts: TokenFacts = {
     chain: chain.id,
     address,
     pairs: [pair],
@@ -107,10 +109,30 @@ export function mockTokenFacts(chain: TraceChain, address: string, now = Date.no
     lp: { burnedPct: mood === 2 ? 20 : 100, lockedPct: 0 },
     launch: { reached: true, at: (pair.pairCreatedAt ?? now) + 1_000, buys, creator: dev },
     links,
-    history: chain.kind === "evm" ? { tokens: mood === 2 ? 6 : 0, dead: mood === 2 ? 5 : 0 } : undefined,
+    history:
+      chain.kind === "evm"
+        ? { tokens: mood === 2 ? 6 : 0, dead: mood === 2 ? 5 : 0, clones: mood === 2 ? 4 : 0, deadClones: mood === 2 ? 4 : 0 }
+        : { tokens: mood === 2 ? 7 : 0, dead: mood === 2 ? 6 : 0 },
+    // A token worth a look borrows a bigger one's name.
+    copycat: mood === 1 ? { chain: "ethereum", address: at("original"), symbol, liquidityUsd: 8e6, times: 32 } : null,
     supply,
     creator: dev,
     label: () => null,
     now,
   };
+  // BSC reads no holders list, launch, funders or deployer: what another source counts instead.
+  if (chain.tokensOnly)
+    return {
+      ...facts,
+      holders: null,
+      holderSummary: { count: 2_400, top10Pct: mood === 2 ? 58 : 24, source: "GeckoTerminal" },
+      // No verified ABI to read: what its owner can do isn't known.
+      contract: facts.contract && { ...facts.contract, ...(facts.contract.kind === "evm" && { powers: null }) },
+      lp: undefined,
+      launch: undefined,
+      links: undefined,
+      history: undefined,
+      creator: null,
+    };
+  return facts;
 }

@@ -3,7 +3,10 @@ import type { Pair } from "../dexscreener";
 import {
   assessToken,
   clustersOf,
+  copycatOf,
   launchOf,
+  washOf,
+  washPairs,
   washShare,
   flowOf,
   holdersOf,
@@ -173,6 +176,58 @@ describe("washShare", () => {
   it("goes by dollars, within 10%, when the trades carry no token amounts", () => {
     expect(washShare([w(3, 3, 300, 290)])).toBe(100);
     expect(washShare([w(3, 3, 900, 100)])).toBe(0);
+  });
+});
+
+describe("washPairs and washOf", () => {
+  const t = (wallet: string, side: "buy" | "sell", amount: number, s: number): RawTrade => ({
+    wallet,
+    side,
+    usd: amount / 10,
+    amount,
+    time: NOW + s * 1_000,
+    tx: `${wallet}${side}${s}`,
+  });
+  // A buys as B sells the same amount, a few seconds apart, three times; then the other way round.
+  const pair = [
+    t("A", "buy", 1_000, 0),
+    t("B", "sell", 1_005, 3),
+    t("B", "buy", 2_000, 60),
+    t("A", "sell", 1_990, 62),
+    t("A", "buy", 500, 120),
+    t("B", "sell", 500, 121),
+  ];
+  it("finds two wallets washing between them, ending where they started", () => {
+    expect(washPairs(pair)).toEqual([["A", "B"]]);
+    // Twice isn't enough; nor is a pair that piles up the token between them.
+    expect(washPairs(pair.slice(0, 4))).toEqual([]);
+    expect(washPairs([...pair, t("A", "buy", 5_000, 300)])).toEqual([]);
+  });
+  it("counts their volume, and linked holders as one owner", () => {
+    const crowd = Array.from({ length: 10 }, (_, i) => t(`W${i}`, "buy", 300, 500 + i * 100));
+    const w = washOf([...pair, ...crowd], () => null, (x) => x);
+    expect(w).toMatchObject({ pairs: 1, selves: 0, linked: false });
+    expect(Math.round(w.pct)).toBe(70);
+    // Two holders sharing a funder: their back-and-forth is one owner's wash.
+    const linked = [t("H1", "buy", 1_000, 0), t("H2", "sell", 1_000, 200), t("H2", "buy", 800, 400), t("H1", "sell", 800, 600)];
+    const one = washOf(linked, () => null, (x) => (x === "H2" ? "H1" : x));
+    expect(one).toMatchObject({ selves: 1, linked: true, pct: 100 });
+  });
+});
+
+describe("copycatOf", () => {
+  const big = (chainId: string, address: string, usd: number, created: number) =>
+    pair({ chainId, pairAddress: `${address}-pool`, baseToken: { address, name: "Meme", symbol: "MEME" }, liquidity: { usd }, pairCreatedAt: created });
+  it("finds a bigger, older token by the same symbol, on any chain", () => {
+    const ours = [pair({ liquidity: { usd: 20_000 }, pairCreatedAt: NOW })];
+    expect(copycatOf(ours, [big("base", "0xOriginal", 3_000_000, NOW - 1e9), ...ours])).toMatchObject({
+      chain: "base",
+      address: "0xOriginal",
+      times: 150,
+    });
+    // Not much bigger, or younger than this one: no copy.
+    expect(copycatOf(ours, [big("base", "0xOther", 150_000, NOW - 1e9)])).toBeNull();
+    expect(copycatOf(ours, [big("base", "0xLater", 3_000_000, NOW + 1e9)])).toBeNull();
   });
 });
 
@@ -411,6 +466,40 @@ describe("assessToken", () => {
       text: "The deployer launched 6 other tokens; 4 are dead",
     });
     expect(statusOf(evm({ contract: base, holders: { ...holders([1]), count: 40 } }).checks, "count")).toBe("warn");
+  });
+
+  it("flags a copied name, cloned code, a serial launcher on Solana", () => {
+    const r = assessToken(
+      facts({
+        copycat: { chain: "solana", address: "Orig", symbol: "MEME", liquidityUsd: 5e6, times: 60 },
+        history: { tokens: 5, dead: 4 },
+      }),
+    );
+    expect(r.checks.find((c) => c.id === "copycat")).toMatchObject({ status: "warn", short: "Copies $MEME" });
+    expect(r.checks.find((c) => c.id === "history")).toMatchObject({ status: "bad", source: "Solana RPC" });
+    const evm = assessToken(facts({ chain: "base", history: { tokens: 3, dead: 2, clones: 2, deadClones: 2 } }));
+    expect(evm.checks.find((c) => c.id === "clones")).toMatchObject({
+      status: "bad",
+      text: "Same code as 2 earlier tokens from this deployer, 2 of them dead",
+    });
+  });
+
+  it("on BSC: holders as another source counts them, an owner not renounced", () => {
+    const sim = { honeypot: false, reason: null, buyTax: 0, sellTax: 0, transferTax: 0 };
+    const r = assessToken(
+      facts({
+        chain: "bsc",
+        holders: null,
+        holderSummary: { count: 40, top10Pct: 72, source: "GeckoTerminal" },
+        contract: { kind: "evm", verified: true, proxy: false, scam: false, sim, owner: "0xowner", powers: null },
+      }),
+    );
+    // Its top 10 may count pools in: worth a look, never more.
+    expect(r.checks.find((c) => c.id === "top10")).toMatchObject({ status: "warn", source: "GeckoTerminal" });
+    expect(statusOf(r.checks, "count")).toBe("warn");
+    expect(r.checks.find((c) => c.id === "owner")).toMatchObject({ status: "warn", short: "Owner not renounced" });
+    expect(r.holders).toMatchObject({ rough: true, count: 40, top: [] });
+    expect(r.notes.map((n) => n.text)).toContain("Who funded the holders isn't read on this chain.");
   });
 
   it("thin liquidity is worth a look; no pool is unknown", () => {

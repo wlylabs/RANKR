@@ -32,7 +32,8 @@ export function TraceIntro() {
         <TrailField />
         <PageHeader title="Follow the money">
           Paste a wallet. Rankr draws where its money came from and where it went, top to bottom, down to the exchange
-          it was cashed out at. Solana, Ethereum, Base, Arbitrum, Optimism and Polygon.
+          it was cashed out at. Solana, Ethereum, Base, Arbitrum, Optimism and Polygon. Paste a token&apos;s CA for its
+          report: who&apos;s buying, who&apos;s selling, and the warning signs (BSC too).
         </PageHeader>
         <div className="cine-in max-w-2xl" style={delay(160)}>
           <TraceInput size="lg" autoFocus />

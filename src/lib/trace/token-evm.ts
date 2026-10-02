@@ -18,6 +18,7 @@ import {
   type Page,
 } from "./evm";
 import { ownerOf } from "./evm-rpc";
+import { tokenHolders } from "./gecko";
 import { simulateTrade } from "./honeypot";
 import { labelOf } from "./labels";
 import { mapLimit } from "./solana";
@@ -40,7 +41,7 @@ type ContractInfo = AddressInfo & {
   implementations?: { address?: string | null; address_hash?: string | null }[] | null;
 };
 type AbiItem = { type?: string; name?: string; stateMutability?: string };
-type SmartContract = { abi?: AbiItem[] | null };
+type SmartContract = { abi?: AbiItem[] | null; deployed_bytecode?: string | null };
 type CreatorTx = { created_contract?: AddressParam | null };
 /** A transfer as the Etherscan-compatible API lists it. */
 type Transfer = { blockNumber: string; timeStamp: string; from: string; to: string; value: string; tokenDecimal?: string };
@@ -109,8 +110,7 @@ export function powersOf(abi: AbiItem[]): OwnerPower[] {
 }
 
 /** Its ABI and, behind a proxy, its implementation's: the functions it actually runs. Null when unverified. */
-async function abiOf(chain: TraceChain, info: ContractInfo | null, address: string): Promise<AbiItem[] | null> {
-  const own = await blockscout<SmartContract>(chain, `/smart-contracts/${address}`);
+async function abiOf(chain: TraceChain, info: ContractInfo | null, own: SmartContract | null): Promise<AbiItem[] | null> {
   const impl = info?.implementations?.[0];
   const implAddress = impl?.address_hash ?? impl?.address ?? null;
   const behind = implAddress ? await blockscout<SmartContract>(chain, `/smart-contracts/${implAddress}`) : null;
@@ -169,10 +169,45 @@ async function links(chain: TraceChain, list: RawHolder[], supply: number): Prom
 }
 
 /**
- * The deployer's other tokens (in its newest 50 transactions), and how many have no pool worth $1K anymore. Not
- * read when the deployer is a contract: a launchpad's factory deploys everyone's tokens.
+ * Runtime bytecode without the compiler's metadata at its end (a CBOR blob, its length in the last two bytes):
+ * that part changes with every compile, even of the same source.
  */
-async function history(chain: TraceChain, creator: string, token: string): Promise<TokenFacts["history"]> {
+export function codeOf(bytecode: string | null | undefined): string | null {
+  const hex = bytecode?.replace(/^0x/, "").toLowerCase();
+  if (!hex || hex.length < 8) return null;
+  const meta = parseInt(hex.slice(-4), 16);
+  return meta > 0 && (meta + 2) * 2 < hex.length ? hex.slice(0, -(meta + 2) * 2) : hex;
+}
+
+/** How alike two contracts' code is, 0 to 1: the share of 8-byte runs they share (Jaccard), 1 when equal. */
+export function codeSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  const runs = (h: string) => {
+    const set = new Set<string>();
+    for (let i = 0; i + 16 <= h.length; i += 2) set.add(h.slice(i, i + 16));
+    return set;
+  };
+  const x = runs(a);
+  const y = runs(b);
+  let both = 0;
+  for (const r of x) if (y.has(r)) both++;
+  return both / (x.size + y.size - both || 1);
+}
+
+/** Code this alike is the same contract with other settings (Serial Scammers: clusters reuse their code). */
+const CLONE = 0.9;
+
+/**
+ * The deployer's other tokens (in its newest 50 transactions), how many have no pool worth $1K anymore, and how
+ * many run the same code as this one. Not read when the deployer is a contract: a launchpad's factory deploys
+ * everyone's tokens.
+ */
+async function history(
+  chain: TraceChain,
+  creator: string,
+  token: string,
+  code: string | null,
+): Promise<TokenFacts["history"]> {
   const [who, page] = await Promise.all([
     blockscout<AddressParam>(chain, `/addresses/${creator}`),
     blockscout<Page<CreatorTx>>(chain, `/addresses/${creator}/transactions`),
@@ -189,10 +224,57 @@ async function history(chain: TraceChain, creator: string, token: string): Promi
   const infos = await mapLimit(created, 3, (c) => blockscout<TokenInfo>(chain, `/tokens/${c}`).catch(() => null));
   const tokens = created.filter((_, i) => infos[i]?.type === "ERC-20");
   if (!tokens.length) return { tokens: 0, dead: 0 };
-  const snaps = await fetchSnapshots(tokens.map((address) => ({ chainId: chain.id, address })));
+  const [snaps, codes] = await Promise.all([
+    fetchSnapshots(tokens.map((address) => ({ chainId: chain.id, address }))),
+    code
+      ? mapLimit(tokens, 3, (t) =>
+          blockscout<SmartContract>(chain, `/smart-contracts/${t}`).then((c) => codeOf(c?.deployed_bytecode), () => null),
+        )
+      : Promise.resolve([] as (string | null | undefined)[]),
+  ]);
   const alive = (t: string) =>
     [...snaps.values()].some((s) => sameAddress(s.address, t) && (s.liquidityUsd ?? 0) >= 1_000);
-  return { tokens: tokens.length, dead: tokens.filter((t) => !alive(t)).length };
+  const clones = tokens.filter((_, i) => code && codes[i] && codeSimilarity(code, codes[i]!) >= CLONE);
+  return {
+    tokens: tokens.length,
+    dead: tokens.filter((t) => !alive(t)).length,
+    clones: clones.length,
+    deadClones: clones.filter((t) => !alive(t)).length,
+  };
+}
+
+/**
+ * A token on a chain with no free explorer API (BSC): what Honeypot.is (a test buy and sell, its taxes, open source
+ * or a proxy, its holders), the chain (owner()) and GeckoTerminal (holders and the top 10's share) say. Its
+ * holders list, launch, funders and deployer aren't read.
+ */
+export async function liteTokenFacts(
+  chain: TraceChain,
+  address: string,
+  pairs: Pair[],
+): Promise<Pick<TokenFacts, "contract" | "holderSummary" | "creator">> {
+  const [sim, owner, held] = await Promise.all([
+    simulateTrade(chain.id, address, pairs[0]?.pairAddress),
+    ownerOf(chain.id, address),
+    tokenHolders(chain.id, address).catch(() => null),
+  ]);
+  const count = held?.count ?? sim?.holders ?? null;
+  return {
+    contract: {
+      kind: "evm",
+      verified: sim?.openSource ?? null,
+      proxy: !!sim?.proxy,
+      scam: false,
+      sim,
+      owner,
+      powers: null,
+    },
+    holderSummary:
+      held || count !== null
+        ? { count, top10Pct: held?.top10Pct ?? null, source: held ? "GeckoTerminal" : "Honeypot.is" }
+        : null,
+    creator: null,
+  };
 }
 
 export async function evmTokenFacts(
@@ -230,11 +312,13 @@ export async function evmTokenFacts(
     label: labelOf(chain.id, h.address.hash) ?? blockscoutLabel(h.address),
   }));
 
+  // Its code: the ABI (when verified) for what the owner can do, the bytecode to tell clones.
+  const own = await soft(blockscout<SmartContract>(chain, `/smart-contracts/${address}`));
   const [abi, launch, linked, past] = await Promise.all([
-    info?.is_verified === false ? null : soft(abiOf(chain, info, address)),
+    info?.is_verified === false ? null : soft(abiOf(chain, info, own)),
     best ? soft(evmLaunch(chain, address, best.pairAddress, decimals)) : undefined,
     page && supply > 0 ? soft(links(chain, list, supply)) : null,
-    creator ? soft(history(chain, creator, address)) : undefined,
+    creator ? soft(history(chain, creator, address, codeOf(own?.deployed_bytecode))) : undefined,
   ]);
 
   return {

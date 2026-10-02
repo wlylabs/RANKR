@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Pair } from "../dexscreener";
 import { traceChain } from "./chains";
-import { poolTrades, poolWindows } from "./gecko";
+import { poolTrades, poolWindows, tokenHolders } from "./gecko";
+import { traceWallet } from "./index";
 import { simulateTrade } from "./honeypot";
-import { evmTokenFacts } from "./token-evm";
+import { codeOf, codeSimilarity, evmTokenFacts, liteTokenFacts } from "./token-evm";
 import { base58Decode } from "./solana-pda";
 import type { ParsedTx } from "./solana";
-import { lpMintOf, readLaunch, readMint, solanaTokenFacts, tokenDeltas } from "./token-solana";
+import { lpMintOf, mintsCreated, readLaunch, readMint, solanaTokenFacts, tokenDeltas } from "./token-solana";
 import { traceToken } from "./token";
 
 const MINT = "MemeMint1111111111111111111111111111111111";
@@ -102,6 +103,9 @@ describe("Honeypot.is", () => {
       buyTax: 1,
       sellTax: 4.5,
       transferTax: 0,
+      openSource: null,
+      proxy: null,
+      holders: null,
     });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ simulationSuccess: false })));
     expect(await simulateTrade("ethereum", "0xabc")).toBeNull();
@@ -295,6 +299,9 @@ describe("an EVM token", () => {
   const BUNDLER = "0x5555555555555555555555555555555555555555";
   const SNIPER = "0x6666666666666666666666666666666666666666";
   const OLD = "0x7777777777777777777777777777777777777777";
+  /** The same contract compiled twice: only the metadata at its end differs. */
+  const code = (hash: string) =>
+    `0x${"6080604052".repeat(30)}a2646970667358221220${hash.repeat(32)}64736f6c63430008140033`;
   beforeEach(() => vi.stubEnv("BLOCKSCOUT_API_KEY", "test-key"));
 
   it("reads the contract, the holders, a test sell, the LP, the launch, the owner's powers and the deployer's tokens", async () => {
@@ -348,8 +355,10 @@ describe("an EVM token", () => {
             ],
           });
         }
+        if (path === `/smart-contracts/${OLD}`) return Response.json({ deployed_bytecode: code("bb") });
         if (path === `/smart-contracts/${TOKEN}`)
           return Response.json({
+            deployed_bytecode: code("aa"),
             abi: [
               { type: "function", name: "setTaxes", stateMutability: "nonpayable" },
               { type: "function", name: "openTrading", stateMutability: "nonpayable" },
@@ -382,7 +391,16 @@ describe("an EVM token", () => {
       verified: true,
       proxy: false,
       scam: false,
-      sim: { honeypot: false, reason: null, buyTax: 0, sellTax: 0, transferTax: 0 },
+      sim: {
+        honeypot: false,
+        reason: null,
+        buyTax: 0,
+        sellTax: 0,
+        transferTax: 0,
+        openSource: null,
+        proxy: null,
+        holders: null,
+      },
       owner: DEV,
       // openTrading is a one-way switch, not a pause.
       powers: ["fees"],
@@ -396,8 +414,8 @@ describe("an EVM token", () => {
         { wallet: SNIPER, amount: 30, phase: "sniper" },
       ],
     });
-    // The old token has no pool left: dead.
-    expect(f.history).toEqual({ tokens: 1, dead: 1 });
+    // The old token has no pool left: dead. And it runs the same code: a clone.
+    expect(f.history).toEqual({ tokens: 1, dead: 1, clones: 1, deadClones: 1 });
     expect(f.lp).toEqual({ burnedPct: 60, lockedPct: 30 });
     expect(f.holders?.count).toBe(321);
     expect(f.holders?.list.map((h) => [h.address, h.amount, h.role])).toEqual([
@@ -405,6 +423,80 @@ describe("an EVM token", () => {
       [DEV, 120, "creator"],
       ["0x000000000000000000000000000000000000dEaD", 50, "burn"],
     ]);
+  });
+});
+
+describe("a deployer's other tokens and its code", () => {
+  it("finds the mints a Solana transaction created, inner instructions included", () => {
+    const tx = {
+      meta: {
+        err: null,
+        innerInstructions: [
+          { index: 0, instructions: [{ program: "spl-token", parsed: { type: "initializeMint2", info: { mint: "NewMint" } } }] },
+        ],
+      },
+      transaction: {
+        signatures: ["s"],
+        message: {
+          accountKeys: ["Dev"],
+          instructions: [{ program: "spl-token", parsed: { type: "transfer", info: {} } }],
+        },
+      },
+    } as ParsedTx;
+    expect(mintsCreated(tx)).toEqual(["NewMint"]);
+  });
+
+  it("tells the same contract compiled twice from another one", () => {
+    const body = "6080604052".repeat(40);
+    const meta = (h: string) => `a2646970667358221220${h.repeat(32)}64736f6c63430008140033`;
+    expect(codeOf(`0x${body}${meta("aa")}`)).toBe(body);
+    expect(codeSimilarity(codeOf(`0x${body}${meta("aa")}`)!, codeOf(`0x${body}${meta("bb")}`)!)).toBe(1);
+    expect(codeSimilarity(body, "60016002".repeat(50))).toBeLessThan(0.1);
+  });
+});
+
+describe("BSC", () => {
+  const bsc = traceChain("bsc")!;
+  const TOKEN = "0x1111111111111111111111111111111111111111";
+  it("sends a token's address to its report, and says its wallets can't be traced yet", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        expect(url).toContain("bsc-rpc.publicnode.com");
+        const { params } = JSON.parse(String(init?.body));
+        return params[0].to === TOKEN
+          ? Response.json({ result: `0x${"0".repeat(63)}1` })
+          : Response.json({ error: { message: "execution reverted" } });
+      }),
+    );
+    await expect(traceWallet("bsc", TOKEN)).rejects.toMatchObject({ code: "token" });
+    await expect(traceWallet("bsc", "0x2222222222222222222222222222222222222222")).rejects.toMatchObject({
+      code: "unsupported",
+    });
+  });
+
+  it("reads a BSC token from Honeypot.is, the chain and GeckoTerminal", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("honeypot.is"))
+          return Response.json({
+            simulationSuccess: true,
+            honeypotResult: { isHoneypot: false },
+            simulationResult: { buyTax: 3, sellTax: 3, transferTax: 0 },
+            contractCode: { openSource: true, isProxy: false },
+            token: { totalHolders: 900 },
+          });
+        if (url.includes("publicnode")) return Response.json({ result: `0x${"0".repeat(64)}` });
+        if (url.includes("/networks/bsc/tokens/"))
+          return Response.json({ data: { attributes: { holders: { count: 1234, distribution_percentage: { top_10: "41.5" } } } } });
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+    const f = await liteTokenFacts(bsc, TOKEN, []);
+    expect(f.contract).toMatchObject({ kind: "evm", verified: true, proxy: false, owner: "renounced", powers: null });
+    expect(f.holderSummary).toEqual({ count: 1234, top10Pct: 41.5, source: "GeckoTerminal" });
+    expect(await tokenHolders("bsc", TOKEN)).toEqual({ count: 1234, top10Pct: 41.5 });
   });
 });
 
@@ -434,7 +526,7 @@ describe("traceToken", () => {
   });
 
   it("turns down a chain it doesn't read", async () => {
-    await expect(traceToken("bsc", "0x1111111111111111111111111111111111111111")).rejects.toMatchObject({
+    await expect(traceToken("tron", "0x1111111111111111111111111111111111111111")).rejects.toMatchObject({
       code: "unsupported",
     });
   });

@@ -16,8 +16,8 @@ describe("parseWallet", () => {
       chain: "optimism",
       address: EVM,
     });
-    // BscScan's chain isn't one Blockscout reads: the address goes to Ethereum.
-    expect(parseWallet(`https://bscscan.com/address/${EVM}`)).toEqual({ chain: "ethereum", address: EVM });
+    // BSC: its tokens have reports (its wallets say they can't be traced yet).
+    expect(parseWallet(`https://bscscan.com/address/${EVM}`)).toEqual({ chain: "bsc", address: EVM });
     expect(parseWallet("EQD4FPq-PRDieyQKkizFTRtSDyucUIqrj0v_zXJmqaDp6_0t")).toBeNull();
     expect(parseWallet("hello")).toBeNull();
     expect(traceHref("solana", SOL)).toBe(`/trace/solana/${SOL}`);

@@ -12,8 +12,8 @@ export default function TraceNotFound() {
     <div className="relative isolate space-y-8 pt-8 sm:pt-12">
       <TrailField />
       <PageHeader title="No trail here">
-        That link isn&apos;t a wallet Rankr can trace. Paste a wallet address, or a Solscan, Etherscan, Basescan,
-        Arbiscan, Optimism or Polygonscan link.
+        That link isn&apos;t a wallet or a token Rankr can trace. Paste an address, or a Solscan, Etherscan, Basescan,
+        Arbiscan, Optimism, Polygonscan, BscScan or DexScreener link.
       </PageHeader>
       <div className="cine-in max-w-2xl" style={delay(160)}>
         <TraceInput size="lg" autoFocus />

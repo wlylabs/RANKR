@@ -15,7 +15,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { formatCount, formatUsd, tokenHref } from "@/lib/format";
 import { apiFetch } from "@/lib/supabase-browser";
-import { EVM_TRACE_CHAINS, explorerAddress, traceChain, traceHref, type TraceChain } from "@/lib/trace/chains";
+import {
+  EVM_TRACE_CHAINS,
+  chainLabel,
+  explorerAddress,
+  traceChain,
+  traceHref,
+  type TraceChain,
+} from "@/lib/trace/chains";
 import type {
   TokenCheck,
   TokenCheckStatus,
@@ -57,8 +64,7 @@ function useReport(chain: string, address: string) {
   return { report, error, loading, reload: load };
 }
 
-const chainName = (chain: TraceChain) =>
-  chain.id === "solana" ? "Solana" : chain.id.charAt(0).toUpperCase() + chain.id.slice(1);
+const chainName = chainLabel;
 
 /** "42 min", "3.5h", "1 day". */
 function span(ms: number): string {
@@ -315,9 +321,16 @@ function Holders({ report, chain }: { report: Report; chain: TraceChain }) {
           Holders
         </h2>
         <span className="label text-subtle">
-          Top 10 · {h.top10Pct.toFixed(1)}%{h.count !== null && <> · {formatCount(h.count)} holders</>}
+          {(!h.rough || h.top10Pct > 0) && <>Top 10 · {h.top10Pct.toFixed(1)}%</>}
+          {h.count !== null && <> · {formatCount(h.count)} holders</>}
         </span>
       </div>
+      {h.rough && (
+        <p className="mt-2 text-[12.5px] text-muted">
+          Counted by {h.source}: the list itself isn&apos;t read on {chainName(chain)}, and its top 10 may count pools
+          in.
+        </p>
+      )}
       <ol className="mt-3 space-y-2.5">
         {shown.map((x) => (
           <li key={x.address} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">

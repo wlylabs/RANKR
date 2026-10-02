@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sha256Hex } from "@/lib/sha256";
 import { apiFetch } from "@/lib/supabase-browser";
-import { EVM_TRACE_CHAINS, traceChain, traceHref } from "@/lib/trace/chains";
+import { EVM_WALLET_CHAINS, chainLabel, traceChain, traceHref } from "@/lib/trace/chains";
 import { dataOf, parentId } from "@/lib/trace/tree";
 import type { TraceErrorCode, TraceResponse } from "@/lib/trace/types";
 import { CopyButton } from "../CopyButton";
@@ -133,7 +133,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
         {root?.label && <FullAddress address={address} max={15} className="-mt-1 text-muted" />}
         {chain.kind === "evm" && (
           <nav aria-label="Chain" className="flex flex-wrap gap-1.5">
-            {EVM_TRACE_CHAINS.map((c) => (
+            {EVM_WALLET_CHAINS.map((c) => (
               <Link
                 key={c.id}
                 href={traceHref(c.id, address)}
@@ -175,7 +175,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
             onPick={pick}
             onRetry={(a) => void load(a)}
             loading={
-              <CaseBoot caseId={caseId} chainName={chain.id === "solana" ? "Solana" : chain.id} address={address} />
+              <CaseBoot caseId={caseId} chainName={chainLabel(chain)} address={address} />
             }
             header={
               <>

@@ -3,7 +3,8 @@
 // them, the main pool's LP tokens (burned, locked or in a wallet), its first trades (bundles and snipers), and who
 // first funded the biggest holders (clusters). Each part is read on its own: one that fails is left out, the rest
 // stays. About 20 to 60 calls, paced like a wallet's.
-import type { Pair } from "../dexscreener";
+import { tokenId } from "../address";
+import { fetchSnapshots, type Pair } from "../dexscreener";
 import { TraceError } from "./errors";
 import { labelOf, solanaDex } from "./labels";
 import {
@@ -277,6 +278,50 @@ async function solanaLaunch(mint: string, decimals: number, supply: number, pair
   return readLaunch(txs, mint, decimals, supply, (o) => pools.has(o) || POOL_AUTHORITIES.has(o));
 }
 
+// ---- The deployer's other tokens
+
+/** The deployer's newest transactions read for the tokens it made. */
+const HISTORY_READS = () => (ownRpc() ? 60 : 20);
+
+/**
+ * The mints a transaction initialized (the token program's initializeMint, outer or inner): every launchpad's
+ * create goes through it, pump.fun's included.
+ */
+export function mintsCreated(tx: ParsedTx): string[] {
+  const ixs = [...tx.transaction.message.instructions, ...(tx.meta?.innerInstructions ?? []).flatMap((i) => i.instructions)];
+  const out: string[] = [];
+  for (const ix of ixs) {
+    if (ix.program !== "spl-token" && ix.program !== "spl-token-2022") continue;
+    if (typeof ix.parsed !== "object" || !/^initializeMint2?$/.test(ix.parsed?.type ?? "")) continue;
+    const mint = str(ix.parsed.info?.mint);
+    if (mint) out.push(mint);
+  }
+  return out;
+}
+
+/**
+ * Tokens the deployer made in its newest transactions (that it paid for), and how many of them have no pool
+ * worth $1K anymore (DexScreener): a serial launcher's trail.
+ */
+async function solanaHistory(creator: string, token: string): Promise<TokenFacts["history"]> {
+  const sigs = await rpc<Signature[]>("getSignaturesForAddress", [creator, { limit: HISTORY_READS() }]);
+  const txs = await mapLimit(
+    sigs.filter((s) => !s.err),
+    concurrency(),
+    (s) => getTx(s.signature).catch(() => null),
+  );
+  const mints = new Set<string>();
+  for (const tx of txs) {
+    if (!tx || payerOf(tx) !== creator) continue;
+    for (const m of mintsCreated(tx)) if (m !== token) mints.add(m);
+  }
+  const list = [...mints].slice(0, 30);
+  if (!list.length) return { tokens: 0, dead: 0 };
+  const snaps = await fetchSnapshots(list.map((address) => ({ chainId: "solana", address })));
+  const dead = list.filter((m) => (snaps.get(tokenId("solana", m))?.liquidityUsd ?? 0) < 1_000).length;
+  return { tokens: list.length, dead };
+}
+
 // ---- Who funded the biggest holders
 
 /** Holders whose funder is read: the biggest wallets (pools, burns and exchanges aside). */
@@ -304,7 +349,7 @@ export async function solanaTokenFacts(
   address: string,
   pairs: Pair[],
   deposits: Map<string, string>,
-): Promise<Pick<TokenFacts, "contract" | "holders" | "supply" | "lp" | "launch" | "links">> {
+): Promise<Pick<TokenFacts, "contract" | "holders" | "supply" | "lp" | "launch" | "links" | "history">> {
   const mint = await rpc<{ value: Account<Parsed<MintInfo>> }>("getAccountInfo", [address, { encoding: "jsonParsed" }]);
   const account = mint.value;
   const data = parsedOf(account);
@@ -317,12 +362,15 @@ export async function solanaTokenFacts(
 
   // The public RPC turns getTokenLargestAccounts down for the busiest tokens now and then.
   const list = quiet("holders", holders(address, decimals, pairs, deposits));
-  const [held, mutable, lp, launch, linked] = await Promise.all([
+  const first = quiet("launch", solanaLaunch(address, decimals, supply, pairs));
+  const [held, mutable, lp, launch, linked, history] = await Promise.all([
     list,
     contract.mutableMetadata === undefined ? quiet("metadata", metadataMutable(address)) : contract.mutableMetadata,
     pairs[0] ? solanaLp(pairs[0], address).catch(() => undefined) : undefined,
-    quiet("launch", solanaLaunch(address, decimals, supply, pairs)),
+    first,
     list.then((l) => (l ? quiet("funders", links(l, supply)) : null)),
+    // The deployer is whoever signed its first transaction: known once the launch is read.
+    first.then((l) => (l?.reached && l.creator ? quiet("history", solanaHistory(l.creator, address)) : undefined)),
   ]);
   return {
     contract: { ...contract, mutableMetadata: mutable },
@@ -331,5 +379,6 @@ export async function solanaTokenFacts(
     lp,
     launch,
     links: linked,
+    history: history ?? undefined,
   };
 }

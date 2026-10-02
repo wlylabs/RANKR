@@ -142,6 +142,12 @@ export async function tokenPairs(chainId: string, address: string): Promise<Pair
     .sort((a, b) => pairScore(b) - pairScore(a));
 }
 
+/** Pairs DexScreener finds for a word (a symbol, a name), on every chain, most relevant first. */
+export async function searchPairs(q: string): Promise<Pair[]> {
+  if (MOCK) return [];
+  return (await getJson<{ pairs: Pair[] | null }>(`/latest/dex/search?q=${encodeURIComponent(q)}`)).pairs ?? [];
+}
+
 /** Live snapshots for many tokens, batched per chain. Keyed by tokenId. */
 export async function fetchSnapshots(
   tokens: { chainId: string; address: string }[],

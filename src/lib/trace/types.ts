@@ -200,6 +200,9 @@ export type TokenHolders = {
   top10Pct: number;
   /** In pools and bonding curves. */
   poolPct: number;
+  /** Counted by another source, without the list (BSC: GeckoTerminal): its top 10 may count pools in. */
+  rough?: boolean;
+  source?: string;
 };
 
 export type TokenReport = {

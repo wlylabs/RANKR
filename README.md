@@ -133,7 +133,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
 - **Token report** (on Trace): paste a token's CA (an address, or a DexScreener / pump.fun / explorer link) on
   Trace and the same page, `/trace/<chain>/<address>`, opens its report instead of a trail. The box asks
   DexScreener what the paste is first, so a bare 0x address goes to the chain it trades on and a pool's address
-  (what a DexScreener link carries) to its token; a token on a chain Trace doesn't read (BSC...) says so. The
+  (what a DexScreener link carries) to its token; a token on a chain Trace doesn't read says so. **BSC** has token
+  reports too (not wallet trails: there's no free explorer API to read its wallets from; a BSC wallet says so). The
   report (`src/lib/trace/token*.ts`, `src/components/trace/TokenReport.tsx`) is kept to what helps decide, top to
   bottom:
   - **The verdict, in three levels, and why in a line**: **Warning signs** (a check came out bad), **Worth a
@@ -157,38 +158,51 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   - **Contract**. Solana: mint and freeze authority still on (bad); metadata that can still be changed (its
     Metaplex account, or Token-2022's own; a launchpad's authority, like pump.fun's, doesn't count); Token-2022's
     transfer fee, permanent delegate, transfer hook, non-transferable, frozen by default, pausable. EVM: a test buy
-    and sell (Honeypot.is, Ethereum and Base; elsewhere "couldn't check that it can be sold"), the tax (10%+ bad),
-    what the owner can still do (owner() over a public RPC; renounced is fine, else its verified ABI's functions to
-    mint, block wallets or stop trading are bad, to change the tax or cap sells worth a look), source verified, a
-    proxy, Blockscout's scam flag.
+    and sell (Honeypot.is, Ethereum, Base and BSC; elsewhere "couldn't check that it can be sold"), the tax (10%+
+    bad), what the owner can still do (owner() over a public RPC; renounced is fine, else its verified ABI's
+    functions to mint, block wallets or stop trading are bad, to change the tax or cap sells worth a look; with no
+    ABI to read, an owner not renounced is worth a look), source verified, a proxy, Blockscout's scam flag. Both: a
+    **copycat** (RugCheck's "copycat token"): another token by its symbol, on any chain, that came first and has
+    10× its liquidity ($100K at least), from DexScreener's search.
   - **Liquidity**: thin under $10K or 2% of the market cap; who holds the main pool's LP tokens (burned, locked
     by a locker or a program, or in a wallet: under 50% safe bad, under 95% worth a look), on EVM v2 pools and on
     Solana's Raydium AMM v4, Raydium CPMM and PumpSwap pools (the LP mint read from the pool account, and only
     trusted when the pool's own mints check out). A pump.fun bonding curve has no pool to pull.
   - **Holders**: the top 10 wallets' share (pools, burn addresses and exchanges aside: 30%+ worth a look, 50%+
     bad), the biggest single wallet (10% / 20%), what the deployer holds (5% / 20%), and under 100 holders (EVM).
+    BSC: how many hold it and the top 10's share as GeckoTerminal counts them (or Honeypot.is the count), with no
+    list; its top 10 may count pools in, so it's worth a look at most.
   - **Launch & insiders**: its first trades, when its history reaches back that far (Solana: up to 3,000 of the
     mint's transactions, 10,000 on your own RPC; EVM: the pool's transfers oldest first, through Blockscout's
     Etherscan-compatible API): wallets buying in the launch block are a **bundle** (10%+ of the supply worth a
     look, 30%+ bad), in the 3 blocks after **snipers** (20%+ worth a look), and a deployer that bought at launch
     and kept under a quarter of it **sold**. Then who first funded each of the biggest holders (6, or 10 on your
     own RPC; 8 on EVM): holders sharing a funder are **linked**, likely one owner (15%+ worth a look, 30%+ bad), and
-    holders the deployer funded are its own (3% / 10%). An exchange, bridge or DEX funds no one in particular. On
-    EVM, the deployer's other tokens: 3 or more worth a look, 3 or more dead bad (skipped when the deployer is a
-    launchpad's factory contract).
-  - **Trading** (the main pool's latest trades, up to 300 within 24 hours, wallet by wallet): wash trading
-    (wallets buying and selling the same amount of the token, within 2%, twice or more each way: 25%+ of the
-    volume worth a look, 50%+ bad), 3 wallets doing 60%+ of the buying, many small buys against a few big sells,
-    selling 2:1, and 6+ trades per wallet over 24 hours (bots). Under 20 trades: too few to judge.
+    holders the deployer funded are its own (3% / 10%). An exchange, bridge or DEX funds no one in particular. The
+    deployer's other tokens (EVM: the contracts in its newest 50 transactions, skipped when the deployer is a
+    launchpad's factory contract; Solana: the mints its newest 20 transactions created, 60 on your own RPC, any
+    launchpad's create going through the token program's initializeMint): 3 or more worth a look, 3 or more dead
+    (no pool worth $1K) bad. On EVM, **cloned code**: the deployer's earlier tokens running the same contract
+    (runtime bytecode without the compiler's metadata, 90%+ alike), bad when the clones are dead: "Serial Scammers
+    and Attack of the Clones" (WWW '25) finds a scammer's tokens share their code. Not read on BSC (a note says so).
+  - **Trading** (the main pool's latest trades, up to 300 within 24 hours, wallet by wallet): wash trading, 25%+
+    of the volume worth a look, 50%+ bad, made of wallets buying and selling the same amount of the token (within
+    2%, twice or more each way), **linked** holders (sharing a funder) counted as one owner, and **pairs** of
+    wallets washing between them (one buys as the other sells the same amount, within 2% and half a minute, three
+    times or more, ending together within 5% of where they started: Victor & Weintraud's two-account structures,
+    and "Exposing Stealthy Wash Trading on AMMs", ACM TOIT 2024); 3 wallets doing 60%+ of the buying, many small
+    buys against a few big sells, selling 2:1, and 6+ trades per wallet over 24 hours (bots). Under 20 trades: too
+    few to judge.
 
   Data: DexScreener (pools, counts), [GeckoTerminal](https://www.geckoterminal.com)'s public API (no key, about
   30 calls a minute; the main pool's wallets and trades; shown as "powered by GeckoTerminal", as its terms ask),
   Solana's RPC or Blockscout (as for wallets), [Honeypot.is](https://honeypot.is) (no key) and PublicNode's free
-  EVM RPCs for owner() (or `<CHAIN>_RPC_URL`). Not used: GoPlus, whose API license rules out commercial use
+  EVM RPCs for owner() and, on BSC, whether an address is a token (or `<CHAIN>_RPC_URL`). Not used: GoPlus, whose API license rules out commercial use
   without written permission; RugCheck, which needs an account. A report is about 20 to 60 Solana RPC calls (a
   Helius key makes it a few seconds) or 15 to 30 Blockscout requests, kept a minute per server; 10 a minute per
   visitor. Each part is read on its own: one that fails is left out and said, the rest stays.
-  With `RANKR_MOCK=1`, a Solana address ending in `pump` opens a made-up report (run through the real checks).
+  With `RANKR_MOCK=1`, a Solana address ending in `pump`, or any BSC address, opens a made-up report (run through
+  the real checks).
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a

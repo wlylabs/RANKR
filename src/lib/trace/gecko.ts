@@ -15,6 +15,7 @@ export const GECKO_NETWORKS: Record<string, string> = {
   arbitrum: "arbitrum",
   optimism: "optimism",
   polygon: "polygon_pos",
+  bsc: "bsc",
 };
 
 async function gecko<T>(path: string): Promise<T | null> {
@@ -53,6 +54,30 @@ export async function poolWindows(chain: string, pool: string): Promise<PoolWind
     if (c) out[w] = { buys: int(c.buys), sells: int(c.sells), buyers: int(c.buyers), sellers: int(c.sellers) };
   }
   return out;
+}
+
+type InfoBody = {
+  data?: {
+    attributes?: {
+      holders?: { count?: number | string | null; distribution_percentage?: { top_10?: number | string | null } | null } | null;
+    };
+  };
+};
+
+/**
+ * How many hold the token and the top 10's share, as GeckoTerminal counts them: for a chain whose holders Trace
+ * can't list itself (BSC). Its top 10 may count pools in.
+ */
+export async function tokenHolders(chain: string, token: string): Promise<{ count: number | null; top10Pct: number | null } | null> {
+  const net = GECKO_NETWORKS[chain];
+  if (!net) return null;
+  const body = await gecko<InfoBody>(`/networks/${net}/tokens/${encodeURIComponent(token)}/info`);
+  const h = body?.data?.attributes?.holders;
+  if (!h) return null;
+  const n = (v: unknown) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+  const count = n(h.count);
+  const top10Pct = n(h.distribution_percentage?.top_10);
+  return count === null && top10Pct === null ? null : { count, top10Pct };
 }
 
 type TradesBody = {

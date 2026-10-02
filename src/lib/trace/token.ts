@@ -2,13 +2,13 @@
 // DexScreener (its pools, buys and sells), GeckoTerminal (the main pool's wallets and latest trades), and the
 // chain itself (Solana's RPC; Blockscout and Honeypot.is on EVM), then runs the checks (token-assess.ts). Kept a
 // minute: trades move fast, and the free upstreams are rate-limited.
-import { MOCK, tokenPairs, type Pair } from "../dexscreener";
+import { MOCK, searchPairs, tokenPairs, type Pair } from "../dexscreener";
 import { traceChain, validWallet, type TraceChain } from "./chains";
 import { TraceError } from "./errors";
 import { poolTrades, poolWindows } from "./gecko";
 import { labelOf, solanaDeposits } from "./labels";
-import { assessToken, type TokenFacts } from "./token-assess";
-import { evmTokenFacts } from "./token-evm";
+import { assessToken, copycatOf, type TokenFacts } from "./token-assess";
+import { evmTokenFacts, liteTokenFacts } from "./token-evm";
 import { mockTokenFacts } from "./token-mock";
 import { solanaTokenFacts } from "./token-solana";
 import type { TokenReport } from "./types";
@@ -29,10 +29,16 @@ async function readToken(chain: TraceChain, address: string, now: number): Promi
       return null;
     });
   const deposits = chain.kind === "solana" ? await solanaDeposits() : undefined;
-  const [facts, pool, trades] = await Promise.all([
-    chain.kind === "solana" ? solanaTokenFacts(address, pairs ?? [], deposits!) : evmTokenFacts(chain, address, pairs ?? []),
+  const [facts, pool, trades, copycat] = await Promise.all([
+    chain.kind === "solana"
+      ? solanaTokenFacts(address, pairs ?? [], deposits!)
+      : chain.tokensOnly
+        ? liteTokenFacts(chain, address, pairs ?? [])
+        : evmTokenFacts(chain, address, pairs ?? []),
     best ? quiet(poolWindows(chain.id, best.pairAddress)) : null,
     best ? quiet(poolTrades(chain.id, best.pairAddress, address)) : null,
+    // Another token by its symbol, bigger and older: a copy of its name.
+    best ? searchPairs(best.baseToken.symbol).then((found) => copycatOf(pairs!, found), () => undefined) : undefined,
   ]);
   const input: TokenFacts = {
     chain: chain.id,
@@ -40,6 +46,8 @@ async function readToken(chain: TraceChain, address: string, now: number): Promi
     pairs,
     pool,
     trades,
+    copycat,
+    holders: null,
     creator: null,
     ...facts,
     label: (a) => labelOf(chain.id, a, deposits),
@@ -51,7 +59,10 @@ async function readToken(chain: TraceChain, address: string, now: number): Promi
 export async function traceToken(chainId: string, address: string, now = Date.now()): Promise<TokenReport> {
   const chain = traceChain(chainId);
   if (!chain)
-    throw new TraceError("unsupported", "Tracing works on Solana, Ethereum, Base, Arbitrum, Optimism and Polygon.");
+    throw new TraceError(
+      "unsupported",
+      "Token reports work on Solana, Ethereum, Base, Arbitrum, Optimism, Polygon and BSC.",
+    );
   if (!validWallet(chain, address))
     throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);
   if (MOCK) return assessToken(mockTokenFacts(chain, address, now));

@@ -80,6 +80,10 @@ export type EvmContract = {
     buyTax: number | null;
     sellTax: number | null;
     transferTax: number | null;
+    /** What Honeypot.is also says: its code is open source, a proxy; how many hold it. */
+    openSource?: boolean | null;
+    proxy?: boolean | null;
+    holders?: number | null;
   } | null;
   /** Its owner() now: an address, "renounced" (zero or dead), "none" (no owner function); undefined: unread. */
   owner?: string | "renounced" | "none";
@@ -113,6 +117,11 @@ export type TokenFacts = {
   holders: { supply: number; count: number | null; list: RawHolder[] } | null;
   /** The supply, in tokens, when known apart from the holders (the mint account). */
   supply?: number | null;
+  /**
+   * Where the holders can't be listed (BSC): how many there are and the top 10's share, as another source counts
+   * them (pools may be in it).
+   */
+  holderSummary?: { count: number | null; top10Pct: number | null; source: string } | null;
   /** null when it couldn't be read. */
   contract: SolanaContract | EvmContract | null;
   /**
@@ -124,8 +133,13 @@ export type TokenFacts = {
   launch?: LaunchFacts | null;
   /** Who first funded each of the biggest holders (null: not in reach); undefined/null: not read. */
   links?: { holder: string; funder: string | null }[] | null;
-  /** The deployer's other tokens (EVM), and how many of them are dead; undefined/null: not read. */
-  history?: { tokens: number; dead: number } | null;
+  /**
+   * The deployer's other tokens, how many of them are dead, and (EVM) how many run the same code as this one
+   * (clones), dead ones among them; undefined/null: not read.
+   */
+  history?: { tokens: number; dead: number; clones?: number; deadClones?: number } | null;
+  /** A bigger, older token by the same symbol (or name) this one may copy; null: none found; undefined: unread. */
+  copycat?: { chain: string; address: string; symbol: string; liquidityUsd: number; times: number } | null;
   creator: string | null;
   label: (address: string) => TraceLabel | null;
   now: number;
@@ -170,6 +184,11 @@ export const LIMITS = {
   washTolerance: 0.02,
   /** Share of the sample's volume from wash-trading wallets. */
   wash: { warn: 25, bad: 50 },
+  /** Two wallets washing between them: matching buys and sells this close together, this many times... */
+  pairWindowMs: 30_000,
+  pairMatches: 3,
+  /** ...ending, together, within this share of what they traded from where they started. */
+  pairNet: 0.05,
   /** The top 3 buyers' share of what was bought. */
   buyers: 60,
   /** Trades per wallet over 24 hours. */
@@ -202,13 +221,18 @@ export function flowOf(pairs: Pair[], pool: PoolWindows | null): TokenFlowWindow
 
 type Wallet = TokenTrader & { bought: number; sold: number; amounts: boolean };
 
-/** The sample, wallet by wallet. */
-function byWallet(trades: RawTrade[], label: (a: string) => TraceLabel | null): Wallet[] {
+/** The sample, wallet by wallet (or by owner: `key` puts linked wallets together). */
+function byWallet(
+  trades: RawTrade[],
+  label: (a: string) => TraceLabel | null,
+  key: (wallet: string) => string = (w) => w,
+): Wallet[] {
   const map = new Map<string, Wallet>();
   for (const t of trades) {
-    const w = map.get(t.wallet) ?? {
-      address: t.wallet,
-      label: label(t.wallet),
+    const k = key(t.wallet);
+    const w = map.get(k) ?? {
+      address: k,
+      label: label(k),
       buyUsd: 0,
       sellUsd: 0,
       buys: 0,
@@ -229,7 +253,7 @@ function byWallet(trades: RawTrade[], label: (a: string) => TraceLabel | null): 
     }
     if (t.amount === undefined) w.amounts = false;
     w.last = Math.max(w.last, t.time);
-    map.set(t.wallet, w);
+    map.set(k, w);
   }
   return [...map.values()];
 }
@@ -300,6 +324,14 @@ export function holdersOf(h: NonNullable<TokenFacts["holders"]>, creator: string
   };
 }
 
+/** A wallet (or one owner's wallets) that bought and sold almost the same amount, twice or more each way. */
+function washing(w: Wallet): boolean {
+  if (w.buys < 2 || w.sells < 2) return false;
+  if (w.amounts && w.bought > 0 && w.sold > 0)
+    return Math.abs(w.bought - w.sold) <= LIMITS.washTolerance * Math.max(w.bought, w.sold);
+  return Math.abs(w.buyUsd - w.sellUsd) <= 0.1 * Math.max(w.buyUsd, w.sellUsd);
+}
+
 /**
  * Wash trading, after Mongardini & Mei: a wallet that bought and sold almost the same amount of the token (within
  * 2%, for fees and slippage), here twice or more each way, so a trader buying in and selling out once isn't one.
@@ -308,14 +340,70 @@ export function holdersOf(h: NonNullable<TokenFacts["holders"]>, creator: string
 export function washShare(wallets: Wallet[]): number {
   const total = wallets.reduce((s, w) => s + w.buyUsd + w.sellUsd, 0);
   if (!total) return 0;
-  const washing = (w: Wallet) => {
-    if (w.buys < 2 || w.sells < 2) return false;
-    if (w.amounts && w.bought > 0 && w.sold > 0)
-      return Math.abs(w.bought - w.sold) <= LIMITS.washTolerance * Math.max(w.bought, w.sold);
-    return Math.abs(w.buyUsd - w.sellUsd) <= 0.1 * Math.max(w.buyUsd, w.sellUsd);
-  };
-  const washed = wallets.filter(washing).reduce((s, w) => s + w.buyUsd + w.sellUsd, 0);
-  return (washed / total) * 100;
+  return (wallets.filter(washing).reduce((s, w) => s + w.buyUsd + w.sellUsd, 0) / total) * 100;
+}
+
+/**
+ * Two wallets washing between them (Victor & Weintraud's two-account structures; on an AMM, "Exposing Stealthy
+ * Wash Trading", ACM TOIT 2024): one buys as the other sells the same amount (within 2%), within half a minute,
+ * three times or more, and together they end about where they started (within 5% of what they traded). Needs
+ * token amounts. The pairs, by wallet.
+ */
+export function washPairs(trades: RawTrade[], key: (wallet: string) => string = (w) => w): [string, string][] {
+  const sorted = trades.filter((t) => t.amount !== undefined).sort((a, b) => a.time - b.time);
+  const used = new Set<RawTrade>();
+  const matches = new Map<string, number>();
+  for (const buy of sorted) {
+    if (buy.side !== "buy" || used.has(buy)) continue;
+    const sell = sorted.find(
+      (t) =>
+        t.side === "sell" &&
+        !used.has(t) &&
+        key(t.wallet) !== key(buy.wallet) &&
+        Math.abs(t.time - buy.time) <= LIMITS.pairWindowMs &&
+        Math.abs(t.amount! - buy.amount!) <= LIMITS.washTolerance * Math.max(t.amount!, buy.amount!),
+    );
+    if (!sell) continue;
+    used.add(buy).add(sell);
+    const pair = [key(buy.wallet), key(sell.wallet)].sort().join(" ");
+    matches.set(pair, (matches.get(pair) ?? 0) + 1);
+  }
+  const net = new Map<string, { net: number; gross: number }>();
+  for (const t of sorted) {
+    const n = net.get(key(t.wallet)) ?? { net: 0, gross: 0 };
+    n.net += t.side === "buy" ? t.amount! : -t.amount!;
+    n.gross += t.amount!;
+    net.set(key(t.wallet), n);
+  }
+  return [...matches]
+    .filter(([pair, n]) => {
+      if (n < LIMITS.pairMatches) return false;
+      const [a, b] = pair.split(" ").map((w) => net.get(w)!);
+      return Math.abs(a.net + b.net) <= LIMITS.pairNet * ((a.gross + b.gross) / 2);
+    })
+    .map(([pair]) => pair.split(" ") as [string, string]);
+}
+
+/**
+ * All the wash trading in the sample: each wallet on its own, top holders sharing a funder as one owner, and pairs
+ * of wallets washing between them. The share of the volume, and what it's made of.
+ */
+export function washOf(
+  trades: RawTrade[],
+  label: (a: string) => TraceLabel | null,
+  owner: (wallet: string) => string,
+): { pct: number; selves: number; pairs: number; linked: boolean } {
+  const owners = byWallet(trades, label, owner);
+  const total = owners.reduce((s, w) => s + w.buyUsd + w.sellUsd, 0);
+  if (!total) return { pct: 0, selves: 0, pairs: 0, linked: false };
+  const selves = owners.filter(washing);
+  const washed = new Set(selves.map((w) => w.address));
+  const pairs = washPairs(trades, owner);
+  for (const [a, b] of pairs) washed.add(a).add(b);
+  const volume = owners.filter((w) => washed.has(w.address)).reduce((s, w) => s + w.buyUsd + w.sellUsd, 0);
+  // Linked wallets made a wash that no single one of them shows.
+  const linked = selves.some((w) => trades.some((t) => owner(t.wallet) === w.address && t.wallet !== w.address));
+  return { pct: (volume / total) * 100, selves: selves.length, pairs: pairs.length, linked };
 }
 
 /** The launch in numbers: what bundles, snipers and the deployer bought, as shares of the supply. */
@@ -389,6 +477,33 @@ export function clustersOf(
   return out.sort((a, b) => b.pct - a.pct);
 }
 
+/**
+ * A bigger, older token by the same symbol, on any chain (from DexScreener's search): one with 10× this one's
+ * liquidity, and $100K at least, that came first. Null when there's none.
+ */
+export function copycatOf(pairs: Pair[], found: Pair[]): TokenFacts["copycat"] {
+  const self = pairs[0];
+  if (!self) return null;
+  const symbol = self.baseToken.symbol.toLowerCase();
+  const ours = pairs.reduce((s, p) => s + (p.liquidity?.usd ?? 0), 0);
+  const born = Math.min(...pairs.map((p) => p.pairCreatedAt ?? Infinity));
+  const others = new Map<string, { chain: string; address: string; symbol: string; liq: number; born: number }>();
+  for (const p of found) {
+    if (p.baseToken.symbol.toLowerCase() !== symbol) continue;
+    if (p.chainId === self.chainId && same(p.baseToken.address, self.baseToken.address)) continue;
+    const key = `${p.chainId}:${p.baseToken.address.toLowerCase()}`;
+    const o = others.get(key) ?? { chain: p.chainId, address: p.baseToken.address, symbol: p.baseToken.symbol, liq: 0, born: Infinity };
+    o.liq += p.liquidity?.usd ?? 0;
+    o.born = Math.min(o.born, p.pairCreatedAt ?? Infinity);
+    others.set(key, o);
+  }
+  const big = [...others.values()].sort((a, b) => b.liq - a.liq)[0];
+  if (!big || big.liq < Math.max(100_000, 10 * ours)) return null;
+  // This one came first: it's the original.
+  if (Number.isFinite(born) && Number.isFinite(big.born) && big.born > born) return null;
+  return { chain: big.chain, address: big.address, symbol: big.symbol, liquidityUsd: big.liq, times: big.liq / Math.max(ours, 1) };
+}
+
 type Check = Omit<TokenCheck, "group">;
 const level = (value: number, l: { warn: number; bad: number }) =>
   value >= l.bad ? "bad" : value >= l.warn ? "warn" : "ok";
@@ -400,6 +515,21 @@ const POWER_TEXT: Record<OwnerPower, { status: Check["status"]; short: string; t
   fees: { status: "warn", short: "Owner can change tax", text: "The owner can change the buy and sell tax" },
   limits: { status: "warn", short: "Owner can cap sells", text: "The owner can cap how much a wallet can sell" },
 };
+
+/** A copy of a bigger token's name: RugCheck's "copycat token". */
+function copycatCheck(f: TokenFacts): Check[] {
+  const c = f.copycat;
+  if (!c) return [];
+  return [
+    {
+      id: "copycat",
+      status: "warn",
+      short: `Copies $${c.symbol}`,
+      text: `Copies a bigger token's name: another $${c.symbol}${c.chain !== f.chain ? ` (on ${c.chain})` : ""} came first and has ${c.times >= 100 ? "100+" : Math.round(c.times)}× its liquidity`,
+      source: "DexScreener",
+    },
+  ];
+}
 
 function contractChecks(c: TokenFacts["contract"], chain: string): Check[] {
   if (!c)
@@ -529,7 +659,8 @@ function contractChecks(c: TokenFacts["contract"], chain: string): Check[] {
 
   // What the owner can still do: nothing once ownership is renounced.
   const powers = c.powers ?? [];
-  const bs = "Blockscout";
+  // Where its code was read: Blockscout, or on BSC (no free explorer API) what Honeypot.is says of it.
+  const bs = chain === "bsc" ? "Honeypot.is" : "Blockscout";
   if (c.owner === "renounced")
     out.push({
       id: "owner",
@@ -559,6 +690,15 @@ function contractChecks(c: TokenFacts["contract"], chain: string): Check[] {
         source: bs,
       });
     }
+  } else if (typeof c.owner === "string" && c.owner !== "none") {
+    // An owner, and no code to read what it can do.
+    out.push({
+      id: "owner",
+      status: "warn",
+      short: "Owner not renounced",
+      text: "Ownership isn't renounced: its owner may still change its settings",
+      source: "RPC",
+    });
   }
   if (c.verified === false)
     out.push({
@@ -653,17 +793,19 @@ function liquidityChecks(f: TokenFacts, mcap: number | null): Check[] {
 }
 
 function holderChecks(h: TokenHolders | null, creator: string | null, chain: string): Check[] {
-  const src = chain === "solana" ? "Solana RPC" : "Blockscout";
+  const src = h?.source ?? (chain === "solana" ? "Solana RPC" : "Blockscout");
   if (!h) return [{ id: "holders", status: "unknown", short: "Holders unread", text: "Couldn't read the holders", source: src }];
   const out: Check[] = [];
-  const top10 = level(h.top10Pct, LIMITS.top10);
-  out.push({
-    id: "top10",
-    status: top10,
-    short: `Top 10 hold ${pct(h.top10Pct)}`,
-    text: `Top 10 wallets hold ${pct(h.top10Pct)} of the supply${top10 === "ok" ? "" : top10 === "bad" ? ": a few can dump on everyone" : ": concentrated"}`,
-    source: src,
-  });
+  // Another source's top 10 may count pools in: worth a look at most.
+  const top10 = h.rough && level(h.top10Pct, LIMITS.top10) === "bad" ? "warn" : level(h.top10Pct, LIMITS.top10);
+  if (!h.rough || h.top10Pct > 0)
+    out.push({
+      id: "top10",
+      status: top10,
+      short: `Top 10 hold ${pct(h.top10Pct)}`,
+      text: `Top 10 wallets hold ${pct(h.top10Pct)} of the supply${h.rough ? " (pools may be counted in)" : top10 === "ok" ? "" : top10 === "bad" ? ": a few can dump on everyone" : ": concentrated"}`,
+      source: src,
+    });
   // The deployer's own stake has its line below.
   const largest = h.top.find((x) => !aside(x));
   if (largest && largest.role !== "creator" && level(largest.pct, LIMITS.largest) !== "ok") {
@@ -748,7 +890,8 @@ function insiderChecks(
     }
   }
 
-  if (!clusters) note("Couldn't read who funded the biggest holders.");
+  if (!clusters)
+    note(f.links === undefined ? "Who funded the holders isn't read on this chain." : "Couldn't read who funded the biggest holders.");
   else {
     const dev = clusters.find((c) => c.deployer);
     if (dev) {
@@ -775,6 +918,16 @@ function insiderChecks(
     });
   }
 
+  if (f.history?.clones) {
+    const { clones, deadClones = 0 } = f.history;
+    out.push({
+      id: "clones",
+      status: deadClones ? "bad" : "warn",
+      short: "Cloned contract",
+      text: `Same code as ${plural(clones, "earlier token")} from this deployer${deadClones ? `, ${deadClones} of them dead` : ""}`,
+      source: src,
+    });
+  }
   if (f.history) {
     const { tokens, dead } = f.history;
     const status =
@@ -786,13 +939,13 @@ function insiderChecks(
       text: tokens
         ? `The deployer launched ${plural(tokens, "other token")}${dead ? `; ${dead} ${dead === 1 ? "is" : "are"} dead` : ""}`
         : "No other tokens from this deployer",
-      source: "Blockscout",
+      source: src,
     });
   }
   return out;
 }
 
-function tradingChecks(f: TokenFacts, wallets: Wallet[] | null): Check[] {
+function tradingChecks(f: TokenFacts, wallets: Wallet[] | null, owner: (wallet: string) => string): Check[] {
   const src = "GeckoTerminal";
   if (!f.trades) {
     return f.pairs?.length
@@ -811,16 +964,20 @@ function tradingChecks(f: TokenFacts, wallets: Wallet[] | null): Check[] {
     ];
   }
   const out: Check[] = [];
-  const wash = washShare(wallets);
-  const washLevel = level(wash, LIMITS.wash);
+  const w = washOf(f.trades, f.label, owner);
+  const washLevel = level(w.pct, LIMITS.wash);
+  const how = [
+    w.selves && "wallets buying and selling the same amount back and forth",
+    w.pairs && `${plural(w.pairs, "pair")} of wallets trading the same amounts against each other`,
+  ].filter(Boolean);
   out.push({
     id: "wash",
     status: washLevel,
-    short: washLevel === "ok" ? "No wash trading" : `${pct(wash)} wash trading`,
+    short: washLevel === "ok" ? "No wash trading" : `${pct(w.pct)} wash trading`,
     text:
       washLevel === "ok"
         ? "No sign of wash trading in the latest trades"
-        : `${washLevel === "bad" ? "Looks like wash trading" : "Some wash trading"}: ${pct(wash)} of the volume is wallets buying and selling the same amount back and forth`,
+        : `${washLevel === "bad" ? "Looks like wash trading" : "Some wash trading"}: ${pct(w.pct)} of the volume is ${how.join(", and ")}${w.linked ? " (linked holders counted as one)" : ""}`,
     source: src,
   });
 
@@ -887,29 +1044,46 @@ export function assessToken(f: TokenFacts): TokenReport {
   const marketCap = num(best?.marketCap) ?? num(best?.fdv);
   // Solana: whoever signed its first transaction, when the launch was read.
   const creator = f.creator ?? (f.launch?.reached ? (f.launch.creator ?? null) : null);
-  const holders = f.holders ? holdersOf(f.holders, creator) : null;
+  const holders = f.holders
+    ? holdersOf(f.holders, creator)
+    : f.holderSummary
+      ? {
+          count: f.holderSummary.count,
+          top: [],
+          top10Pct: f.holderSummary.top10Pct ?? 0,
+          poolPct: 0,
+          rough: true,
+          source: f.holderSummary.source,
+        }
+      : null;
   const wallets = f.trades ? byWallet(f.trades, f.label) : null;
   const supply = f.supply ?? f.holders?.supply ?? null;
   const launch = f.launch?.reached && supply ? launchOf(f.launch, supply, creator, holders) : null;
   const clusters = holders && f.links ? clustersOf(holders, f.links, creator, f.label) : null;
+  // Wallets sharing a funder are one owner when it comes to trading.
+  const ownerOf = new Map<string, string>();
   if (holders && clusters)
     clusters.forEach((c, i) =>
       c.members.forEach((m) => {
         const h = holders.top.find((x) => x.address === m.address);
         if (h) h.cluster = i;
+        ownerOf.set(m.address, c.members[0].address);
       }),
     );
+  const owner = (wallet: string) => ownerOf.get(wallet) ?? wallet;
 
   const notes: TokenNote[] = [];
   const groups: [TokenGroup, Check[]][] = [
-    ["contract", contractChecks(f.contract, f.chain)],
+    ["contract", [...contractChecks(f.contract, f.chain), ...copycatCheck(f)]],
     ["liquidity", liquidityChecks(f, marketCap)],
     ["holders", holderChecks(holders, creator, f.chain)],
     ["insiders", insiderChecks(f, holders, launch, clusters, notes)],
-    ["trading", tradingChecks(f, wallets)],
+    ["trading", tradingChecks(f, wallets, owner)],
   ];
   if (f.lp === undefined && best && f.chain === "solana" && !/pump/i.test(best.dexId))
     notes.push({ group: "liquidity", text: "Who holds its LP tokens wasn't read (concentrated pools have none)." });
+  if (f.lp === undefined && best && f.chain === "bsc")
+    notes.push({ group: "liquidity", text: "Who holds its LP tokens isn't read on BSC." });
   const checks = groups
     .flatMap(([group, list]) => list.map((c) => ({ ...c, group })))
     .sort((a, b) => ORDER[a.status] - ORDER[b.status]);
