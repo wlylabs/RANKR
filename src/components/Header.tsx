@@ -10,7 +10,6 @@ import { AccountMenu } from "./AccountMenu";
 import { Logo } from "./Logo";
 import { PasteBox } from "./PasteBox";
 import { SettingsMenu } from "./SettingsMenu";
-import { Indicator, useIndicator } from "./Tabs";
 
 export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
@@ -25,32 +24,12 @@ function isActive(pathname: string, href: string) {
 }
 
 /**
- * The desktop nav. A pill follows the pointer across the links (it fades in where the pointer enters, then
- * glides), and a line on the header's bottom edge marks the page you're on, gliding to the next one.
+ * The desktop nav: its links, the page you're on marked by a line on the header's bottom edge. Nothing in it
+ * moves, like any other app's: no hover pill, no line gliding from page to page.
  */
 function NavLinks({ pathname }: { pathname: string }) {
-  const ref = useRef<HTMLElement>(null);
-  const current = useIndicator(ref, NAV.find(({ href }) => isActive(pathname, href))?.href ?? null);
-  const [hover, setHover] = useState<{ x: number; w: number } | null>(null);
-  const [hovering, setHovering] = useState(false);
-
   return (
-    <nav
-      ref={ref}
-      aria-label="Main"
-      onPointerLeave={() => setHovering(false)}
-      className="relative hidden items-center self-stretch md:flex"
-    >
-      <span
-        aria-hidden
-        className={clsx(
-          "pointer-events-none absolute top-1/2 left-0 h-8 -translate-y-1/2 rounded-md bg-surface-2",
-          hovering
-            ? "opacity-100 transition-[transform,width,opacity] duration-300 ease-emphasized"
-            : "opacity-0 transition-opacity duration-200",
-        )}
-        style={hover ? { transform: `translateX(${hover.x}px)`, width: hover.w } : undefined}
-      />
+    <nav aria-label="Main" className="hidden items-stretch self-stretch md:flex">
       {NAV.map(({ href, label }) => {
         const active = isActive(pathname, href);
         return (
@@ -58,25 +37,13 @@ function NavLinks({ pathname }: { pathname: string }) {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            data-active={active || undefined}
-            onPointerEnter={(e) => {
-              // A tap on a tablet would leave the pill stuck on the link: mouse only.
-              if (e.pointerType !== "mouse") return;
-              const { offsetLeft: x, offsetWidth: w } = e.currentTarget;
-              setHover({ x, w });
-              // Placed first while hidden, shown on the next frame: it appears here instead of sliding in.
-              requestAnimationFrame(() => setHovering(true));
-            }}
-            className={clsx(
-              "relative rounded-md px-3 py-1.5 text-sm transition-colors",
-              active ? "text-fg" : "text-muted hover:text-fg",
-            )}
+            className={clsx("relative flex items-center px-3 text-sm", active ? "text-fg" : "text-muted hover:text-fg")}
           >
             {label}
+            {active && <span aria-hidden className="absolute inset-x-0 -bottom-px h-px bg-fg" />}
           </Link>
         );
       })}
-      <Indicator {...current} className="-bottom-px h-px bg-fg" />
     </nav>
   );
 }
@@ -199,7 +166,7 @@ export function BottomNav() {
               key={href}
               href={href}
               className={clsx(
-                "flex flex-col items-center justify-center gap-0.5 text-[11px] transition-colors",
+                "flex flex-col items-center justify-center gap-0.5 text-[11px]",
                 active ? "text-fg" : "text-subtle",
               )}
               aria-current={active ? "page" : undefined}

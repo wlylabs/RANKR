@@ -190,12 +190,14 @@ hairline borders), "decrypted text" reveal effects, and hash visualizations such
   - under it, the board's top runners stand tipped back like a screen on a desk and swing upright as they scroll
     into view, the counter-move to the hero pulling away (scroll-driven, Chromium);
   - sections below arrive as they scroll into view;
-  - app pages settle in on every navigation (`(app)/template.tsx`): the title, then the line under it, then
-    lists cascading in row by row (`Cascade`; only on first show, so live re-ranks and new rows don't replay it);
-    whole-number stats count up (`CountUp`); loading rows shimmer;
-  - tab underlines, segmented controls and the header nav's current-page line glide to the picked option
-    (`src/components/Tabs.tsx`); a pill follows the pointer across the header nav; the phone's bottom nav stays
-    still: the current page is the one in full color, its icon drawn bolder, with no pill behind it;
+  - the nav doesn't move, like any other app's: switching pages is instant (no page transition), the header
+    nav marks the page you're on with a still line under it (no hover pill, nothing gliding), and the phone's
+    bottom nav marks it in full color, its icon drawn bolder (no pill, no icon motion);
+  - on a page, the title arrives, then the line under it, then lists cascade in row by row (`Cascade`; only on
+    first show, so live re-ranks and new rows don't replay it); whole-number stats count up (`CountUp`); loading
+    rows shimmer;
+  - tabs and segmented controls inside a page don't move either (`src/components/Tabs.tsx`): the picked tab is
+    underlined, the picked option filled, at once;
   - menus open out of their corner; Track rises as a sheet on phones and settles in as a dialog from sm up, over a
     blurred page, and plays backwards on close (where the browser can animate the top layer);
   - switching theme opens the new theme as a circle from the toggle (View Transitions).

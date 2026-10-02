@@ -342,18 +342,6 @@ body {
   animation-delay: var(--d, 0ms);
 }
 
-/* A page of the app settling in after navigation. */
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-    filter: blur(6px);
-  }
-}
-.animate-page-in {
-  animation: page-in 0.5s var(--ease-enter) backwards;
-}
-
 /* The hash field behind the hero: lit cells breathe in and out, each on its own clock. */
 @keyframes twinkle {
   0%,
