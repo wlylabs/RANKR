@@ -20,7 +20,11 @@ export async function traceWallet(chainId: string, address: string, now = Date.n
     throw new TraceError("unsupported", "Tracing works on Solana, Ethereum, Base, Arbitrum, Optimism and Polygon.");
   if (!validWallet(chain, address))
     throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);
-  if (MOCK) return mockTrace(chain, address, now);
+  if (MOCK) {
+    // Made up: a Solana address ending in "pump", like pump.fun's tokens, is a token (its report is made up too).
+    if (chain.kind === "solana" && address.endsWith("pump")) throw new TraceError("token", "That's a token, not a wallet.");
+    return mockTrace(chain, address, now);
+  }
 
   const key = `${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
   const hit = cache.get(key);
@@ -38,3 +42,4 @@ export async function traceWallet(chainId: string, address: string, now = Date.n
 }
 
 export { TraceError } from "./errors";
+export { traceToken } from "./token";

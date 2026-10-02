@@ -4,15 +4,32 @@ import clsx from "clsx";
 import { ArrowRight, ClipboardPaste, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { parseWallet, traceHref } from "@/lib/trace/chains";
+import { parseWallet, traceChain, traceHref } from "@/lib/trace/chains";
+import type { LookupResponse } from "@/lib/types";
 
 /** With a mouse, the box can take focus for free; on a phone, focusing it pops the keyboard up over the page. */
 const withMouse = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 /**
- * The wallet box: paste an address or an explorer link, and its trail opens. Empty, Trace pastes what's on the
- * clipboard and goes, like Paste on the CA box. `autoFocus` only with a mouse: on a phone the keyboard stays down
- * until the box is tapped.
+ * The token a paste points at, if it's one DexScreener knows: its own address (a DexScreener link carries the
+ * pool's) and the chain it trades on (a bare 0x address could be on any). Null for a wallet, or when the lookup
+ * can't be made: the paste then goes as it is.
+ */
+async function tokenOf(raw: string): Promise<{ chain: string; address: string } | null> {
+  try {
+    const res = await fetch(`/api/lookup?input=${encodeURIComponent(raw.trim())}`);
+    if (!res.ok) return null;
+    const { preview } = (await res.json()) as LookupResponse;
+    return preview ? { chain: preview.chainId, address: preview.address } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The wallet box: paste a wallet or a token's CA (an address, or an explorer / DexScreener link), and its trail or
+ * its report opens. Empty, Trace pastes what's on the clipboard and goes, like Paste on the CA box. `autoFocus` only
+ * with a mouse: on a phone the keyboard stays down until the box is tapped.
  */
 export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; size?: "md" | "lg" }) {
   const router = useRouter();
@@ -20,6 +37,7 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [canReadClipboard, setCanReadClipboard] = useState(false);
+  const [busy, setBusy] = useState(false);
   const lg = size === "lg";
   const pasteMode = !value && canReadClipboard;
 
@@ -28,14 +46,22 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
     if (autoFocus && withMouse()) inputRef.current?.focus();
   }, [autoFocus]);
 
-  const go = (raw: string) => {
+  const go = async (raw: string) => {
     const wallet = parseWallet(raw);
     if (!wallet) {
-      setError("That isn't a Solana or EVM wallet address.");
+      setError("That isn't a Solana or EVM wallet or token address.");
       return;
     }
     setError(null);
-    router.push(traceHref(wallet.chain, wallet.address));
+    setBusy(true);
+    const token = await tokenOf(raw);
+    setBusy(false);
+    if (token && !traceChain(token.chain)) {
+      setError(`That token trades on ${token.chain}, which Trace doesn't read yet.`);
+      return;
+    }
+    const to = token ?? wallet;
+    router.push(traceHref(to.chain, to.address));
   };
 
   async function pasteAndGo() {
@@ -47,7 +73,7 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
         return;
       }
       setValue(text);
-      go(text);
+      await go(text);
     } catch {
       // The browser said no to reading the clipboard: paste by hand.
       setError("Couldn't read the clipboard. Tap the box and paste the address.");
@@ -60,7 +86,8 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (value.trim()) go(value);
+          if (busy) return;
+          if (value.trim()) void go(value);
           else if (canReadClipboard) void pasteAndGo();
           else inputRef.current?.focus();
         }}
@@ -79,11 +106,11 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
             if (parseWallet(text)) {
               e.preventDefault();
               setValue(text);
-              go(text);
+              void go(text);
             }
           }}
-          placeholder="Paste a wallet address or explorer link"
-          aria-label="Wallet address"
+          placeholder="Paste a wallet or a token's CA"
+          aria-label="Wallet or token address"
           spellCheck={false}
           autoComplete="off"
           autoCapitalize="off"
@@ -108,9 +135,11 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
         )}
         <button
           type="submit"
+          disabled={busy}
+          aria-busy={busy}
           title={pasteMode ? "Paste from the clipboard and trace" : undefined}
           className={clsx(
-            "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-fg font-medium text-bg transition-opacity hover:opacity-85",
+            "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-fg font-medium text-bg transition-opacity hover:opacity-85 disabled:opacity-60",
             lg ? "h-10 px-4 text-sm" : "h-9 px-3.5 text-sm",
           )}
         >

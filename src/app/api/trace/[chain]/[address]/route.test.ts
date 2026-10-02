@@ -19,11 +19,11 @@ const get = async (chain: string, address: string, ip: string) => {
 };
 
 describe("GET /api/trace/:chain/:address", () => {
-  it("reads the wallet, trimmed and decoded, and lets shared caches keep it a minute", async () => {
+  it("reads the wallet, trimmed and decoded, and lets only the browser keep it a minute", async () => {
     const res = await get("solana", "%209WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", "1.1.1.1");
     expect(res.status).toBe(200);
     expect(asked.at(-1)).toEqual(["solana", "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"]);
-    expect(res.headers.get("cache-control")).toContain("s-maxage=60");
+    expect(res.headers.get("cache-control")).toBe("private, max-age=60");
   });
 
   it("answers a wallet it can't trace with the reason and its code", async () => {

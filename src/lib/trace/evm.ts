@@ -23,7 +23,7 @@ export type AddressParam = {
   public_tags?: { display_name?: string; label?: string }[] | null;
 };
 
-type Page<T> = { items: T[]; next_page_params: unknown | null };
+export type Page<T> = { items: T[]; next_page_params: unknown | null };
 
 type Tx = {
   hash: string;
@@ -61,13 +61,14 @@ type TokenTransfer = {
   } | null;
 };
 
-type AddressInfo = AddressParam & {
+export type AddressInfo = AddressParam & {
   coin_balance?: string | null;
   exchange_rate?: string | null;
   token?: unknown | null;
 };
 
-async function get<T>(chain: TraceChain, path: string): Promise<T | null> {
+/** One Blockscout API v2 request on `chain`; null for an address it has never seen (404). */
+export async function blockscout<T>(chain: TraceChain, path: string): Promise<T | null> {
   const key = process.env.BLOCKSCOUT_API_KEY;
   if (!key)
     throw new TraceError(
@@ -212,10 +213,10 @@ export function evmLegs(
 export async function traceEvm(chain: TraceChain, address: string): Promise<TraceResponse> {
   const path = `/addresses/${address}`;
   const [info, txs, internal, tokens] = await Promise.all([
-    get<AddressInfo>(chain, path),
-    get<Page<Tx>>(chain, `${path}/transactions`),
-    get<Page<InternalTx>>(chain, `${path}/internal-transactions`),
-    get<Page<TokenTransfer>>(chain, `${path}/token-transfers?type=ERC-20`),
+    blockscout<AddressInfo>(chain, path),
+    blockscout<Page<Tx>>(chain, `${path}/transactions`),
+    blockscout<Page<InternalTx>>(chain, `${path}/internal-transactions`),
+    blockscout<Page<TokenTransfer>>(chain, `${path}/token-transfers?type=ERC-20`),
   ]);
   if (info?.token) throw new TraceError("token", "That's a token, not a wallet.");
 

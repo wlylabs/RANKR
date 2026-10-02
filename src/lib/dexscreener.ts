@@ -15,9 +15,11 @@ export type Pair = {
   baseToken: { address: string; name: string; symbol: string };
   quoteToken: { address: string; name: string; symbol: string };
   priceUsd?: string;
-  volume?: { h24?: number };
-  txns?: { h24?: { buys?: number; sells?: number } };
-  priceChange?: { h24?: number };
+  volume?: Partial<Record<"m5" | "h1" | "h6" | "h24", number>>;
+  txns?: Partial<Record<"m5" | "h1" | "h6" | "h24", { buys?: number; sells?: number }>>;
+  priceChange?: Partial<Record<"m5" | "h1" | "h6" | "h24", number>>;
+  /** "v2", "v3", "DLMM"...: the kind of pool. */
+  labels?: string[];
   liquidity?: { usd?: number };
   fdv?: number;
   marketCap?: number;
@@ -130,6 +132,14 @@ export async function findToken(address: string, chainHint: string | null): Prom
     `/tokens/v1/${encodeURIComponent(match.chainId)}/${encodeURIComponent(match.baseToken.address)}`,
   );
   return toSnapshot(bestAcrossChains(tokenPairs ?? [], match.baseToken.address) ?? match);
+}
+
+/** Every pool a token trades in on one chain, the token as the base, most liquid first. */
+export async function tokenPairs(chainId: string, address: string): Promise<Pair[]> {
+  const pairs = await getJson<Pair[] | null>(`/tokens/v1/${encodeURIComponent(chainId)}/${encodeURIComponent(address)}`);
+  return (pairs ?? [])
+    .filter((p) => p.chainId === chainId && sameAddress(p.baseToken.address, address))
+    .sort((a, b) => pairScore(b) - pairScore(a));
 }
 
 /** Live snapshots for many tokens, batched per chain. Keyed by tokenId. */

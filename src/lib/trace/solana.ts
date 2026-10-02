@@ -39,8 +39,8 @@ export const RPC_TIMING = { backoffMs: 700 };
 const LAMPORTS = 1e9;
 /** Below this, an account creation only pays rent. */
 const RENT_FLOOR = 3_000_000;
-const WSOL = "So11111111111111111111111111111111111111112";
-const TOKEN_PROGRAMS = new Set([
+export const WSOL = "So11111111111111111111111111111111111111112";
+export const TOKEN_PROGRAMS = new Set([
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
 ]);
@@ -86,7 +86,7 @@ async function pace(url: string) {
  * One JSON-RPC call. A 429, 403 or 5xx moves on to the next endpoint; after a full round of them, a pause
  * (Retry-After when given). Three rounds and it gives up with "busy". Errors in the answer itself are RpcError.
  */
-async function rpc<T>(method: string, params: unknown[]): Promise<T> {
+export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
   const urls = endpoints();
   const tries = urls.length * 3;
   let unreachable = 0;
@@ -361,19 +361,19 @@ export async function getTx(signature: string): Promise<ParsedTx | null> {
 }
 
 export async function traceSolana(address: string): Promise<TraceResponse> {
-  const [account, history, deposits] = await Promise.all([
-    rpc<{ value: { lamports: number; owner: string; executable: boolean; data: unknown } | null }>("getAccountInfo", [
-      address,
-      { encoding: "jsonParsed" },
-    ]),
-    signatures(address),
-    solanaDeposits(),
-  ]);
+  // The account first: a token's address (pasted on Trace, it opens the token's report) costs one call, not its
+  // whole busy history.
+  const deposits = solanaDeposits();
+  const account = await rpc<{ value: { lamports: number; owner: string; executable: boolean; data: unknown } | null }>(
+    "getAccountInfo",
+    [address, { encoding: "jsonParsed" }],
+  );
   const info = account.value;
   if (info?.executable) throw new TraceError("program", "That's a program, not a wallet.");
   const parsedType = (info?.data as { parsed?: { type?: string } } | undefined)?.parsed?.type;
   if (info && TOKEN_PROGRAMS.has(info.owner) && parsedType === "mint")
     throw new TraceError("token", "That's a token, not a wallet.");
+  const history = await signatures(address);
 
   const ok = history.sigs.filter((s) => !s.err);
   const recent = ok.slice(0, txLimit());
@@ -405,9 +405,9 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
   // Its first money can't be a trade's proceeds: someone had to pay for the trade's fee first.
   const fundingLegs = read.filter((r) => !r.swap).flatMap((r) => r.legs);
 
-  const p = await prices([...raw, ...fundingLegs]);
+  const [p, depositList] = await Promise.all([prices([...raw, ...fundingLegs]), deposits]);
   const legs = priced(raw, p);
-  const label = (a: string) => labelOf("solana", a, deposits);
+  const label = (a: string) => labelOf("solana", a, depositList);
   const funder = history.complete ? firstFunding(priced(fundingLegs, p)) : null;
 
   const times = recent.map((s) => (s.blockTime ?? 0) * 1000).filter(Boolean);

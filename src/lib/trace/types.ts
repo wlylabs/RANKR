@@ -91,3 +91,107 @@ export type TraceErrorCode =
   | "busy"
   | "nokey"
   | "limit";
+
+// ---- A token's report: a contract address pasted on Trace opens this instead of a trail.
+
+/**
+ * How one check came out. bad: a warning sign. warn: worth a closer look. ok: nothing wrong there.
+ * unknown: it couldn't be read (counts as worth a look: nothing read isn't nothing wrong).
+ */
+export type TokenCheckStatus = "bad" | "warn" | "ok" | "unknown";
+
+export type TokenCheck = {
+  id: string;
+  group: "contract" | "liquidity" | "holders" | "trading";
+  status: TokenCheckStatus;
+  /** One line, plain words: "Freeze authority is on: any holder's tokens can be frozen". */
+  text: string;
+  /** Where it was read: "Solana RPC", "Blockscout", "Honeypot.is", "GeckoTerminal", "DexScreener". */
+  source: string;
+};
+
+/** The three levels: warning signs (a bad check), worth a closer look (a warn or unknown one), none read. */
+export type TokenVerdict = "danger" | "check" | "clear";
+
+export type TokenWindow = "5m" | "1h" | "6h" | "24h";
+
+/** Buys and sells in one window: counts over every pool (DexScreener), wallets in the main pool (GeckoTerminal). */
+export type TokenFlowWindow = {
+  window: TokenWindow;
+  buys: number;
+  sells: number;
+  buyers: number | null;
+  sellers: number | null;
+  volumeUsd: number | null;
+};
+
+/** One wallet's trades in the sample: what it bought and sold, in dollars at the time. */
+export type TokenTrader = {
+  address: string;
+  label: TraceLabel | null;
+  buyUsd: number;
+  sellUsd: number;
+  buys: number;
+  sells: number;
+  last: number;
+};
+
+/** The main pool's latest trades (GeckoTerminal: up to 300, within 24 hours), wallet by wallet. */
+export type TokenTrades = {
+  pool: string;
+  count: number;
+  from: number;
+  to: number;
+  buyUsd: number;
+  sellUsd: number;
+  wallets: number;
+  /** Bought the most, net of what they sold; biggest first. */
+  buyers: TokenTrader[];
+  /** Sold the most, net of what they bought; biggest first. */
+  sellers: TokenTrader[];
+};
+
+/** pool: a DEX pool or bonding curve. burn: a burn address. creator: who deployed the contract. */
+export type TokenHolderRole = "pool" | "burn" | "creator";
+
+export type TokenHolder = {
+  address: string;
+  /** Share of the supply, 0-100. */
+  pct: number;
+  role: TokenHolderRole | null;
+  label: TraceLabel | null;
+};
+
+export type TokenHolders = {
+  /** All holders, when the source counts them (Blockscout); Solana's RPC doesn't. */
+  count: number | null;
+  /** The biggest holders, biggest first (Solana's RPC gives the top 20 accounts). */
+  top: TokenHolder[];
+  /** The ten biggest wallets' share, not counting pools, burn addresses and exchanges. */
+  top10Pct: number;
+  /** In pools and bonding curves. */
+  poolPct: number;
+};
+
+export type TokenReport = {
+  chain: string;
+  address: string;
+  name: string | null;
+  symbol: string | null;
+  priceUsd: number | null;
+  marketCap: number | null;
+  liquidityUsd: number | null;
+  /** The main pool (the most liquid), its DEX and when it opened. */
+  pool: { address: string; dex: string; url: string; createdAt: number | null } | null;
+  /** Pools the token trades in on this chain. */
+  pools: number;
+  verdict: TokenVerdict;
+  /** Bad first, then warn, unknown, ok. */
+  checks: TokenCheck[];
+  flow: TokenFlowWindow[];
+  trades: TokenTrades | null;
+  holders: TokenHolders | null;
+  /** Who deployed it (EVM: Blockscout), to follow its money. */
+  creator: string | null;
+  updatedAt: number;
+};

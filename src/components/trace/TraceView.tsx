@@ -1,11 +1,11 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowUpRight, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { tokenHref } from "@/lib/format";
 import { sha256Hex } from "@/lib/sha256";
+import { apiFetch } from "@/lib/supabase-browser";
 import { EVM_TRACE_CHAINS, traceChain, traceHref } from "@/lib/trace/chains";
 import { dataOf, parentId } from "@/lib/trace/tree";
 import type { TraceErrorCode, TraceResponse } from "@/lib/trace/types";
@@ -17,6 +17,7 @@ import { FullAddress } from "./TraceCard";
 import { CaseBoot } from "./TraceCinema";
 import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
+import { TokenReport } from "./TokenReport";
 import { TraceInput } from "./TraceInput";
 import { useTrail } from "./useTrail";
 
@@ -39,7 +40,8 @@ function useWallets(chain: string) {
         return next;
       });
       try {
-        const res = await fetch(`/api/trace/${chain}/${encodeURIComponent(address)}`);
+        // With the session: Trace is for official accounts only.
+        const res = await apiFetch(`/api/trace/${chain}/${encodeURIComponent(address)}`);
         const body = await res.json().catch(() => null);
         if (!res.ok) {
           const error: ReadError = { message: body?.error ?? `Request failed (${res.status})`, code: body?.code };
@@ -59,30 +61,13 @@ function useWallets(chain: string) {
   return { data, errors, load };
 }
 
-/** Why the target can't be traced, and what to do instead. */
-function RootError({
-  chain,
-  address,
-  error,
-  onRetry,
-}: {
-  chain: string;
-  address: string;
-  error: ReadError;
-  onRetry: () => void;
-}) {
+/** Why the target can't be traced. */
+function RootError({ error, onRetry }: { error: ReadError; onRetry: () => void }) {
   return (
     <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
       <p className="text-sm">{error.message}</p>
       <div className="mt-4 flex justify-center gap-2">
-        {error.code === "token" ? (
-          <Link
-            href={tokenHref({ chainId: chain, address })}
-            className="inline-flex items-center gap-1 rounded-md bg-fg px-3 py-1.5 text-sm font-medium text-bg"
-          >
-            Open the token <ArrowUpRight className="size-3.5" />
-          </Link>
-        ) : error.code === "nokey" ||
+        {error.code === "nokey" ||
           error.code === "unsupported" ||
           error.code === "invalid" ||
           error.code === "program" ? null : (
@@ -122,6 +107,9 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
   const rootError = !root ? errors.get(address) : undefined;
   const pickedParent = parentId(picked.id);
   const caseId = useMemo(() => sha256Hex(`${chainId}:${address}`).slice(0, 8), [chainId, address]);
+
+  // A token's address: its report instead of a trail (where its buys and sells come from, and the checks).
+  if (rootError?.code === "token") return <TokenReport chain={chainId} address={address} />;
 
   return (
     <div className="space-y-5 pt-8 sm:pt-10">
@@ -164,7 +152,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
       </header>
 
       {rootError ? (
-        <RootError chain={chainId} address={address} error={rootError} onRetry={() => void load(address)} />
+        <RootError error={rootError} onRetry={() => void load(address)} />
       ) : (
         <>
           <p className="label flex flex-wrap gap-x-4 gap-y-1 text-subtle">

@@ -55,7 +55,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   three ranks catching the light and a band of light over #1 as the board comes in. **You**: your own glyph, large
   and faint behind the page's top, its cells coming in under a scan; your rank on the caller board climbs to its
   place from the foot of the board. The nav itself stays still: its icons don't move.
-- **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
+- **Trace** (`/trace`, in the nav **for official accounts only**, see **Trace is private** below): an on-chain
+  trail, top to bottom, or a token's report (next item). Paste a wallet (an address, or a Solscan,
   Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and its trail opens at `/trace/<chain>/<address>`;
   with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. On a phone the
   box isn't focused when the page opens, so the keyboard stays down until you tap it. The trail is
@@ -125,9 +126,43 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
     6 MB, is read once per server at runtime, and skipped if GitHub can't be reached); the Solana DEX and bridge
     programs (Jupiter, Raydium, Orca, Meteora, pump.fun, PumpSwap, Wormhole, deBridge...) in
     `src/lib/trace/labels.ts`. Not used: Dune's Spellbook, whose license rules out data platforms.
-  Each wallet read is kept 5 minutes per server and a minute in shared caches; 20 reads a minute per visitor.
+  Each wallet read is kept 5 minutes per server and a minute in the browser (never in shared caches: Trace is
+  private); 20 reads a minute per visitor.
   With `RANKR_MOCK=1`, made-up trails (the same for the same address). The page without a wallet shows a made-up
   example to play with: every wallet in it opens.
+- **Token report** (on Trace): paste a token's CA (an address, or a DexScreener / pump.fun / explorer link) on
+  Trace and the same page, `/trace/<chain>/<address>`, opens its report instead of a trail. The box asks
+  DexScreener what the paste is first, so a bare 0x address goes to the chain it trades on and a pool's address
+  (what a DexScreener link carries) to its token; a token on a chain Trace doesn't read (BSC...) says so. The
+  report (`src/lib/trace/token*.ts`, `src/components/trace/TokenReport.tsx`):
+  - **A verdict, in three levels, with every reason behind it**: **Warning signs** (a check came out bad),
+    **Worth a closer look** (one is worth a look, or couldn't be read: nothing read isn't nothing wrong) or
+    **No warning signs**. Each check is one line with its source, warning signs first. Never "scam" or "good to
+    buy": a warning sign is a fact about the token, and no warning signs isn't a promise.
+  - **Contract**: Solana: mint and freeze authority still on (bad), Token-2022's transfer fee, permanent
+    delegate, transfer hook, non-transferable, frozen by default, pausable (read from the mint account). EVM: a
+    test buy and sell (Honeypot.is, Ethereum and Base; elsewhere "couldn't check that it can be sold"), the buy /
+    sell / transfer tax (10%+ bad), source verified, a proxy (its code can be swapped), Blockscout's scam flag.
+  - **Liquidity**: thin under $10K or 2% of the market cap; on EVM v2 pools, how much of the LP is burned or
+    locked in a locker (under 50% bad, under 95% worth a look).
+  - **Holders**: the top 10 wallets' share (pools, burn addresses and exchanges aside: 30%+ worth a look, 50%+
+    bad), the biggest single wallet (10% / 20%), and on EVM what the deployer still holds (5% / 20%). Solana: the 20
+    biggest token accounts, followed to their owners (a pool's vault is told by its DEX's program, or its pair).
+  - **Trading** (the main pool's latest trades, up to 300 within 24 hours, wallet by wallet): wash trading
+    (wallets buying and selling about the same, three times or more each way: 25%+ of the volume worth a look,
+    50%+ bad), 3 wallets doing 60%+ of the buying, many small buys against a few big sells, selling 2:1, and 6+
+    trades per wallet over 24 hours (bots). Under 20 trades: too few to judge.
+  - **Buys and sells** per window (5m, 1h, 6h, 24h): counts and volume over every pool, the wallets behind them
+    in the main pool, a bar for the split.
+  - **Where the buys and sells come from**: the top buyers and sellers in the latest trades, net of what each
+    sold or bought back, each a tap from its own trail (where its money came from and went); the biggest holders,
+    pools, burns and the deployer marked; and **Trace the deployer** (EVM).
+  Data: DexScreener (pools, counts), [GeckoTerminal](https://www.geckoterminal.com)'s public API (no key, about
+  30 calls a minute; the main pool's wallets and trades; shown as "powered by GeckoTerminal", as its terms ask),
+  Solana's RPC or Blockscout (as for wallets), and [Honeypot.is](https://honeypot.is) (no key). Not used:
+  GoPlus, whose API license rules out commercial use without written permission; RugCheck, which needs an
+  account. A report costs about ten upstream calls and is kept a minute per server; 10 a minute per visitor.
+  With `RANKR_MOCK=1`, a Solana address ending in `pump` opens a made-up report (run through the real checks).
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
@@ -161,7 +196,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   bottom on phones and a dialog from sm up.
 - **Settings menu** (the gear in the header): theme (switching cross-fades the page), milestone alerts, About
   Rankr (the landing page) or Open app, Install app and the app link. It keeps pages free of app buttons.
-- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, feed, trace, leaderboard) and an
+- **Installable app (PWA)**: opens on `/app`, full screen, with shortcuts (track, feed, leaderboard) and an
   offline page (next section).
 - Responsive (bottom nav on mobile, table on desktop), dark and light theme.
 
@@ -374,6 +409,15 @@ in the app. To set up `@rankr`:
 
 To take the badge away: `select rankr_set_official('rankr', p_official => false);`
 
+#### Trace is private
+
+Trace (wallet trails and token reports) is open to official accounts only, so today to `@rankr` alone. Everyone
+else gets no Trace in the nav, and its pages say "Trace is private" (signed out: with a Sign in button); its PWA
+shortcut is gone. The API checks it, not just the page: `/api/trace/...` answers 401 without a session and 403
+for any other account (`requireTraceAccess`, `src/lib/api-auth.ts`), and its answers are never kept in shared
+caches. Its pages stay out of search results. To let another account in, make it official as above; without
+accounts (local dev, `RANKR_MOCK=1`), Trace is open, like pasting.
+
 An official account's name is locked (only `rankr_set_official` changes it), so the badge always vouches for
 the same name. Names starting with `rankr` or containing `official` are reserved for everyone else, so nobody
 can pass for the project without the badge. The function can't be called from the browser (service role only).
@@ -431,7 +475,8 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
-| `GET /api/trace/:chain/:address` | one wallet for a trail on the trace tab: who funded it, its biggest counterparties in and out (named where a public list knows them), its trades summed, what was read |
+| `GET /api/trace/:chain/:address` | one wallet for a trail on the trace tab: who funded it, its biggest counterparties in and out (named where a public list knows them), its trades summed, what was read (official accounts only) |
+| `GET /api/trace/token/:chain/:address` | a token's report: the verdict and its checks, buys and sells per window, the latest trades' top buyers and sellers, the biggest holders, the deployer (official accounts only) |
 | `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 
 ## How the numbers work
@@ -459,7 +504,8 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/callers, api/me/*      caller board, your account, username, profile, calls and rank
   api/callers/[u]/[chain]/[addr]  GET one caller's call; .../card its share card (PNG)
   api/feed                   GET the feed: calls and milestones
-  api/trace/[chain]/[addr]   GET one wallet's trail (the Trace tab)
+  api/trace/[chain]/[addr]   GET one wallet's trail (the Trace tab, official accounts only)
+  api/trace/token/[chain]/[addr]  GET a token's report (the Trace tab, official accounts only)
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, SettingsMenu...)
@@ -475,7 +521,8 @@ src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
-src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, the trail and its path, case file, share text
+src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, the trail and its path, case file, share text;
+                             token reports (token.ts; token-assess.ts the checks; token-solana.ts, token-evm.ts, gecko.ts, honeypot.ts the readers)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names
