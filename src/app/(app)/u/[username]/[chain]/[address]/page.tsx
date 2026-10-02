@@ -3,6 +3,7 @@ import { cache } from "react";
 import { CallDetail } from "@/components/CallDetail";
 import { callerCall } from "@/lib/accounts";
 import { formatMultiple, formatUsd } from "@/lib/format";
+import { OG_HD_SIZE } from "@/lib/og";
 import type { CallResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // The share card is the link preview (X, Telegram, Discord...).
   const image = {
     url: `/api/callers/${encodeURIComponent(caller.username)}/${chain}/${encodeURIComponent(decode(address))}/card`,
-    width: 1200,
-    height: 630,
+    ...OG_HD_SIZE,
     alt: title,
   };
   return {

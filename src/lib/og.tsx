@@ -6,6 +6,10 @@ import { avatarCells } from "./avatar";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
+/** 4K (3840x2016): a card laid out at OG_SIZE and scaled up as vectors, for cards that get saved and reposted. */
+export const OG_HD_SCALE = 3.2;
+export const OG_HD_SIZE = { width: OG_SIZE.width * OG_HD_SCALE, height: OG_SIZE.height * OG_HD_SCALE };
+
 export const OG = {
   bg: "#0A0A0A",
   fg: "#EDEDED",
