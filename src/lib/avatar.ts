@@ -21,3 +21,8 @@ export function avatarCells(userId: string): [number, number][] {
   }
   return cells;
 }
+
+/** The avatar's file name when saved: rankr-nonce_7f3a.png */
+export function avatarFile(username: string): string {
+  return `rankr-${username.replace(/[^\w-]/g, "")}.png`;
+}

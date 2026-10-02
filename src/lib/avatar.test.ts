@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avatarCells } from "./avatar";
+import { avatarCells, avatarFile } from "./avatar";
 
 const ids = Array.from({ length: 300 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
 
@@ -21,5 +21,11 @@ describe("avatarCells", () => {
       expect(cells.length).toBeLessThanOrEqual(18);
     }
     expect(new Set(all.map((c) => JSON.stringify(c))).size).toBeGreaterThan(290);
+  });
+});
+
+describe("avatarFile", () => {
+  it("is named after the account", () => {
+    expect(avatarFile("nonce_7f3a")).toBe("rankr-nonce_7f3a.png");
   });
 });

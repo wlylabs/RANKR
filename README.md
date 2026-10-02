@@ -35,7 +35,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   (or how many calls you still need to be ranked). Each caller has a public profile at `/u/<username>` with their
   numbers and every call.
 - **Caller profiles**: an avatar drawn from the account (a mirrored 5x5 matrix from `sha256(user id)`, in the style
-  of the logo, nothing to upload), a short bio, Telegram and website links, and an **X account, shown only once
+  of the logo, nothing to upload; **Save avatar** on You and your own profile saves it as a 1024px PNG,
+  `rankr-<username>.png`, to use as a profile picture on X or Telegram), a short bio, Telegram and website links, and an **X account, shown only once
   verified**: the caller posts a code from that X account and pastes the link (next sections). Edited on
   `/account`. Two small charts: where the calls are now (below entry, 1-2x, 2-5x, 5-10x, 10-100x, 100x+) and the
   last 10 calls (each up or down from its entry, how many are up, and the streak in profit up to the newest).

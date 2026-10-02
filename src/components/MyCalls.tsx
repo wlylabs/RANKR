@@ -22,6 +22,7 @@ import { rankLine } from "./CallersBoard";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { PageHeader } from "./PageHeader";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
+import { SaveAvatar } from "./SaveAvatar";
 import { ShareCall } from "./ShareCall";
 import { Segmented, TabBar } from "./Tabs";
 import { TimeAgo } from "./TimeAgo";
@@ -150,6 +151,7 @@ function AccountCalls({
                   <Pencil className="size-3.5" />
                   <span className="max-sm:sr-only">Edit profile</span>
                 </Link>
+                <SaveAvatar userId={userId} username={username} />
               </>
             }
           />
