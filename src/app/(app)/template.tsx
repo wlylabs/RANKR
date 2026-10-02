@@ -1,4 +1,7 @@
-/** Re-mounted on every navigation, so each page of the app settles in (see .animate-page-in). */
+/**
+ * Re-mounted on every navigation. Switching pages doesn't animate, like any other app's tabs: the page is just
+ * there (its own header and backdrop still arrive, see Backdrops.tsx).
+ */
 export default function AppTemplate({ children }: { children: React.ReactNode }) {
-  return <div className="animate-page-in">{children}</div>;
+  return <div>{children}</div>;
 }
