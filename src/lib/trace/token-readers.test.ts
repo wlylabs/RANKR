@@ -4,7 +4,9 @@ import { traceChain } from "./chains";
 import { poolTrades, poolWindows } from "./gecko";
 import { simulateTrade } from "./honeypot";
 import { evmTokenFacts } from "./token-evm";
-import { readMint, solanaTokenFacts } from "./token-solana";
+import { base58Decode } from "./solana-pda";
+import type { ParsedTx } from "./solana";
+import { lpMintOf, readLaunch, readMint, solanaTokenFacts, tokenDeltas } from "./token-solana";
 import { traceToken } from "./token";
 
 const MINT = "MemeMint1111111111111111111111111111111111";
@@ -105,6 +107,73 @@ describe("Honeypot.is", () => {
     expect(await simulateTrade("ethereum", "0xabc")).toBeNull();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 502 })));
     expect(await simulateTrade("ethereum", "0xabc")).toBeNull();
+  });
+});
+
+describe("a Solana token's launch and pool", () => {
+  /** A swap of MEME: each owner's balance before and after. */
+  const swap = (sig: string, slot: number, changes: [string, number, number][], dex = true): ParsedTx => ({
+    slot,
+    blockTime: 1_790_000_000 + slot,
+    meta: {
+      err: null,
+      preTokenBalances: changes.map(([owner, before], i) => ({
+        accountIndex: i,
+        mint: MINT,
+        owner,
+        uiTokenAmount: { amount: String(before * 1e6), decimals: 6 },
+      })),
+      postTokenBalances: changes.map(([owner, , after], i) => ({
+        accountIndex: i,
+        mint: MINT,
+        owner,
+        uiTokenAmount: { amount: String(after * 1e6), decimals: 6 },
+      })),
+    },
+    transaction: {
+      signatures: [sig],
+      message: { accountKeys: [`payer-${sig}`], instructions: dex ? [{ programId: PUMP }] : [] },
+    },
+  });
+
+  it("follows each wallet's change in the token over a transaction", () => {
+    const d = tokenDeltas(swap("a", 1, [["Curve", 900, 800], ["Buyer", 0, 100]]), MINT, 6);
+    expect(Object.fromEntries(d)).toEqual({ Curve: -100, Buyer: 100 });
+  });
+
+  it("finds the launch, its bundle and its snipers; the curve filling up isn't a buyer", () => {
+    const txs = [
+      // The deployer creates it: the curve gets the supply, the deployer its first buy, a bundled wallet too.
+      swap("create", 10, [["Curve", 0, 900], ["Dev", 0, 50], ["Bundler", 0, 50]]),
+      swap("snipe", 12, [["Curve", 900, 880], ["Sniper", 0, 20]]),
+      swap("late", 30, [["Curve", 880, 870], ["Late", 0, 10]]),
+    ].map((tx) => ({ tx, slot: tx.slot!, time: (tx.blockTime ?? 0) * 1000 }));
+    const l = readLaunch(txs, MINT, 6, 1_000, () => false);
+    expect(l).toEqual({
+      reached: true,
+      at: 1_790_000_010_000,
+      creator: "payer-create",
+      buys: [
+        { wallet: "Dev", amount: 50, phase: "bundle" },
+        { wallet: "Bundler", amount: 50, phase: "bundle" },
+        { wallet: "Sniper", amount: 20, phase: "sniper" },
+      ],
+    });
+  });
+
+  it("reads a pool account's LP mint only where the pool's own mints check out", () => {
+    const data = new Uint8Array(752);
+    const put = (at: number, key: string) => data.set(base58Decode(key), at);
+    const LP = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
+    const BONK = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
+    put(400, BONK);
+    put(432, WSOL);
+    put(464, LP);
+    const V4 = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
+    expect(lpMintOf(V4, data, BONK)).toBe(LP);
+    // Not this token's pool, or a layout this doesn't know: nothing read.
+    expect(lpMintOf(V4, data, "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")).toBeNull();
+    expect(lpMintOf("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK", data, BONK)).toBeNull();
   });
 });
 
@@ -223,12 +292,15 @@ describe("an EVM token", () => {
   const PAIR = "0x2222222222222222222222222222222222222222";
   const DEV = "0x3333333333333333333333333333333333333333";
   const LOCKER = "0x4444444444444444444444444444444444444444";
+  const BUNDLER = "0x5555555555555555555555555555555555555555";
+  const SNIPER = "0x6666666666666666666666666666666666666666";
+  const OLD = "0x7777777777777777777777777777777777777777";
   beforeEach(() => vi.stubEnv("BLOCKSCOUT_API_KEY", "test-key"));
 
-  it("reads the contract, the holders, a test sell and who holds the LP", async () => {
+  it("reads the contract, the holders, a test sell, the LP, the launch, the owner's powers and the deployer's tokens", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
+      vi.fn(async (url: string, init?: RequestInit) => {
         if (url.includes("honeypot.is"))
           return Response.json({ simulationSuccess: true, honeypotResult: { isHoneypot: false }, simulationResult: { buyTax: 0, sellTax: 0, transferTax: 0 } });
         const path = new URL(url).pathname.replace("/8453/api/v2", "");
@@ -245,6 +317,51 @@ describe("an EVM token", () => {
             ],
             next_page_params: null,
           });
+        if (url.includes("publicnode")) {
+          expect(JSON.parse(String(init?.body)).params[0]).toEqual({ to: TOKEN, data: "0x8da5cb5b" });
+          return Response.json({ result: `0x${"0".repeat(24)}${DEV.slice(2)}` });
+        }
+        if (url.includes("/v2/api?")) {
+          const q = new URL(url).searchParams;
+          expect([q.get("action"), q.get("address"), q.get("contractaddress"), q.get("sort")]).toEqual([
+            "tokentx",
+            PAIR,
+            TOKEN,
+            "asc",
+          ]);
+          const t = (block: number, from: string, to: string, value: string) => ({
+            blockNumber: String(block),
+            timeStamp: "1790000000",
+            from,
+            to,
+            value,
+            tokenDecimal: "18",
+          });
+          return Response.json({
+            status: "1",
+            result: [
+              t(100, DEV, PAIR, "600000000000000000000"), // the liquidity going in
+              t(101, PAIR, BUNDLER, "200000000000000000000"),
+              t(101, PAIR, DEV, "50000000000000000000"),
+              t(103, PAIR, SNIPER, "30000000000000000000"),
+              t(200, PAIR, "0x9999999999999999999999999999999999999999", "1000000000000000000"),
+            ],
+          });
+        }
+        if (path === `/smart-contracts/${TOKEN}`)
+          return Response.json({
+            abi: [
+              { type: "function", name: "setTaxes", stateMutability: "nonpayable" },
+              { type: "function", name: "openTrading", stateMutability: "nonpayable" },
+              { type: "function", name: "balanceOf", stateMutability: "view" },
+            ],
+          });
+        if (path === `/addresses/${DEV}`) return Response.json({ hash: DEV, is_contract: false });
+        if (path === `/addresses/${DEV}/transactions`)
+          return Response.json({ items: [{ created_contract: { hash: OLD } }, { created_contract: null }], next_page_params: null });
+        if (path === `/tokens/${OLD}`) return Response.json({ type: "ERC-20" });
+        if (url.includes("dexscreener")) return Response.json([]);
+        if (path.endsWith("/internal-transactions")) return Response.json({ items: [], next_page_params: null });
         if (path === `/tokens/${PAIR}`) return Response.json({ type: "ERC-20", decimals: "18", total_supply: "100" });
         if (path === `/tokens/${PAIR}/holders`)
           return Response.json({
@@ -266,7 +383,21 @@ describe("an EVM token", () => {
       proxy: false,
       scam: false,
       sim: { honeypot: false, reason: null, buyTax: 0, sellTax: 0, transferTax: 0 },
+      owner: DEV,
+      // openTrading is a one-way switch, not a pause.
+      powers: ["fees"],
     });
+    expect(f.launch).toEqual({
+      reached: true,
+      at: 1_790_000_000_000,
+      buys: [
+        { wallet: BUNDLER, amount: 200, phase: "bundle" },
+        { wallet: DEV, amount: 50, phase: "bundle" },
+        { wallet: SNIPER, amount: 30, phase: "sniper" },
+      ],
+    });
+    // The old token has no pool left: dead.
+    expect(f.history).toEqual({ tokens: 1, dead: 1 });
     expect(f.lp).toEqual({ burnedPct: 60, lockedPct: 30 });
     expect(f.holders?.count).toBe(321);
     expect(f.holders?.list.map((h) => [h.address, h.amount, h.role])).toEqual([

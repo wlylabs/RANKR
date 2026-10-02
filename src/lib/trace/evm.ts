@@ -97,6 +97,28 @@ export async function blockscout<T>(chain: TraceChain, path: string): Promise<T 
   }
 }
 
+/**
+ * Blockscout's Etherscan-compatible API (api.blockscout.com/v2/api?chain_id=...), for what its REST API can't do,
+ * like a token's transfers oldest first. Null when it answers with an error or nothing.
+ */
+export async function blockscoutRpc<T>(chain: TraceChain, params: Record<string, string>): Promise<T[] | null> {
+  const key = process.env.BLOCKSCOUT_API_KEY;
+  if (!key) return null;
+  const q = new URLSearchParams({ chain_id: String(chain.chainId), ...params, apikey: key });
+  try {
+    const res = await fetch(`${api()}/v2/api?${q}`, {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { status?: string; result?: unknown };
+    return Array.isArray(body.result) ? (body.result as T[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 const num = (v: unknown): number | null => {
   const n = typeof v === "string" ? Number.parseFloat(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? n : null;
@@ -208,6 +230,22 @@ export function evmLegs(
     if (l) legs.push(l);
   }
   return legs;
+}
+
+/**
+ * Who sent a wallet its first ETH (or POL), when its whole history fits Blockscout's first page (50 transactions
+ * and internal transactions): two requests. Null for a busier wallet.
+ */
+export async function evmFunder(chain: TraceChain, address: string): Promise<string | null> {
+  const path = `/addresses/${address}`;
+  const [txs, internal] = await Promise.all([
+    blockscout<Page<Tx>>(chain, `${path}/transactions`),
+    blockscout<Page<InternalTx>>(chain, `${path}/internal-transactions`),
+  ]);
+  const complete = [txs, internal].every((p) => !p || p.next_page_params === null || p.next_page_params === undefined);
+  if (!complete) return null;
+  const legs = evmLegs(address, chain, { txs: txs?.items ?? [], internal: internal?.items ?? [], tokens: [] }, null);
+  return firstFunding(legs)?.address ?? null;
 }
 
 export async function traceEvm(chain: TraceChain, address: string): Promise<TraceResponse> {

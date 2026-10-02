@@ -65,6 +65,8 @@ type TradesBody = {
       block_timestamp?: string;
       from_token_address?: string;
       to_token_address?: string;
+      from_token_amount?: string | number;
+      to_token_amount?: string | number;
     };
   }[];
 };
@@ -89,7 +91,16 @@ export async function poolTrades(chain: string, pool: string, token: string): Pr
     const usd = Number(a.volume_in_usd);
     const time = Date.parse(a.block_timestamp ?? "");
     if (!side || !Number.isFinite(usd) || !Number.isFinite(time)) continue;
-    out.push({ wallet: a.tx_from_address, side, usd, time, tx: a.tx_hash });
+    // In tokens: what came out of the pool on a buy, what went in on a sell.
+    const amount = Number(side === "buy" ? a.to_token_amount : a.from_token_amount);
+    out.push({
+      wallet: a.tx_from_address,
+      side,
+      usd,
+      ...(Number.isFinite(amount) && amount > 0 && { amount }),
+      time,
+      tx: a.tx_hash,
+    });
   }
   return out;
 }

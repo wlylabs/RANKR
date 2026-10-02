@@ -3,7 +3,7 @@
 import type { Pair } from "../dexscreener";
 import type { TraceChain } from "./chains";
 import { hash, mockAddress, rng } from "./mock";
-import type { RawHolder, RawTrade, TokenFacts } from "./token-assess";
+import type { LaunchBuy, RawHolder, RawTrade, TokenFacts } from "./token-assess";
 
 export function mockTokenFacts(chain: TraceChain, address: string, now = Date.now()): TokenFacts {
   const r = rng(`token:${chain.id}:${address}`);
@@ -39,13 +39,8 @@ export function mockTokenFacts(chain: TraceChain, address: string, now = Date.no
     const churn = churners.length && i % 2 === 0;
     const wallet = churn ? churners[i % churners.length] : crowd[Math.floor(r() * crowd.length)];
     const side = churn ? (Math.floor(i / 2) % 2 ? "sell" : "buy") : r() < 0.55 ? "buy" : "sell";
-    trades.push({
-      wallet,
-      side,
-      usd: churn ? 900 : Math.round(20 + r() ** 3 * 4_000),
-      time: now - i * 40_000,
-      tx: at(`tx/${i}`),
-    });
+    const usd = churn ? 900 : Math.round(20 + r() ** 3 * 4_000);
+    trades.push({ wallet, side, usd, amount: churn ? 250_000 : usd * 300, time: now - i * 40_000, tx: at(`tx/${i}`) });
   }
 
   const supply = 1e9;
@@ -54,6 +49,23 @@ export function mockTokenFacts(chain: TraceChain, address: string, now = Date.no
     { address: pool, amount: supply * 0.2, role: "pool", label: null },
     ...shares.map((s, i) => ({ address: crowd[i + 5], amount: supply * s, role: null, label: null })),
   ];
+
+  // The deployer, and its launch: a few wallets in the launch block (many, for a token with warning signs).
+  const dev = crowd[5];
+  const buys: LaunchBuy[] = [
+    { wallet: dev, amount: supply * (mood === 2 ? 0.06 : 0.03), phase: "bundle" },
+    ...crowd.slice(20, mood === 2 ? 25 : 21).map((wallet) => ({ wallet, amount: supply * 0.07, phase: "bundle" as const })),
+    ...crowd.slice(30, mood === 1 ? 38 : 33).map((wallet) => ({ wallet, amount: supply * 0.03, phase: "sniper" as const })),
+  ];
+  // Who funded the biggest holders: apart, or (a token worth a look or with warning signs) a few from one wallet.
+  const funder = at("funder");
+  const links = list
+    .filter((h) => !h.role)
+    .slice(0, 8)
+    .map((h, i) => ({
+      holder: h.address,
+      funder: mood === 2 && i >= 1 && i <= 4 ? dev : mood === 1 && i >= 1 && i <= 5 ? funder : at(`f/${i}`),
+    }));
 
   return {
     chain: chain.id,
@@ -81,6 +93,7 @@ export function mockTokenFacts(chain: TraceChain, address: string, now = Date.no
             nonTransferable: false,
             defaultFrozen: false,
             pausable: null,
+            mutableMetadata: mood === 1,
           }
         : {
             kind: "evm",
@@ -88,9 +101,15 @@ export function mockTokenFacts(chain: TraceChain, address: string, now = Date.no
             proxy: false,
             scam: false,
             sim: { honeypot: false, reason: null, buyTax: 0, sellTax: mood === 2 ? 12 : 0, transferTax: 0 },
+            owner: mood === 2 ? dev : "renounced",
+            powers: mood === 2 ? ["mint", "blacklist", "fees"] : ["fees"],
           },
-    lp: chain.kind === "evm" ? { burnedPct: mood === 2 ? 20 : 100, lockedPct: 0 } : undefined,
-    creator: chain.kind === "evm" ? crowd[5] : null,
+    lp: { burnedPct: mood === 2 ? 20 : 100, lockedPct: 0 },
+    launch: { reached: true, at: (pair.pairCreatedAt ?? now) + 1_000, buys, creator: dev },
+    links,
+    history: chain.kind === "evm" ? { tokens: mood === 2 ? 6 : 0, dead: mood === 2 ? 5 : 0 } : undefined,
+    supply,
+    creator: dev,
     label: () => null,
     now,
   };

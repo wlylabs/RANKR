@@ -23,10 +23,12 @@ const endpoints = () => {
   return own.length ? own : PUBLIC_RPCS;
 };
 const custom = () => !!process.env.SOLANA_RPC_URL?.trim();
+/** Its own RPC is set (SOLANA_RPC_URL): reads can go further. */
+export const ownRpc = custom;
 
 /** Transactions read per wallet, and at once. */
 const txLimit = () => (custom() ? 80 : 20);
-const concurrency = () => (custom() ? 8 : 3);
+export const concurrency = () => (custom() ? 8 : 3);
 /**
  * Calls per second per endpoint: under the public endpoint's 40 per method per 10 seconds, and Helius's free
  * 10 per second. SOLANA_RPC_RPS raises it for a paid plan.
@@ -134,7 +136,7 @@ export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
 }
 
 /** Runs `fn` over `items`, `n` at a time, in order; once `stop()` says so, the rest aren't started. */
-async function mapLimit<T, R>(
+export async function mapLimit<T, R>(
   items: T[],
   n: number,
   fn: (item: T) => Promise<R>,
@@ -160,8 +162,14 @@ type ParsedIx = {
   programId?: string;
   parsed?: { type?: string; info?: Record<string, unknown> } | string;
 };
-type TokenBalance = { accountIndex: number; mint: string; owner?: string; uiTokenAmount?: { decimals?: number } };
+export type TokenBalance = {
+  accountIndex: number;
+  mint: string;
+  owner?: string;
+  uiTokenAmount?: { decimals?: number; amount?: string; uiAmountString?: string };
+};
 export type ParsedTx = {
+  slot?: number;
   blockTime?: number | null;
   meta?: {
     err?: unknown;
@@ -301,7 +309,7 @@ function priced(legs: RawLeg[], p: { usd: Map<string, number>; symbols: Map<stri
 
 // ---- A wallet
 
-type Signature = { signature: string; err: unknown; blockTime?: number | null };
+export type Signature = { signature: string; err: unknown; slot?: number; blockTime?: number | null };
 
 /** The wallet's signatures, newest first, up to 3 pages (3,000): its whole history unless it's busier than that. */
 async function signatures(address: string): Promise<{ sigs: Signature[]; complete: boolean }> {
@@ -358,6 +366,24 @@ export async function getTx(signature: string): Promise<ParsedTx | null> {
     }
   }
   return null;
+}
+
+/**
+ * Who sent a wallet its first SOL, when its whole history is in reach (up to 3,000 transactions): its newest
+ * signatures, then its three oldest transactions. Null for a busier wallet, or one first paid in a trade.
+ */
+export async function solanaFunder(address: string): Promise<string | null> {
+  const history = await signatures(address);
+  if (!history.complete) return null;
+  const oldest = history.sigs.filter((s) => !s.err).slice(-3);
+  const txs = await mapLimit(oldest, concurrency(), (s) => getTx(s.signature));
+  const legs = txs
+    .filter((tx): tx is ParsedTx => !!tx && !tx.meta?.err)
+    .flatMap((tx) => {
+      const r = walletLegs(tx, address);
+      return r.swap ? [] : r.legs.map((l) => ({ ...l, symbol: l.symbol ?? "", usd: null }));
+    });
+  return firstFunding(legs)?.address ?? null;
 }
 
 export async function traceSolana(address: string): Promise<TraceResponse> {

@@ -1,28 +1,36 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowUpRight, Check, CircleAlert, CircleHelp, Crosshair, RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  CircleAlert,
+  CircleHelp,
+  Crosshair,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { formatCount, formatPrice, formatUsd, tokenHref } from "@/lib/format";
+import { formatCount, formatUsd, tokenHref } from "@/lib/format";
 import { apiFetch } from "@/lib/supabase-browser";
 import { EVM_TRACE_CHAINS, explorerAddress, traceChain, traceHref, type TraceChain } from "@/lib/trace/chains";
 import type {
   TokenCheck,
   TokenCheckStatus,
-  TokenHolder,
+  TokenGroup,
   TokenReport as Report,
   TokenTrader,
   TokenVerdict,
+  TokenWindow,
 } from "@/lib/trace/types";
 import { Avatar } from "../Avatar";
 import { CopyButton } from "../CopyButton";
+import { Segmented } from "../Tabs";
 import { TimeAgo } from "../TimeAgo";
 import { FullAddress, LabelTag, Scramble } from "./TraceCard";
 import { TraceInput } from "./TraceInput";
-
-const linkClass =
-  "inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:border-border-strong hover:text-fg";
 
 type ReadError = { message: string; code?: string };
 
@@ -60,165 +68,153 @@ function span(ms: number): string {
   return h < 24 ? `${h < 10 ? h.toFixed(1) : Math.round(h)}h` : "1 day";
 }
 
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// ---- Status, the same marks everywhere: red for a warning sign, a ring to check, grey unread, green fine.
+
 const VERDICT: Record<TokenVerdict, { title: string; box: string; text: string; Icon: typeof Check }> = {
-  danger: {
-    title: "Warning signs",
-    box: "border-down/40 bg-down-soft",
-    text: "text-down",
-    Icon: TriangleAlert,
-  },
-  check: { title: "Worth a closer look", box: "border-border-strong", text: "text-fg", Icon: CircleAlert },
+  danger: { title: "Warning signs", box: "border-down/40 bg-down-soft", text: "text-down", Icon: TriangleAlert },
+  check: { title: "Worth a closer look", box: "border-border-strong bg-surface-2/60", text: "text-fg", Icon: CircleAlert },
   clear: { title: "No warning signs", box: "border-up/40 bg-up-soft", text: "text-up", Icon: Check },
 };
 
 const STATUS: Record<TokenCheckStatus, { Icon: typeof Check; className: string; label: string }> = {
   bad: { Icon: TriangleAlert, className: "text-down", label: "Warning sign" },
   warn: { Icon: CircleAlert, className: "text-fg", label: "Worth a look" },
-  unknown: { Icon: CircleHelp, className: "text-subtle", label: "Couldn't read" },
+  unknown: { Icon: CircleHelp, className: "text-subtle", label: "Not read" },
   ok: { Icon: Check, className: "text-up", label: "Fine" },
 };
+const RANK: Record<TokenCheckStatus, number> = { bad: 0, warn: 1, unknown: 2, ok: 3 };
 
-const GROUPS: Record<TokenCheck["group"], string> = {
-  contract: "Contract",
-  liquidity: "Liquidity",
-  holders: "Holders",
-  trading: "Trading",
+const GROUPS: [TokenGroup, string][] = [
+  ["contract", "Contract"],
+  ["liquidity", "Liquidity"],
+  ["holders", "Holders"],
+  ["insiders", "Launch & insiders"],
+  ["trading", "Trading"],
+];
+
+/** A few checks' short words, worst first: "Can be frozen · 35% bundled". */
+const shorts = (checks: TokenCheck[], n: number) => {
+  const picked = checks.slice(0, n).map((c) => c.short);
+  return checks.length > n ? [...picked, `+${checks.length - n} more`] : picked;
 };
 
-function plural(n: number, one: string, many = `${one}s`) {
-  return `${n} ${n === 1 ? one : many}`;
+function Dots({ items, className }: { items: string[]; className?: string }) {
+  return (
+    <span className={className}>
+      {items.map((t, i) => (
+        <span key={i}>
+          {i > 0 && <span className="text-subtle"> · </span>}
+          {t}
+        </span>
+      ))}
+    </span>
+  );
 }
 
-/** The verdict, and every check behind it: warning signs first. */
+/** The verdict, and in a line what it rests on. */
 function Verdict({ report }: { report: Report }) {
   const v = VERDICT[report.verdict];
-  const count = (s: TokenCheckStatus) => report.checks.filter((c) => c.status === s).length;
-  const bad = count("bad");
-  const look = count("warn") + count("unknown");
-  const summary =
-    report.verdict === "danger"
-      ? `${plural(bad, "warning sign")}${look ? ` · ${look} to check` : ""}`
-      : report.verdict === "check"
-        ? `${look} to check · no warning sign`
-        : `${plural(count("ok"), "check")}, nothing found`;
+  const by = (s: TokenCheckStatus[]) => report.checks.filter((c) => s.includes(c.status));
+  const reasons = report.verdict === "danger" ? by(["bad"]) : report.verdict === "check" ? by(["warn", "unknown"]) : by(["ok"]);
+  const bad = by(["bad"]).length;
+  const look = by(["warn", "unknown"]).length;
+  const fine = by(["ok"]).length;
   return (
-    <section className={clsx("rounded-xl border p-4 sm:p-5", v.box)} aria-labelledby="verdict-title">
-      <div className="flex items-start gap-3">
-        <v.Icon className={clsx("mt-1 size-5 shrink-0", v.text)} />
-        <div className="min-w-0">
-          <h2 id="verdict-title" className={clsx("text-xl font-semibold tracking-[-0.02em]", v.text)}>
-            {v.title}
-          </h2>
-          <p className="label mt-0.5 text-muted">{summary}</p>
-        </div>
-      </div>
-      <ul className="mt-4 divide-y divide-border border-t border-border">
-        {report.checks.map((c) => {
-          const s = STATUS[c.status];
-          return (
-            <li key={c.id} className="flex gap-2.5 py-2.5 text-sm">
-              <s.Icon className={clsx("mt-0.5 size-4 shrink-0", s.className)} aria-label={s.label} />
-              <span className="min-w-0 flex-1 text-pretty">
-                {c.text}
-                <span className="text-[12px] text-subtle">
-                  {" "}
-                  · {GROUPS[c.group]}
-                  {c.source && <> · {c.source}</>}
-                </span>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="mt-3 text-[12px] leading-relaxed text-subtle">
-        Read just now from public data. A warning sign is a fact about the token, not proof of a scam; no warning signs
-        isn&apos;t a promise: a token that passes every check can still be dumped on. Not financial advice.
-      </p>
-    </section>
-  );
-}
-
-function Stat({ k, children }: { k: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="label text-subtle">{k}</dt>
-      <dd className="tabular mt-0.5 truncate font-mono text-[15px]">{children}</dd>
-    </div>
-  );
-}
-
-/** Buys against sells in each window: counts over every pool, a bar for the split, the wallets behind them. */
-function Flow({ report }: { report: Report }) {
-  return (
-    <section className="card p-4 sm:p-5" aria-labelledby="flow-title">
-      <h2 id="flow-title" className="label text-fg">
-        Buys and sells
+    <section className={clsx("rounded-xl border px-4 py-4 sm:px-5", v.box)} aria-labelledby="verdict-title">
+      <h2 id="verdict-title" className={clsx("flex items-center gap-2 text-xl font-semibold tracking-[-0.02em]", v.text)}>
+        <v.Icon className="size-5 shrink-0" />
+        {v.title}
       </h2>
-      <p className="mt-1 text-[12px] text-muted">
-        Trades over {plural(report.pools, "pool")}; wallets in the main pool.
+      <p className="mt-1.5 text-[15px] text-pretty">
+        <Dots items={shorts(reasons, report.verdict === "clear" ? 4 : 3)} />
       </p>
-      <ul className="mt-3 space-y-3">
-        {report.flow.map((w) => {
-          const total = w.buys + w.sells;
-          const share = total ? (w.buys / total) * 100 : 50;
-          return (
-            <li key={w.window} className="tabular grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
-              <span className="label text-subtle">{w.window}</span>
-              <div className="min-w-0">
-                <div className="flex justify-between gap-3 font-mono text-[12.5px]">
-                  <span className="text-up">{formatCount(w.buys)} buys</span>
-                  <span className="text-right text-down">{formatCount(w.sells)} sells</span>
-                </div>
-                <div className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
-                  {total > 0 && (
-                    <>
-                      <span className="bg-up" style={{ width: `${share}%` }} />
-                      <span className="flex-1 bg-down" />
-                    </>
-                  )}
-                </div>
-                <p className="mt-0.5 text-[11px] text-subtle">
-                  {[
-                    w.buyers !== null && w.sellers !== null
-                      ? `${formatCount(w.buyers)} buyers · ${formatCount(w.sellers)} sellers`
-                      : null,
-                    w.volumeUsd !== null ? `${formatUsd(w.volumeUsd)} traded` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <p className="label mt-2 text-subtle">
+        {[bad && plural(bad, "warning sign"), look && `${look} to check`, fine && `${fine} fine`].filter(Boolean).join(" · ")}
+      </p>
     </section>
   );
 }
+
+/** The five areas, one line each: its worst finding in a few words. Tap one for every check behind it. */
+function Areas({ report }: { report: Report }) {
+  return (
+    <section className="card divide-y divide-border" aria-label="What was checked">
+      {GROUPS.map(([group, title]) => {
+        const checks = report.checks
+          .filter((c) => c.group === group)
+          .sort((a, b) => RANK[a.status] - RANK[b.status]);
+        const notes = report.notes.filter((n) => n.group === group);
+        if (!checks.length && !notes.length) return null;
+        const worst = checks[0]?.status ?? "unknown";
+        const s = STATUS[worst];
+        const top = checks.filter((c) => c.status === worst);
+        return (
+          <details key={group} className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
+              <s.Icon className={clsx("size-4 shrink-0", s.className)} aria-label={s.label} />
+              {/* On a phone the finding goes under the area's name; from sm up, beside it. */}
+              <span className="min-w-0 flex-1 sm:flex sm:items-baseline sm:gap-3">
+                <span className="block text-sm font-medium sm:w-36 sm:shrink-0">{title}</span>
+                <Dots items={shorts(top, 2)} className="block min-w-0 text-[13px] text-muted sm:truncate sm:text-sm" />
+              </span>
+              <ChevronDown className="size-4 shrink-0 text-subtle transition-transform group-open:rotate-180" />
+            </summary>
+            <ul className="space-y-2 px-4 pb-4 sm:px-5 sm:pl-12">
+              {checks.map((c) => {
+                const cs = STATUS[c.status];
+                return (
+                  <li key={c.id} className="flex gap-2.5 text-sm">
+                    <cs.Icon className={clsx("mt-0.5 size-3.5 shrink-0", cs.className)} aria-label={cs.label} />
+                    <span className="min-w-0 text-pretty">
+                      {c.text}
+                      {c.source && <span className="text-[12px] text-subtle"> · {c.source}</span>}
+                    </span>
+                  </li>
+                );
+              })}
+              {notes.map((n) => (
+                <li key={n.text} className="flex gap-2.5 text-[13px] text-subtle">
+                  <CircleHelp className="mt-0.5 size-3.5 shrink-0" />
+                  <span>{n.text}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })}
+    </section>
+  );
+}
+
+const WINDOW_LABELS: Record<TokenWindow, string> = { "5m": "5m", "1h": "1h", "6h": "6h", "24h": "24h" };
 
 function TraderRow({ chain, t, side }: { chain: TraceChain; t: TokenTrader; side: "buy" | "sell" }) {
   const net = side === "buy" ? t.buyUsd - t.sellUsd : t.sellUsd - t.buyUsd;
   return (
     <li className="flex items-center gap-2.5 py-2">
-      <Avatar userId={t.address} size={26} className="rounded-[6px]" />
+      <Avatar userId={t.address} size={24} className="rounded-[6px]" />
       <div className="min-w-0 flex-1">
         <FullAddress address={t.address} max={12} />
         <p className="mt-0.5 flex min-w-0 items-center gap-2 text-[11.5px] text-subtle">
           {t.label && <LabelTag label={t.label} className="min-w-0" />}
           <span className="shrink-0">
-            {t.buys}↑ {t.sells}↓ · <TimeAgo at={t.last} compact />
+            {plural(t.buys, "buy")} · {plural(t.sells, "sell")} · <TimeAgo at={t.last} compact />
+          </span>
+          <span
+            className={clsx("tabular ml-auto shrink-0 font-mono text-[13px]", side === "buy" ? "text-up" : "text-down")}
+          >
+            {side === "buy" ? "+" : "−"}
+            {formatUsd(net)}
           </span>
         </p>
       </div>
-      <span className={clsx("tabular shrink-0 font-mono text-[13px]", side === "buy" ? "text-up" : "text-down")}>
-        {side === "buy" ? "+" : "−"}
-        {formatUsd(net)}
-      </span>
       <Link
         href={traceHref(chain.id, t.address)}
         className="grid size-8 shrink-0 place-items-center rounded-md text-subtle hover:bg-surface-2 hover:text-fg"
-        aria-label="Trace where this wallet's money goes"
-        title="Trace this wallet"
+        aria-label="Follow this wallet's money"
+        title="Follow this wallet's money"
       >
         <Crosshair className="size-3.5" />
       </Link>
@@ -226,117 +222,166 @@ function TraderRow({ chain, t, side }: { chain: TraceChain; t: TokenTrader; side
   );
 }
 
-/** Who's buying and who's selling in the latest trades, net, each a tap away from its own trail. */
-function Traders({ report, chain }: { report: Report; chain: TraceChain }) {
+/** Buys against sells in a window, then who is buying and who is selling, each a tap from its own trail. */
+function MoneyFlow({ report, chain }: { report: Report; chain: TraceChain }) {
+  const [win, setWin] = useState<TokenWindow>("1h");
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const w = report.flow.find((f) => f.window === win)!;
+  const total = w.buys + w.sells;
   const t = report.trades;
+  const list = t ? (side === "buy" ? t.buyers : t.sellers) : [];
   return (
-    <section className="card p-4 sm:p-5" aria-labelledby="traders-title">
-      <h2 id="traders-title" className="label text-fg">
-        Where the buys and sells come from
-      </h2>
+    <section className="card p-4 sm:p-5" aria-labelledby="flow-title">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="flow-title" className="label text-fg">
+          Money flow
+        </h2>
+        <Segmented label="Window" options={WINDOW_LABELS} value={win} onChange={setWin} optionClassName="px-2.5 text-xs" />
+      </div>
+      <div className="tabular mt-4 flex items-baseline justify-between gap-3 font-mono">
+        <span className="text-up">
+          <span className="text-lg">{formatCount(w.buys)}</span> <span className="text-[12px]">buys</span>
+        </span>
+        <span className="text-down">
+          <span className="text-[12px]">sells</span> <span className="text-lg">{formatCount(w.sells)}</span>
+        </span>
+      </div>
+      <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+        {total > 0 && (
+          <>
+            <span className="bg-up" style={{ width: `${(w.buys / total) * 100}%` }} />
+            <span className="flex-1 bg-down" />
+          </>
+        )}
+      </div>
+      <p className="mt-1.5 text-[12px] text-subtle">
+        {[
+          w.buyers !== null && w.sellers !== null && `${formatCount(w.buyers)} buyers · ${formatCount(w.sellers)} sellers`,
+          w.volumeUsd !== null && `${formatUsd(w.volumeUsd)} traded`,
+        ]
+          .filter(Boolean)
+          .join(" · ") || "No trades in this window"}
+      </p>
+
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+        <h3 className="label text-fg">Who&apos;s {side === "buy" ? "buying" : "selling"}</h3>
+        <Segmented
+          label="Side"
+          options={{ buy: "Buyers", sell: "Sellers" }}
+          value={side}
+          onChange={setSide}
+          optionClassName="px-2.5 text-xs"
+        />
+      </div>
       {!t ? (
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-3 text-sm text-muted">
           {report.pool ? "Couldn't read the latest trades right now." : "No pool trades it yet."}
         </p>
+      ) : list.length ? (
+        <ul className="mt-1 divide-y divide-border">
+          {list.slice(0, 5).map((x) => (
+            <TraderRow key={x.address} chain={chain} t={x} side={side} />
+          ))}
+        </ul>
       ) : (
-        <>
-          <p className="mt-1 text-[12px] text-muted">
-            The latest {t.count} trades in the main pool, over {span(t.to - t.from)}:{" "}
-            <span className="text-up">{formatUsd(t.buyUsd)} bought</span>,{" "}
-            <span className="text-down">{formatUsd(t.sellUsd)} sold</span>, by {plural(t.wallets, "wallet")}. Net of
-            what each sold or bought back. Tap the crosshair to follow a wallet&apos;s money.
-          </p>
-          <div className="mt-3 space-y-4">
-            {(["buy", "sell"] as const).map((side) => {
-              const list = side === "buy" ? t.buyers : t.sellers;
-              return (
-                <div key={side} className="min-w-0">
-                  <h3 className={clsx("label", side === "buy" ? "text-up" : "text-down")}>
-                    {side === "buy" ? "Top buyers" : "Top sellers"}
-                  </h3>
-                  {list.length ? (
-                    <ul className="mt-1 divide-y divide-border">
-                      {list.map((w) => (
-                        <TraderRow key={w.address} chain={chain} t={w} side={side} />
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-2 text-sm text-muted">None in these trades.</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-3 text-[11px] text-subtle">
-            Trades{" "}
-            <a href="https://www.geckoterminal.com" target="_blank" rel="noreferrer" className="underline">
-              powered by GeckoTerminal
-            </a>
-          </p>
-        </>
+        <p className="mt-3 text-sm text-muted">No net {side === "buy" ? "buyers" : "sellers"} in the latest trades.</p>
+      )}
+      {t && (
+        <p className="mt-2 text-[11px] text-subtle">
+          Net, from the latest {t.count} trades ({span(t.to - t.from)}): {formatUsd(t.buyUsd)} in, {formatUsd(t.sellUsd)}{" "}
+          out ·{" "}
+          <a href="https://www.geckoterminal.com" target="_blank" rel="noreferrer" className="underline">
+            powered by GeckoTerminal
+          </a>
+        </p>
       )}
     </section>
   );
 }
 
-const ROLE: Record<NonNullable<TokenHolder["role"]>, string> = { pool: "Pool", burn: "Burn", creator: "Deployer" };
+const ROLE: Record<"pool" | "burn" | "creator", string> = { pool: "Pool", burn: "Burn", creator: "Dev" };
+const CLUSTER = "ABCDEFGH";
 
-/** The biggest holders, a bar each, pools and burn addresses marked. */
+/** The biggest holders as bars: pools, burns and the deployer marked, wallets sharing a funder lettered. */
 function Holders({ report, chain }: { report: Report; chain: TraceChain }) {
+  const [all, setAll] = useState(false);
   const h = report.holders;
+  if (!h) return null;
+  const shown = all ? h.top : h.top.slice(0, 6);
   return (
     <section className="card p-4 sm:p-5" aria-labelledby="holders-title">
-      <h2 id="holders-title" className="label text-fg">
-        Holders
-      </h2>
-      {!h ? (
-        <p className="mt-2 text-sm text-muted">Couldn&apos;t read the holders right now.</p>
-      ) : (
-        <>
-          <p className="mt-1 text-[12px] text-muted">
-            Top 10 wallets: {h.top10Pct.toFixed(1)}% of the supply (pools, burns and exchanges aside)
-            {h.poolPct > 0 && <> · in pools: {h.poolPct.toFixed(1)}%</>}
-            {h.count !== null && <> · {formatCount(h.count)} holders</>}
-          </p>
-          <ol className="mt-3 space-y-2">
-            {h.top.slice(0, 12).map((x) => (
-              <li key={x.address} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    {x.role && (
-                      <span
-                        className={clsx(
-                          "shrink-0 rounded-[3px] px-1 font-mono text-[9.5px] leading-[15px] tracking-wide uppercase",
-                          x.role === "creator" ? "bg-fg text-bg" : "border border-border-strong text-muted",
-                        )}
-                      >
-                        {ROLE[x.role]}
-                      </span>
-                    )}
-                    {x.label && !x.role && <LabelTag label={x.label} className="shrink-0 text-[12px]" />}
-                    <Link
-                      href={traceHref(chain.id, x.address)}
-                      className="min-w-0 flex-1 hover:underline"
-                      title="Trace this wallet"
-                    >
-                      <FullAddress address={x.address} max={11.5} className="text-muted" />
-                    </Link>
-                  </div>
-                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
-                    <span
-                      className={clsx("block h-full", x.role ? "bg-border-strong" : "bg-fg")}
-                      style={{ width: `${Math.min(100, x.pct)}%` }}
-                    />
-                  </div>
-                </div>
-                <span className="tabular font-mono text-[13px]">{x.pct.toFixed(x.pct >= 10 ? 1 : 2)}%</span>
-              </li>
-            ))}
-          </ol>
-          {chain.kind === "solana" && (
-            <p className="mt-3 text-[11px] text-subtle">The 20 biggest token accounts, by wallet (Solana RPC).</p>
-          )}
-        </>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="holders-title" className="label text-fg">
+          Holders
+        </h2>
+        <span className="label text-subtle">
+          Top 10 · {h.top10Pct.toFixed(1)}%{h.count !== null && <> · {formatCount(h.count)} holders</>}
+        </span>
+      </div>
+      <ol className="mt-3 space-y-2.5">
+        {shown.map((x) => (
+          <li key={x.address} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
+            {/* The address on a line of its own, whole; what it is beside its bar. */}
+            <Link href={traceHref(chain.id, x.address)} className="min-w-0 hover:underline" title="Trace this wallet">
+              <FullAddress address={x.address} max={11.5} className="text-muted" />
+            </Link>
+            <span className="tabular row-span-2 self-center font-mono text-[13px]">{x.pct.toFixed(x.pct >= 10 ? 1 : 2)}%</span>
+            <div className="flex min-w-0 items-center gap-1.5">
+              {x.role && (
+                <span
+                  className={clsx(
+                    "shrink-0 rounded-[3px] px-1 font-mono text-[9.5px] leading-[15px] tracking-wide uppercase",
+                    x.role === "creator" ? "bg-fg text-bg" : "border border-border-strong text-muted",
+                  )}
+                >
+                  {ROLE[x.role]}
+                </span>
+              )}
+              {x.cluster !== undefined && (
+                <span
+                  className="shrink-0 rounded-[3px] bg-down px-1 font-mono text-[9.5px] leading-[15px] tracking-wide text-bg uppercase"
+                  title="Shares a funder with other top holders"
+                >
+                  Linked {CLUSTER[x.cluster] ?? ""}
+                </span>
+              )}
+              {x.label && !x.role && <LabelTag label={x.label} className="max-w-[45%] shrink-0 text-[12px]" />}
+              <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+                <span
+                  className={clsx("block h-full", x.role ? "bg-border-strong" : x.cluster !== undefined ? "bg-down" : "bg-fg")}
+                  style={{ width: `${Math.min(100, x.pct)}%` }}
+                />
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+      {h.top.length > 6 && (
+        <button
+          type="button"
+          onClick={() => setAll((v) => !v)}
+          className="mt-3 text-[13px] text-muted hover:text-fg"
+        >
+          {all ? "Show fewer" : `Show all ${h.top.length}`}
+        </button>
+      )}
+      {report.clusters.length > 0 && (
+        <ul className="mt-3 space-y-2 border-t border-border pt-3 text-[12.5px] text-muted">
+          {report.clusters.map((c, i) => (
+            <li key={c.funder} className="min-w-0">
+              <p>
+                <span className="font-mono text-down">Linked {CLUSTER[i] ?? ""}</span> ·{" "}
+                {plural(c.members.length, "wallet")} holding {c.pct.toFixed(1)}%,{" "}
+                {c.deployer ? "tied to the deployer" : "all first funded by"}
+              </p>
+              {!c.deployer && (
+                <Link href={traceHref(chain.id, c.funder)} className="block min-w-0 hover:underline" title="Trace the funder">
+                  <FullAddress address={c.funder} max={11} />
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );
@@ -350,14 +395,15 @@ function ReportBoot({ chain, address }: { chain: TraceChain; address: string }) 
       Target
       <FullAddress address={address} max={12.5} className="mt-0.5 text-fg" />
     </>,
-    "Reading its pools",
-    "Reading the latest trades",
+    "Reading its pools and trades",
     "Checking the contract",
     "Counting the holders",
+    "Reading its launch",
+    "Finding who funded the holders",
   ];
   const [shown, setShown] = useState(1);
   useEffect(() => {
-    const id = window.setInterval(() => setShown((n) => (n < lines.length ? n + 1 : n)), 480);
+    const id = window.setInterval(() => setShown((n) => (n < lines.length ? n + 1 : n)), 900);
     return () => window.clearInterval(id);
   }, [lines.length]);
   return (
@@ -382,9 +428,12 @@ function ReportBoot({ chain, address }: { chain: TraceChain; address: string }) 
   );
 }
 
+const linkClass =
+  "inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:border-border-strong hover:text-fg";
+
 /**
- * A token pasted on Trace: the verdict and the checks behind it, where its buys and sells come from (each wallet
- * a tap from its own trail), who holds it, and who deployed it.
+ * A token pasted on Trace, kept to what helps decide: the verdict and why in a line, the five areas it rests on
+ * (tap one for every check), where the money is flowing, and who holds it.
  */
 export function TokenReport({ chain: chainId, address }: { chain: string; address: string }) {
   const chain = traceChain(chainId)!;
@@ -392,27 +441,44 @@ export function TokenReport({ chain: chainId, address }: { chain: string; addres
   const [link, setLink] = useState("");
   useEffect(() => setLink(window.location.href), []);
 
+  const facts = report
+    ? [
+        report.marketCap !== null && `${formatUsd(report.marketCap)} mc`,
+        report.liquidityUsd !== null && `${formatUsd(report.liquidityUsd)} liquidity`,
+        report.pool?.dex,
+      ].filter((x): x is string => !!x)
+    : [];
+
   return (
-    <div className="space-y-5 pt-8 sm:pt-10">
+    <div className="mx-auto max-w-3xl space-y-4 pt-8 sm:pt-10">
       <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="label text-subtle">Token report</span>
-          <span className="label text-subtle">· {chainName(chain)}</span>
-          <span className="ml-auto flex items-center gap-3">
-            {link && <CopyButton value={link} label="Copy link" what="link" />}
-          </span>
+          <span className="label text-subtle">Token report · {chainName(chain)}</span>
+          <span className="ml-auto">{link && <CopyButton value={link} label="Copy link" what="link" />}</span>
         </div>
-        <h1 className="cine-in text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
-          {report?.symbol ? (
-            <>
-              ${report.symbol}
-              {report.name && <span className="ml-2 text-lg font-normal text-muted sm:text-xl">{report.name}</span>}
-            </>
-          ) : (
-            <FullAddress address={address} decrypt max={30} className="tracking-[-0.02em]" />
+        <div>
+          <h1 className="cine-in text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
+            {report?.symbol ? (
+              <>
+                ${report.symbol}
+                {report.name && <span className="ml-2 text-lg font-normal text-muted sm:text-xl">{report.name}</span>}
+              </>
+            ) : (
+              <FullAddress address={address} decrypt max={30} className="tracking-[-0.02em]" />
+            )}
+          </h1>
+          {report?.symbol && <FullAddress address={address} max={14} className="mt-0.5 text-muted" />}
+          {facts.length > 0 && (
+            <p className="mt-1.5 text-[13px] text-muted">
+              <Dots items={facts} />
+              {report?.pool?.createdAt && (
+                <>
+                  <span className="text-subtle"> · </span>opened <TimeAgo at={report.pool.createdAt} />
+                </>
+              )}
+            </p>
           )}
-        </h1>
-        {report?.symbol && <FullAddress address={address} max={15} className="-mt-1 text-muted" />}
+        </div>
         {chain.kind === "evm" && (
           <nav aria-label="Chain" className="flex flex-wrap gap-1.5">
             {EVM_TRACE_CHAINS.map((c) => (
@@ -450,88 +516,46 @@ export function TokenReport({ chain: chainId, address }: { chain: string; addres
         <ReportBoot chain={chain} address={address} />
       ) : (
         <>
-          <dl className="card grid grid-cols-2 gap-x-6 gap-y-3 p-4 sm:grid-cols-4 sm:p-5">
-            <Stat k="Price">{formatPrice(report.priceUsd)}</Stat>
-            <Stat k="Market cap">{formatUsd(report.marketCap)}</Stat>
-            <Stat k="Liquidity">{formatUsd(report.liquidityUsd)}</Stat>
-            <Stat k="Main pool">
-              {report.pool ? (
-                <>
-                  {report.pool.dex}
-                  {report.pool.createdAt && (
-                    <span className="text-[12px] text-subtle">
-                      {" "}
-                      · <TimeAgo at={report.pool.createdAt} compact />
-                    </span>
-                  )}
-                </>
-              ) : (
-                "—"
-              )}
-            </Stat>
-          </dl>
+          <Verdict report={report} />
+          <Areas report={report} />
+          <MoneyFlow report={report} chain={chain} />
+          <Holders report={report} chain={chain} />
 
-          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-            <Verdict report={report} />
-            <div className="space-y-4">
-              <Flow report={report} />
-              <Traders report={report} chain={chain} />
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-            <Holders report={report} chain={chain} />
-            <section className="card p-4 sm:p-5" aria-labelledby="links-title">
-              <h2 id="links-title" className="label text-fg">
-                Follow the money
-              </h2>
-              {report.creator ? (
-                <div className="mt-3 flex items-start gap-3">
-                  <Avatar userId={report.creator} size={32} className="rounded-[7px]" />
-                  <div className="min-w-0 flex-1">
-                    <p className="label text-subtle">Deployed by</p>
-                    <FullAddress address={report.creator} max={12.5} className="mt-0.5" />
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-muted">
-                  Tap a buyer, a seller or a holder to see where their money came from and where it went.
-                </p>
-              )}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {report.creator && (
-                  <Link
-                    href={traceHref(chain.id, report.creator)}
-                    className="inline-flex items-center gap-1 rounded-md bg-fg px-3 py-1.5 text-[13px] font-medium text-bg hover:opacity-85"
-                  >
-                    <Crosshair className="size-3.5" /> Trace the deployer
-                  </Link>
-                )}
-                <Link href={tokenHref({ chainId: chain.id, address })} className={linkClass}>
-                  Open on Rankr
-                </Link>
-                {report.pool && (
-                  <a href={report.pool.url} target="_blank" rel="noreferrer" className={linkClass}>
-                    DexScreener <ArrowUpRight className="size-3.5" />
-                  </a>
-                )}
-                <a href={explorerAddress(chain, address)} target="_blank" rel="noreferrer" className={linkClass}>
-                  Explorer <ArrowUpRight className="size-3.5" />
-                </a>
-              </div>
-              <p className="mt-4 flex items-center gap-2 border-t border-border pt-3 text-[12px] text-subtle">
-                Read <TimeAgo at={report.updatedAt} />
-                <button
-                  type="button"
-                  onClick={() => void reload()}
-                  disabled={loading}
-                  className="inline-flex items-center gap-1 text-muted hover:text-fg disabled:opacity-50"
-                >
-                  <RotateCcw className={clsx("size-3", loading && "animate-spin")} /> Read again
-                </button>
-              </p>
-            </section>
-          </div>
+          <section className="flex flex-wrap items-center gap-2 pt-1" aria-label="Links">
+            {report.creator && (
+              <Link
+                href={traceHref(chain.id, report.creator)}
+                className="inline-flex items-center gap-1 rounded-md bg-fg px-3 py-1.5 text-[13px] font-medium text-bg hover:opacity-85"
+              >
+                <Crosshair className="size-3.5" /> Trace the deployer
+              </Link>
+            )}
+            <Link href={tokenHref({ chainId: chain.id, address })} className={linkClass}>
+              Open on Rankr
+            </Link>
+            {report.pool && (
+              <a href={report.pool.url} target="_blank" rel="noreferrer" className={linkClass}>
+                DexScreener <ArrowUpRight className="size-3.5" />
+              </a>
+            )}
+            <a href={explorerAddress(chain, address)} target="_blank" rel="noreferrer" className={linkClass}>
+              Explorer <ArrowUpRight className="size-3.5" />
+            </a>
+          </section>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-subtle">
+            <span>
+              Read <TimeAgo at={report.updatedAt} />
+            </span>
+            <button
+              type="button"
+              onClick={() => void reload()}
+              disabled={loading}
+              className="inline-flex items-center gap-1 text-muted hover:text-fg disabled:opacity-50"
+            >
+              <RotateCcw className={clsx("size-3", loading && "animate-spin")} /> Read again
+            </button>
+            <span>· Facts from public data, not proof of a scam; no warning signs isn&apos;t a promise. Not financial advice.</span>
+          </p>
         </>
       )}
     </div>

@@ -100,14 +100,41 @@ export type TraceErrorCode =
  */
 export type TokenCheckStatus = "bad" | "warn" | "ok" | "unknown";
 
+/** The report's five areas: what the contract allows, the pool, who holds it, its launch and insiders, trading. */
+export type TokenGroup = "contract" | "liquidity" | "holders" | "insiders" | "trading";
+
 export type TokenCheck = {
   id: string;
-  group: "contract" | "liquidity" | "holders" | "trading";
+  group: TokenGroup;
   status: TokenCheckStatus;
+  /** A few words for the summary: "Can be frozen", "42% bundled at launch". */
+  short: string;
   /** One line, plain words: "Freeze authority is on: any holder's tokens can be frozen". */
   text: string;
   /** Where it was read: "Solana RPC", "Blockscout", "Honeypot.is", "GeckoTerminal", "DexScreener". */
   source: string;
+};
+
+/** Something that wasn't read for an area (its launch too far back...): said, never counted in the verdict. */
+export type TokenNote = { group: TokenGroup; text: string };
+
+/** Its first trades: wallets that bought in the launch block (a bundle) and the few right after (snipers). */
+export type TokenLaunch = {
+  at: number | null;
+  bundle: { wallets: number; pct: number };
+  snipers: { wallets: number; pct: number };
+  /** The deployer's own buy at launch, and what it holds now (null: not among the biggest holders). */
+  dev: { boughtPct: number; holdsPct: number | null } | null;
+};
+
+/** Top holders first funded by the same wallet (or by the deployer): likely one owner behind several wallets. */
+export type TokenCluster = {
+  funder: string;
+  label: TraceLabel | null;
+  /** The deployer funded them, or is one of them. */
+  deployer: boolean;
+  pct: number;
+  members: { address: string; pct: number }[];
 };
 
 /** The three levels: warning signs (a bad check), worth a closer look (a warn or unknown one), none read. */
@@ -160,6 +187,8 @@ export type TokenHolder = {
   pct: number;
   role: TokenHolderRole | null;
   label: TraceLabel | null;
+  /** Its cluster (index in the report's clusters), when it shares a funder with other top holders. */
+  cluster?: number;
 };
 
 export type TokenHolders = {
@@ -191,7 +220,10 @@ export type TokenReport = {
   flow: TokenFlowWindow[];
   trades: TokenTrades | null;
   holders: TokenHolders | null;
-  /** Who deployed it (EVM: Blockscout), to follow its money. */
+  launch: TokenLaunch | null;
+  clusters: TokenCluster[];
+  notes: TokenNote[];
+  /** Who deployed it (EVM: Blockscout; Solana: whoever signed its first transaction), to follow its money. */
   creator: string | null;
   updatedAt: number;
 };

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { Pair } from "../dexscreener";
 import {
   assessToken,
-  churnShare,
+  clustersOf,
+  launchOf,
+  washShare,
   flowOf,
   holdersOf,
   tradesOf,
@@ -147,23 +149,92 @@ describe("holdersOf", () => {
   });
 });
 
-describe("churnShare", () => {
-  it("counts wallets buying and selling about the same, three times or more each way", () => {
-    const w = (buys: number, sells: number, buyUsd: number, sellUsd: number) => ({
-      address: "x",
-      label: null,
-      buys,
-      sells,
-      buyUsd,
-      sellUsd,
-      last: 0,
+describe("washShare", () => {
+  const w = (buys: number, sells: number, buyUsd: number, sellUsd: number, bought = 0, sold = 0) => ({
+    address: "x",
+    label: null,
+    buys,
+    sells,
+    buyUsd,
+    sellUsd,
+    last: 0,
+    bought,
+    sold,
+    amounts: bought > 0,
+  });
+  it("counts wallets buying and selling the same amount of the token, within 2%, twice or more each way", () => {
+    // 600 of 1,000 dollars of volume: the wallet trading the same 1,000 tokens back and forth.
+    expect(washShare([w(2, 2, 300, 300, 1_000, 990), w(1, 0, 400, 0, 50, 0)])).toBe(60);
+    // 5% apart in tokens: a trader, not a wash.
+    expect(washShare([w(2, 2, 300, 300, 1_000, 950)])).toBe(0);
+    // In and out once is a trade, not a wash.
+    expect(washShare([w(1, 1, 300, 300, 1_000, 1_000)])).toBe(0);
+  });
+  it("goes by dollars, within 10%, when the trades carry no token amounts", () => {
+    expect(washShare([w(3, 3, 300, 290)])).toBe(100);
+    expect(washShare([w(3, 3, 900, 100)])).toBe(0);
+  });
+});
+
+describe("launchOf", () => {
+  const top = holdersOf({ supply: 1_000, count: null, list: [{ address: "Dev", amount: 10, role: null, label: null }] }, "Dev");
+  it("splits the first buys into a bundle, snipers and the deployer's own, as shares of the supply", () => {
+    const l = launchOf(
+      {
+        reached: true,
+        at: 5,
+        creator: "Dev",
+        buys: [
+          { wallet: "Dev", amount: 100, phase: "bundle" },
+          { wallet: "A", amount: 150, phase: "bundle" },
+          { wallet: "B", amount: 150, phase: "bundle" },
+          { wallet: "C", amount: 50, phase: "sniper" },
+        ],
+      },
+      1_000,
+      "Dev",
+      top,
+    );
+    expect(l).toEqual({
+      at: 5,
+      bundle: { wallets: 2, pct: 30 },
+      snipers: { wallets: 1, pct: 5 },
+      dev: { boughtPct: 10, holdsPct: 1 },
     });
-    // 600 of 1,000 dollars of volume: the wallet trading back and forth.
-    expect(churnShare([w(3, 3, 300, 300), w(1, 0, 400, 0)])).toBe(60);
-    // One way, or twice each way, isn't churn.
-    expect(churnShare([w(2, 2, 300, 300), w(5, 0, 400, 0)])).toBe(0);
-    // Bought much more than it sold: a trader, not a churner.
-    expect(churnShare([w(3, 3, 900, 100)])).toBe(0);
+  });
+});
+
+describe("clustersOf", () => {
+  const h = holdersOf(
+    {
+      supply: 100,
+      count: null,
+      list: ["A", "B", "C", "D", "E", "Dev"].map((address, i) => ({ address, amount: 10 - i, role: null, label: null })),
+    },
+    "Dev",
+  );
+  const cex = (a: string) => (a === "Binance" ? { kind: "cex" as const, name: "Binance", source: "x" } : null);
+  it("groups holders sharing a funder, and holders the deployer funded; an exchange funds no one in particular", () => {
+    const c = clustersOf(
+      h,
+      [
+        { holder: "A", funder: "F" },
+        { holder: "B", funder: "F" },
+        { holder: "C", funder: "Binance" },
+        { holder: "D", funder: "Binance" },
+        { holder: "E", funder: "Dev" },
+        { holder: "Dev", funder: null },
+      ],
+      "Dev",
+      cex,
+    );
+    expect(c.map((x) => [x.funder, x.deployer, x.pct, x.members.map((m) => m.address)])).toEqual([
+      ["F", false, 19, ["A", "B"]],
+      ["Dev", true, 11, ["E", "Dev"]],
+    ]);
+  });
+  it("doesn't count the deployer alone as a group", () => {
+    expect(clustersOf(h, [{ holder: "Dev", funder: "Z" }], "Dev", () => null)).toEqual([]);
   });
 });
 
@@ -270,6 +341,78 @@ describe("assessToken", () => {
     expect(dev.holders?.top.find((h) => h.address === "H0")?.role).toBe("creator");
   });
 
+  it("reads the launch: a big bundle is a warning sign, a deployer that sold its launch buy worth a look", () => {
+    const r = assessToken(
+      facts({
+        supply: 1_000,
+        launch: {
+          reached: true,
+          at: NOW,
+          creator: "Dev",
+          buys: [
+            { wallet: "Dev", amount: 50, phase: "bundle" },
+            { wallet: "X", amount: 200, phase: "bundle" },
+            { wallet: "Y", amount: 150, phase: "bundle" },
+            { wallet: "Z", amount: 250, phase: "sniper" },
+          ],
+        },
+      }),
+    );
+    expect(r.creator).toBe("Dev");
+    expect(r.checks.find((c) => c.id === "bundle")).toMatchObject({ status: "bad", short: "35% bundled" });
+    expect(statusOf(r.checks, "snipers")).toBe("warn");
+    // Bought 5%, and isn't among the biggest holders (the smallest holds 3%... of 1,000: it can't hold 5% now).
+    expect(r.checks.find((c) => c.id === "devsold")).toMatchObject({ status: "warn", short: "Deployer sold" });
+    expect(r.verdict).toBe("danger");
+  });
+
+  it("notes a launch it couldn't reach, without counting it", () => {
+    const r = assessToken(facts({ launch: { reached: false } }));
+    expect(r.notes.map((n) => n.text)).toContain("Its launch is too far back to read: it has traded a lot since.");
+    expect(r.verdict).toBe("clear");
+  });
+
+  it("calls a big group of top holders funded by one wallet a warning sign", () => {
+    const r = assessToken(
+      facts({
+        links: ["H0", "H1", "H2", "H3"].map((holder) => ({ holder, funder: "Same" })),
+        holders: holders([12, 10, 8, 6, 2, 1, 1, 1, 1, 1]),
+      }),
+    );
+    expect(r.checks.find((c) => c.id === "cluster")).toMatchObject({ status: "bad", short: "Linked wallets: 36%" });
+    expect(r.clusters[0].members).toHaveLength(4);
+    expect(r.holders?.top.find((h) => h.address === "H0")?.cluster).toBe(0);
+  });
+
+  it("on Solana, flags metadata that can still be changed", () => {
+    const r = assessToken(facts({ contract: { ...clean, mutableMetadata: true } }));
+    expect(r.checks.find((c) => c.id === "metadata")).toMatchObject({ status: "warn", short: "Name can change" });
+  });
+
+  it("on EVM: what the owner can still do, the deployer's other tokens, few holders", () => {
+    const sim = { honeypot: false, reason: null, buyTax: 0, sellTax: 0, transferTax: 0 };
+    const base = { kind: "evm" as const, verified: true, proxy: false, scam: false, sim };
+    const evm = (extra: Partial<TokenFacts>) => assessToken(facts({ chain: "base", ...extra }));
+    const renounced = evm({ contract: { ...base, owner: "renounced", powers: ["mint", "fees"] } });
+    expect(renounced.checks.filter((c) => c.id.startsWith("power:"))).toEqual([]);
+    expect(statusOf(renounced.checks, "owner")).toBe("ok");
+    const owned = evm({ contract: { ...base, owner: "0xowner", powers: ["mint", "fees"] } });
+    expect(statusOf(owned.checks, "power:mint")).toBe("bad");
+    expect(statusOf(owned.checks, "power:fees")).toBe("warn");
+    // No owner() to say who holds the admin functions: worth a look.
+    expect(statusOf(evm({ contract: { ...base, owner: "none", powers: ["blacklist"] } }).checks, "power:blacklist")).toBe(
+      "warn",
+    );
+    expect(evm({ contract: { ...base, owner: "0xowner", powers: [] } }).checks.find((c) => c.id === "owner")?.status).toBe(
+      "ok",
+    );
+    expect(evm({ contract: base, history: { tokens: 6, dead: 4 } }).checks.find((c) => c.id === "history")).toMatchObject({
+      status: "bad",
+      text: "The deployer launched 6 other tokens; 4 are dead",
+    });
+    expect(statusOf(evm({ contract: base, holders: { ...holders([1]), count: 40 } }).checks, "count")).toBe("warn");
+  });
+
   it("thin liquidity is worth a look; no pool is unknown", () => {
     expect(statusOf(assessToken(facts({ pairs: [pair({ liquidity: { usd: 3_000 } })] })).checks, "liquidity")).toBe(
       "warn",
@@ -287,7 +430,14 @@ describe("assessToken", () => {
 });
 
 describe("verdictOf", () => {
-  const c = (status: TokenCheck["status"]): TokenCheck => ({ id: "x", group: "contract", status, text: "", source: "" });
+  const c = (status: TokenCheck["status"]): TokenCheck => ({
+    id: "x",
+    group: "contract",
+    status,
+    short: "",
+    text: "",
+    source: "",
+  });
   it("is a warning sign with one bad check, worth a look with a warn or unknown one, clear otherwise", () => {
     expect(verdictOf([c("ok"), c("bad"), c("warn")])).toBe("danger");
     expect(verdictOf([c("ok"), c("unknown")])).toBe("check");

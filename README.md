@@ -134,34 +134,60 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   Trace and the same page, `/trace/<chain>/<address>`, opens its report instead of a trail. The box asks
   DexScreener what the paste is first, so a bare 0x address goes to the chain it trades on and a pool's address
   (what a DexScreener link carries) to its token; a token on a chain Trace doesn't read (BSC...) says so. The
-  report (`src/lib/trace/token*.ts`, `src/components/trace/TokenReport.tsx`):
-  - **A verdict, in three levels, with every reason behind it**: **Warning signs** (a check came out bad),
-    **Worth a closer look** (one is worth a look, or couldn't be read: nothing read isn't nothing wrong) or
-    **No warning signs**. Each check is one line with its source, warning signs first. Never "scam" or "good to
-    buy": a warning sign is a fact about the token, and no warning signs isn't a promise.
-  - **Contract**: Solana: mint and freeze authority still on (bad), Token-2022's transfer fee, permanent
-    delegate, transfer hook, non-transferable, frozen by default, pausable (read from the mint account). EVM: a
-    test buy and sell (Honeypot.is, Ethereum and Base; elsewhere "couldn't check that it can be sold"), the buy /
-    sell / transfer tax (10%+ bad), source verified, a proxy (its code can be swapped), Blockscout's scam flag.
-  - **Liquidity**: thin under $10K or 2% of the market cap; on EVM v2 pools, how much of the LP is burned or
-    locked in a locker (under 50% bad, under 95% worth a look).
+  report (`src/lib/trace/token*.ts`, `src/components/trace/TokenReport.tsx`) is kept to what helps decide, top to
+  bottom:
+  - **The verdict, in three levels, and why in a line**: **Warning signs** (a check came out bad), **Worth a
+    closer look** (one is worth a look, or couldn't be read: nothing read isn't nothing wrong) or **No warning
+    signs**, with the findings behind it in a few words ("Can be frozen · 35% bundled · Deployer holds 24%") and
+    the count of each. Never "scam" or "good to buy": a warning sign is a fact about the token, and no warning
+    signs isn't a promise.
+  - **Five areas, one line each** (Contract, Liquidity, Holders, Launch & insiders, Trading): the area's worst
+    finding in a few words; tap one for every check behind it, each in a sentence with its source, and what
+    couldn't be read there (a note, never counted).
+  - **Money flow**: buys against sells for 5m, 1h, 6h or 24h (over every pool, the wallets behind them in the
+    main pool), then who's buying and who's selling in the latest trades, net, each a tap from its own trail.
+  - **Holders**: the biggest, as bars, with pools, burns, the deployer and **linked** wallets (sharing a funder)
+    marked, and which wallet funded each linked group.
+  - Links: **Trace the deployer**, Rankr's token page, DexScreener, the explorer.
+
+  The checks, and the lines they draw (`LIMITS` in `src/lib/trace/token-assess.ts`), follow what the common
+  scanners and studies use: RugCheck, GoPlus and Token Sniffer for the contract and holders; Bubblemaps and GMGN
+  for bundles, snipers and clusters; Mongardini & Mei, "A Midsummer Meme's Dream" (USENIX Security '26), for wash
+  trading.
+  - **Contract**. Solana: mint and freeze authority still on (bad); metadata that can still be changed (its
+    Metaplex account, or Token-2022's own; a launchpad's authority, like pump.fun's, doesn't count); Token-2022's
+    transfer fee, permanent delegate, transfer hook, non-transferable, frozen by default, pausable. EVM: a test buy
+    and sell (Honeypot.is, Ethereum and Base; elsewhere "couldn't check that it can be sold"), the tax (10%+ bad),
+    what the owner can still do (owner() over a public RPC; renounced is fine, else its verified ABI's functions to
+    mint, block wallets or stop trading are bad, to change the tax or cap sells worth a look), source verified, a
+    proxy, Blockscout's scam flag.
+  - **Liquidity**: thin under $10K or 2% of the market cap; who holds the main pool's LP tokens (burned, locked
+    by a locker or a program, or in a wallet: under 50% safe bad, under 95% worth a look), on EVM v2 pools and on
+    Solana's Raydium AMM v4, Raydium CPMM and PumpSwap pools (the LP mint read from the pool account, and only
+    trusted when the pool's own mints check out). A pump.fun bonding curve has no pool to pull.
   - **Holders**: the top 10 wallets' share (pools, burn addresses and exchanges aside: 30%+ worth a look, 50%+
-    bad), the biggest single wallet (10% / 20%), and on EVM what the deployer still holds (5% / 20%). Solana: the 20
-    biggest token accounts, followed to their owners (a pool's vault is told by its DEX's program, or its pair).
+    bad), the biggest single wallet (10% / 20%), what the deployer holds (5% / 20%), and under 100 holders (EVM).
+  - **Launch & insiders**: its first trades, when its history reaches back that far (Solana: up to 3,000 of the
+    mint's transactions, 10,000 on your own RPC; EVM: the pool's transfers oldest first, through Blockscout's
+    Etherscan-compatible API): wallets buying in the launch block are a **bundle** (10%+ of the supply worth a
+    look, 30%+ bad), in the 3 blocks after **snipers** (20%+ worth a look), and a deployer that bought at launch
+    and kept under a quarter of it **sold**. Then who first funded each of the biggest holders (6, or 10 on your
+    own RPC; 8 on EVM): holders sharing a funder are **linked**, likely one owner (15%+ worth a look, 30%+ bad), and
+    holders the deployer funded are its own (3% / 10%). An exchange, bridge or DEX funds no one in particular. On
+    EVM, the deployer's other tokens: 3 or more worth a look, 3 or more dead bad (skipped when the deployer is a
+    launchpad's factory contract).
   - **Trading** (the main pool's latest trades, up to 300 within 24 hours, wallet by wallet): wash trading
-    (wallets buying and selling about the same, three times or more each way: 25%+ of the volume worth a look,
-    50%+ bad), 3 wallets doing 60%+ of the buying, many small buys against a few big sells, selling 2:1, and 6+
-    trades per wallet over 24 hours (bots). Under 20 trades: too few to judge.
-  - **Buys and sells** per window (5m, 1h, 6h, 24h): counts and volume over every pool, the wallets behind them
-    in the main pool, a bar for the split.
-  - **Where the buys and sells come from**: the top buyers and sellers in the latest trades, net of what each
-    sold or bought back, each a tap from its own trail (where its money came from and went); the biggest holders,
-    pools, burns and the deployer marked; and **Trace the deployer** (EVM).
+    (wallets buying and selling the same amount of the token, within 2%, twice or more each way: 25%+ of the
+    volume worth a look, 50%+ bad), 3 wallets doing 60%+ of the buying, many small buys against a few big sells,
+    selling 2:1, and 6+ trades per wallet over 24 hours (bots). Under 20 trades: too few to judge.
+
   Data: DexScreener (pools, counts), [GeckoTerminal](https://www.geckoterminal.com)'s public API (no key, about
   30 calls a minute; the main pool's wallets and trades; shown as "powered by GeckoTerminal", as its terms ask),
-  Solana's RPC or Blockscout (as for wallets), and [Honeypot.is](https://honeypot.is) (no key). Not used:
-  GoPlus, whose API license rules out commercial use without written permission; RugCheck, which needs an
-  account. A report costs about ten upstream calls and is kept a minute per server; 10 a minute per visitor.
+  Solana's RPC or Blockscout (as for wallets), [Honeypot.is](https://honeypot.is) (no key) and PublicNode's free
+  EVM RPCs for owner() (or `<CHAIN>_RPC_URL`). Not used: GoPlus, whose API license rules out commercial use
+  without written permission; RugCheck, which needs an account. A report is about 20 to 60 Solana RPC calls (a
+  Helius key makes it a few seconds) or 15 to 30 Blockscout requests, kept a minute per server; 10 a minute per
+  visitor. Each part is read on its own: one that fails is left out and said, the rest stays.
   With `RANKR_MOCK=1`, a Solana address ending in `pump` opens a made-up report (run through the real checks).
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
@@ -476,7 +502,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
 | `GET /api/trace/:chain/:address` | one wallet for a trail on the trace tab: who funded it, its biggest counterparties in and out (named where a public list knows them), its trades summed, what was read (official accounts only) |
-| `GET /api/trace/token/:chain/:address` | a token's report: the verdict and its checks, buys and sells per window, the latest trades' top buyers and sellers, the biggest holders, the deployer (official accounts only) |
+| `GET /api/trace/token/:chain/:address` | a token's report: the verdict and its checks (with what couldn't be read), buys and sells per window, the latest trades' top buyers and sellers, the biggest holders and linked groups, its launch (bundles, snipers, the deployer's buy), the deployer (official accounts only) |
 | `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 
 ## How the numbers work
@@ -522,7 +548,8 @@ src/lib/pwa.ts               install state: the browser's install prompt, iOS, i
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
 src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, the trail and its path, case file, share text;
-                             token reports (token.ts; token-assess.ts the checks; token-solana.ts, token-evm.ts, gecko.ts, honeypot.ts the readers)
+                             token reports (token.ts; token-assess.ts the checks and their LIMITS; token-solana.ts, token-evm.ts, gecko.ts,
+                             honeypot.ts, evm-rpc.ts the readers; solana-pda.ts base58 and program addresses)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names
