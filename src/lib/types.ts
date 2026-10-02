@@ -174,36 +174,6 @@ export type StatsResponse = {
   updatedAt: number;
 };
 
-/** The news page's tabs: trending (what people search for and read right now, where memes come from), crypto. */
-export type NewsCategory = "trending" | "crypto";
-
-/** A headline (src/lib/news.ts): only the headline, the publisher and the link. */
-export type NewsItem = {
-  id: string;
-  title: string;
-  /** The article (through Google News). */
-  url: string;
-  /** The publisher, e.g. "Yonhap News Agency". */
-  source: string | null;
-  publishedAt: number;
-  /** What a token named after the story would be called, best first: "Bukang-i", "Busan". */
-  keywords: string[];
-  category: NewsCategory;
-  /**
-   * Google searches for the story's topic in the last day, summed over the countries it trends in (Google Trends'
-   * approx_traffic, a floor); null when it isn't a trending search.
-   */
-  searches: number | null;
-};
-
-export type NewsResponse = { items: NewsItem[]; updatedAt: number };
-
-/**
- * Live tokens named after a story, most traded first, for the reader to pick from: DEX data, and Rankr's
- * multiple since the first paste for the ones it tracks.
- */
-export type NamesakesResponse = { items: { market: MarketSnapshot; multiple: number | null }[]; updatedAt: number };
-
 /** A month that ended: its top 10 callers and tokens, kept when the boards reset (public.seasons). */
 export type Season = {
   /** The month's first day, "2026-09-01". */

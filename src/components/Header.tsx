@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { House, Newspaper, Plus, Radio, Trophy, UserRound, X } from "lucide-react";
+import { House, Network, Plus, Radio, Trophy, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -15,7 +15,7 @@ import { Indicator, useIndicator } from "./Tabs";
 export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
   { href: "/feed", label: "Feed", icon: Radio },
-  { href: "/news", label: "News", icon: Newspaper },
+  { href: "/trace", label: "Trace", icon: Network },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/me", label: "You", icon: UserRound },
 ];

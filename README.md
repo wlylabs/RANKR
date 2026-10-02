@@ -47,42 +47,49 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
-- **News** (`/news`, in the nav): what's in the news right now, live, most searched first, e.g. "Over 560,000
-  visitors flock to Busan to see canal-trapped shark Bukang-i". Just the headline (a link to the article), the
-  publisher, how long ago and, for a trending search's story, how many searched for it ("200K+ searches");
-  nothing has to be pasted first. Most searched first: Google searches in the last day for the story's topic
-  (Google Trends' approx_traffic, a floor, summed over the countries it trends in), what most people are looking
-  at and the likeliest to get a token named after it (trends ranked by approx_traffic as
-  [trending-search-google](https://github.com/suvrockzzzz/trending-search-google) ranks them); then newest
-  first. Tabs **All · Trending · Crypto** (`/news?category=trending`):
-  trending is what people search for and read right now, where memes come from; All takes the newest 25 of each,
-  so the many crypto outlets don't bury the trending stories. From every free source, each story once, today's
-  news only, at most 20 from any one source and 60 per tab; the page refreshes every 2 minutes.
-  Sources (`src/lib/news-sources.ts`), with URLs taken from references rather than guessed:
-  - no key, always on: Google Trends' "Trending now" RSS for the US, UK, Canada, Australia, India and Singapore
-    (`trends.google.com/trending/rss?geo=`; each search people are making, with the story behind it: one story
-    per search, and the search is the first name its Tokens button offers; read as
-    [google-trends-bot](https://github.com/minodisk/google-trends-bot) reads it, and story links hiding another
-    address are dropped, as [this report](https://github.com/tmokmss/my-ambient-agents/issues/728) found them);
-    Google News (US and Singapore top stories, Entertainment and Science); UPI Odd News, New York Post; crypto:
-    35 news outlets (CoinDesk, The Block, Decrypt,
-    Cointelegraph, Blockworks, Watcher Guru, ...), those
-    [cryptocurrency.cv](https://github.com/nirholas/cryptocurrency.cv)'s feed health check keeps enabled;
-  - free key, on once set (`.env.example`): GNews, NewsAPI.org and TheNewsAPI top headlines, each read as often
-    as its free daily quota allows. Keys never show in logs.
-  Not included: Reddit (needs an OAuth app), CryptoPanic (paid since 2026), Mediastack (free plan is HTTP only).
-  Each headline has a **Tokens** button: every token named after the story. The names in the headline are the
-  choices ("Bukang-i", "Busan"; the likeliest is picked: a quoted name, a run of capitalised words like "Moo
-  Deng", then single ones), or type another. Tokens come from DexScreener's search (the name as written and run
-  together: "Bukang-i", "Bukangi"), most traded first (24h volume, as Birdeye ranks tokens; then liquidity),
-  each tagged high, mid or low cap on pump.fun's milestones ($1M and up; $69K, where a token leaves its bonding
-  curve, to $1M; under $69K), with chain, address, age, market cap, 24h volume,
-  liquidity, 24h transactions and 24h change, and Rankr's multiple for the ones it tracks. Many tokens share a
-  name or a ticker, so the reader picks one (it opens its page on Rankr, to watch or call it). Dead tokens are
-  left out altogether: under $1K market cap, 24h volume or liquidity (the minimums DexScreener's and GMGN's
-  screeners filter by), with no filter controls. A number the DEX doesn't give (a pump.fun token on its bonding
-  curve has no liquidity) doesn't count against a token. With `RANKR_MOCK=1`,
-  made-up stories.
+- **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
+  Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and the tree opens on it at
+  `/trace/<chain>/<address>`: above it, who sent it money (its first money marked **1ST**); the wallet in the
+  middle; below it, where its money went. Money always flows down the page, as dashes running along the lines,
+  thicker for more money. Each wallet shows its three biggest counterparties that way (**+N more** shows up to
+  eight), and tapping one opens the next row, as deep as six hops each way; the tree makes room around it and the
+  card you tapped stays put. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
+  already higher up its branch isn't opened again (the money went round). Trades aren't followed: a transaction
+  where the wallet sends one asset and gets another back is a swap, summed on a **Swaps** card (DEX pools are no
+  one to follow). Dust under $1 and tokens with no price (where airdropped spam lives) are left out. Every
+  wallet gets a matrix glyph from its address (like the avatars), addresses decrypt into place, the rows sit on
+  a dotted ledger; flagged addresses are drawn in red.
+  Under the tree: the picked card in full (whole address, label and its source, what moved, links to the
+  transaction and the explorer, and **Trace from here**), and the **case file**: who the wallet is, who funded it,
+  money in and out, where the money ended up (exchanges, bridges, mixers, with the hop they were reached at), what
+  was read, and flags: a fresh wallet (first seen under 7 days ago), money to or from a sanctioned, exploiter,
+  scam, mixer or frozen address (each with its source), bridged out, reached an exchange, spread out to 5+
+  wallets, emptied. It grows as wallets are opened. Names are quoted with their source and never turned into
+  accusations: a label isn't an identity, and money passing through a wallet isn't proof of a crime.
+  Free data only:
+  - **Solana**: its public RPC (`api.mainnet-beta.solana.com`, no key; about 40 calls per 10 seconds), or any RPC
+    in `SOLANA_RPC_URL` (Helius, QuickNode... their free plans read more and faster). A wallet costs one
+    `getAccountInfo`, one to three `getSignaturesForAddress` pages (its whole history up to 3,000 transactions,
+    for who funded it) and a `getTransaction` (jsonParsed) for each of its newest 30 transactions (80 on your own
+    RPC). Prices: DexScreener, stablecoins at $1.
+  - **Ethereum, Base, Arbitrum, Optimism, Polygon**: [Blockscout's API](https://api.blockscout.com), which since
+    July 2026 needs a key (free at dev.blockscout.com: 100K credits a day; without one its public explorers allow
+    about 10 requests per 16 minutes). A wallet costs four requests: the address and its newest 50 transactions,
+    ERC-20 transfers and internal transactions. Blockscout's own tags (exchanges, contract names, ENS names,
+    scam flags) name what the lists below don't. Without the key, EVM wallets say so.
+  - **Names** (`src/lib/trace/labels.json`, built by `npm run trace:labels` from datasets pinned to a commit):
+    exchanges' own proof-of-reserves wallets, OFAC-sanctioned addresses, USDT / USDC frozen by Tether and Circle,
+    Tornado Cash, bridges and named exploiters, from
+    [wallet-attribution](https://github.com/prettydeath/wallet-attribution) and
+    [crypttrace](https://github.com/bobslayerX/crypttrace) (both MIT; Binance's and OKX's reserve wallets as
+    they publish them); exchange hot wallets and ~100K Solana exchange deposit wallets from
+    [crypto-wallet-address-labels](https://github.com/ImMike/crypto-wallet-address-labels) (MIT; the deposit list,
+    6 MB, is read once per server at runtime, and skipped if GitHub can't be reached); the Solana DEX and bridge
+    programs (Jupiter, Raydium, Orca, Meteora, pump.fun, PumpSwap, Wormhole, deBridge...) in
+    `src/lib/trace/labels.ts`. Not used: Dune's Spellbook, whose license rules out data platforms.
+  Each wallet read is kept 5 minutes per server and a minute in shared caches; 20 reads a minute per visitor.
+  With `RANKR_MOCK=1`, made-up trails (the same for the same address). The page without a wallet shows a made-up
+  example.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
@@ -384,8 +391,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
-| `GET /api/news` | what's in the news right now, most searched first, each with the names a token would be called |
-| `GET /api/news/tokens?q=` | every token named after a name from a story, most liquid first, with market data and Rankr's multiple |
+| `GET /api/trace/:chain/:address` | one wallet for the trace tree: who funded it, its biggest counterparties in and out (named where a public list knows them), its trades summed, what was read |
 | `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 
 ## How the numbers work
@@ -405,7 +411,7 @@ rolls everything back. Run it against a local or throwaway database:
 ```
 src/app/                     pages, API routes, icons, manifest, social cards
   (site)/                    the landing page at / (own header and footer)
-  (app)/                     the app shell (header, bottom nav) and its pages: app (/app), feed, leaderboard, me, t/..., u/...
+  (app)/                     the app shell (header, bottom nav) and its pages: app (/app), feed, trace, leaderboard, me, t/..., u/...
   api/track                  POST { input } -> records a paste
   api/tokens                 GET a leaderboard page (sort, filter, paging)
   api/stats                  GET home page totals
@@ -413,7 +419,7 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/callers, api/me/*      caller board, your account, username, profile, calls and rank
   api/callers/[u]/[chain]/[addr]  GET one caller's call; .../card its share card (PNG)
   api/feed                   GET the feed: calls and milestones
-  api/news, api/news/tokens  GET the live news, and the tokens named after a story
+  api/trace/[chain]/[addr]   GET one wallet's trail (the Trace tab)
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, SettingsMenu...)
@@ -429,8 +435,7 @@ src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
-src/lib/news.ts              news: the live headlines, the names in them, and their namesakes on DexScreener
-src/lib/news-sources.ts      every free news source (RSS and JSON APIs, keyed ones when set), read and cached
+src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, tree layout, case file
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

@@ -19,6 +19,16 @@ export function formatUsd(value: number | null | undefined): string {
   return `$${value.toFixed(abs >= 100 ? 0 : abs >= 1 ? 2 : 4)}`;
 }
 
+/** An amount of a coin or token: 0.0042, 12.5, 1,204.3, 2.4M. */
+export function formatAmount(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  if (abs === 0) return "0";
+  if (abs < 0.0001) return "<0.0001";
+  if (abs >= 1e6) return formatCount(value);
+  return value.toLocaleString("en-US", { maximumFractionDigits: abs >= 1000 ? 0 : abs >= 1 ? 2 : 4 });
+}
+
 /** A count in short: 2K, 2.5K, 200K, 1M. */
 export function formatCount(value: number): string {
   return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);

@@ -132,33 +132,6 @@ export async function findToken(address: string, chainHint: string | null): Prom
   return toSnapshot(bestAcrossChains(tokenPairs ?? [], match.baseToken.address) ?? match);
 }
 
-/**
- * Tokens whose name, ticker or address matches `query` on DexScreener, each once (its most liquid pair).
- * Many tokens share a name or a ticker; they differ by chain and address.
- */
-export async function searchTokens(query: string): Promise<MarketSnapshot[]> {
-  if (MOCK) {
-    // Made-up namesakes, so the news page works offline.
-    const name = query.replace(/^\$/, "");
-    const ticker = name.replace(/[^\p{L}\p{N}]/gu, "").toUpperCase();
-    return ["1", "2", "3"].map((n, i) => ({
-      ...mockSnapshot(`${ticker}Mock${n}${"x".repeat(32)}`.slice(0, 44), "solana"),
-      symbol: i === 2 ? ticker.slice(0, -1) : ticker,
-      name: i === 1 ? `${name} Inu` : name,
-    }));
-  }
-  const search = await getJson<{ pairs: Pair[] | null }>(`/latest/dex/search?q=${encodeURIComponent(query)}`);
-  const byToken = new Map<string, Pair[]>();
-  for (const p of search.pairs ?? []) {
-    const id = tokenId(p.chainId, p.baseToken.address);
-    byToken.set(id, [...(byToken.get(id) ?? []), p]);
-  }
-  return [...byToken.values()].flatMap((pairs) => {
-    const best = bestPair(pairs);
-    return best ? [toSnapshot(best)] : [];
-  });
-}
-
 /** Live snapshots for many tokens, batched per chain. Keyed by tokenId. */
 export async function fetchSnapshots(
   tokens: { chainId: string; address: string }[],

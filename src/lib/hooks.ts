@@ -12,8 +12,6 @@ import type {
   MarketSnapshot,
   MyCallsResponse,
   MyRankResponse,
-  NamesakesResponse,
-  NewsResponse,
   SeasonResponse,
   StatsResponse,
   TokenView,
@@ -199,22 +197,6 @@ export function useFeedPages(params: FeedParams, pageSize = 30) {
     isValidating,
     loadMore: () => setSize(size + 1),
   };
-}
-
-/** What's in the news right now, every 2 minutes. */
-export function useNews() {
-  const { data, error, isLoading } = useSWR<NewsResponse>("/api/news", fetcher, { refreshInterval: 2 * 60_000 });
-  return { items: data?.items ?? [], error, isLoading };
-}
-
-/** Every token named after `keyword` (a name from a story, see /api/news/tokens), refreshed every minute. */
-export function useNamesakes(keyword: string) {
-  const { data, error, isLoading } = useSWR<NamesakesResponse>(
-    keyword ? `/api/news/tokens?q=${encodeURIComponent(keyword)}` : null,
-    fetcher,
-    { refreshInterval: 60_000 },
-  );
-  return { items: data?.items ?? [], error, isLoading };
 }
 
 export function useStats() {
