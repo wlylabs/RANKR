@@ -1,4 +1,5 @@
 import { Lock } from "lucide-react";
+import { HashField } from "@/components/Cinema";
 import { DecryptText } from "@/components/DecryptText";
 import { HomeFeed, HomeTop, LiveStatus } from "@/components/HomeFeed";
 import { PasteBox } from "@/components/PasteBox";
@@ -7,7 +8,9 @@ import { chainMeta, FEATURED_CHAINS } from "@/lib/chains";
 /** The headline and the paste box, for visitors who aren't signed in. */
 function Hero() {
   return (
-    <section className="pt-16 pb-14 sm:pt-28 sm:pb-20">
+    <section className="relative isolate pt-16 pb-14 sm:pt-28 sm:pb-20">
+      {/* The landing's hash field: entries are sealed with SHA-256, and the field is lit from one. */}
+      <HashField />
       <div className="mx-auto max-w-2xl text-center">
         <LiveStatus />
         <h1 className="mt-6 font-mono text-[2.1rem] leading-[1.1] font-medium tracking-[-0.06em] sm:text-6xl">

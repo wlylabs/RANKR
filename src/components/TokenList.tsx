@@ -7,9 +7,10 @@ import { Cascade } from "./Cinema";
 import { MultipleBadge } from "./MultipleBadge";
 import { TimeAgo } from "./TimeAgo";
 
-function Rank({ rank }: { rank: number }) {
+/** A row's place on the board; the top three catch the light once as the board comes in. */
+export function Rank({ rank, className = "w-6" }: { rank: number; className?: string }) {
   return (
-    <span className={clsx("tabular w-6 shrink-0 font-mono text-xs", rank <= 3 ? "text-fg" : "text-subtle")}>
+    <span className={clsx("tabular shrink-0 font-mono text-xs", className, rank <= 3 ? "rank-shine text-fg" : "text-subtle")}>
       {String(rank).padStart(2, "0")}
     </span>
   );
@@ -31,7 +32,8 @@ export function TokenName({ symbol, name, className }: { symbol: string; name: s
  */
 export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView; rank?: number; meta?: "pasted" | "peak" }) {
   return (
-    <Link href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
+    // The board's #1: a band of light passes over it as the board comes in.
+    <Link href={tokenHref(t)} className={clsx("flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2", rank === 1 && "sweep")}>
       {rank !== undefined && <Rank rank={rank} />}
       <div className="min-w-0 flex-1">
         <TokenName symbol={t.symbol} name={t.name} />

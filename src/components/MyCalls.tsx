@@ -15,6 +15,7 @@ import { nextResetAt, resetDay } from "@/lib/season";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import type { CallView, CallerAbout, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
+import { IdentityField } from "./Backdrops";
 import { CallSpread, RecentForm } from "./CallerCharts";
 import { Cascade } from "./Cinema";
 import { CountUp } from "./CountUp";
@@ -201,7 +202,16 @@ export function RankCard({
       href={href}
       className={clsx("flex items-center gap-4 card px-4 py-3 transition-colors hover:bg-surface-2", className)}
     >
-      <span className="tabular font-mono text-2xl font-medium tracking-tight">{mine.rank ? `#${mine.rank}` : "—"}</span>
+      {/* Your place, climbing to it from the foot of the board. */}
+      <span className="tabular font-mono text-2xl font-medium tracking-tight">
+        {mine.rank ? (
+          <>
+            #<CountUp value={mine.rank} from={mine.total} />
+          </>
+        ) : (
+          "—"
+        )}
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm">
           {mine.rank ? `of ${mine.total} on the caller board` : "Not on the caller board yet"}
@@ -264,10 +274,14 @@ function Page({
 }) {
   const watching = useWatchlist().length;
   const [tab, setTab] = useTab();
+  const { userId } = useAuth();
 
   return (
     <div className="pt-10 sm:pt-14">
-      {header ?? <PageHeader title="You" />}
+      <div className="relative isolate">
+        <IdentityField seed={userId ?? "rankr/you"} />
+        {header ?? <PageHeader title="You" />}
+      </div>
       <TabBar
         label="You"
         options={{

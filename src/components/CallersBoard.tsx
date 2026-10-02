@@ -12,7 +12,7 @@ import { Avatar } from "./Avatar";
 import { Cascade } from "./Cinema";
 import { MultipleBadge } from "./MultipleBadge";
 import { OfficialBadge } from "./OfficialBadge";
-import { ListSkeleton } from "./TokenList";
+import { ListSkeleton, Rank } from "./TokenList";
 
 export const CALLER_SORT_LABELS: Record<CallerSort, string> = {
   rate: "Hit rate",
@@ -67,7 +67,7 @@ export function CallerRateRow({
 }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <span className="tabular w-5 shrink-0 font-mono text-xs text-subtle">{rankLabel(rank)}</span>
+      <Rank rank={rank} className="w-5" />
       <Link href={callerHref(c.username)} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
         <Avatar userId={c.userId} size={20} />
         <span className="truncate font-mono text-[13px]">@{c.username}</span>
@@ -174,7 +174,9 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
               <Cascade as="tbody" className="font-mono text-[13px]">
                 {callers.map((c, i) => (
                   <tr key={c.userId} className={clsx("border-b border-border last:border-0", c.userId === userId && "bg-surface-2")}>
-                    <td className={clsx("tabular py-3 pl-4 text-xs", i < 3 ? "text-fg" : "text-subtle")}>{rankLabel(i + 1)}</td>
+                    <td className="py-3 pl-4">
+                      <Rank rank={i + 1} />
+                    </td>
                     <td className="py-3">
                       <Caller c={c} me={c.userId === userId} />
                     </td>
@@ -197,9 +199,7 @@ export function CallersBoard({ sort }: { sort: CallerSort }) {
           <Cascade as="ul" className="divide-y divide-border overflow-hidden card md:hidden">
             {callers.map((c, i) => (
               <li key={c.userId} className={clsx("flex items-center gap-3 px-4 py-3", c.userId === userId && "bg-surface-2")}>
-                <span className={clsx("tabular w-6 shrink-0 font-mono text-xs", i < 3 ? "text-fg" : "text-subtle")}>
-                  {rankLabel(i + 1)}
-                </span>
+                <Rank rank={i + 1} />
                 <div className="min-w-0 flex-1">
                   <Caller c={c} me={c.userId === userId} />
                   <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">

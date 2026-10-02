@@ -17,6 +17,7 @@ import { MultipleBadge } from "./MultipleBadge";
 import { ShareCall } from "./ShareCall";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
+import { DecryptText } from "./DecryptText";
 import { TokenName } from "./TokenList";
 
 type Result = TrackResponse & { firstCallByYou: boolean };
@@ -426,6 +427,12 @@ function TrackResult({
             {!created && <> · now {formatUsd(t.marketCap)}</>}
           </div>
         </div>
+        {/* The entry is locked in: a stamp comes down on it as its hash decrypts below. */}
+        {created && (
+          <span className="stamp shrink-0 rounded border-2 border-up px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.2em] text-up uppercase">
+            Sealed
+          </span>
+        )}
         <MultipleBadge multiple={t.multiple} />
       </Link>
       <div className="flex items-center gap-2 border-t border-border px-4 py-2 font-mono text-[11px] text-subtle">
@@ -433,7 +440,8 @@ function TrackResult({
         <span className="min-w-0 flex-1 truncate">
           {created ? (
             <>
-              sealed {formatDate(t.firstPastedAt)} · sha256 <span className="text-muted">{t.seal.slice(0, 16)}</span>
+              sealed {formatDate(t.firstPastedAt)} · sha256{" "}
+              <DecryptText text={t.seal.slice(0, 16)} className="text-muted" duration={1100} />
             </>
           ) : (
             <>

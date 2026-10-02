@@ -47,6 +47,15 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
+- **Cinema, page by page.** Each tab of the app has its own backdrop and moments, about what it is (Backdrops.tsx,
+  globals.css; CSS only, still with reduced motion). **Home**: the landing's hash field behind the paste box
+  (entries are SHA-256 sealed), and a call sealed gets a **SEALED** stamp as its hash decrypts. **Feed**: **On air**
+  next to the title, rings of signal going out behind it, a band of green light over a milestone as it lands, and a
+  ripple on the "N new" button. **Trace**: below. **Leaderboard**: two spotlights swaying over the stage, the top
+  three ranks catching the light and a band of light over #1 as the board comes in. **You**: your own glyph, large
+  and faint behind the page's top, its cells coming in under a scan; your rank on the caller board climbs to its
+  place from the foot of the board. In the bottom nav, each icon moves now and then on its own page: Home's door
+  draws itself, Feed's waves go out, Trace drops money down its line, Leaderboard raises the cup, You lifts its head.
 - **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
   Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and its trail opens at `/trace/<chain>/<address>`;
   with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. On a phone the
