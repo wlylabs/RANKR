@@ -1,4 +1,4 @@
-// The trace page (Rankr in the nav): paste a wallet, see where its money came from and where it went, hop by
+// The trace page (Trace in the nav): paste a wallet, see where its money came from and where it went, hop by
 // hop, top to bottom. One request reads one wallet; the page asks again for every wallet you open.
 
 /**

@@ -15,7 +15,7 @@ import { Indicator, useIndicator } from "./Tabs";
 export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
   { href: "/feed", label: "Feed", icon: Radio },
-  { href: "/trace", label: "Rankr", icon: Network },
+  { href: "/trace", label: "Trace", icon: Network },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/me", label: "You", icon: UserRound },
 ];

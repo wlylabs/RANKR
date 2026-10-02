@@ -47,7 +47,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   are in the URL (`/feed?scope=you&kind=milestone`). Grouped by day (Today, Yesterday, Sep 25...). Entries that
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
-- **Rankr** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
+- **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
   Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and the tree opens on it at
   `/trace/<chain>/<address>`: above it, who sent it money (its first money marked **1ST**); the wallet in the
   middle; below it, where its money went. Money always flows down the page, as dashes running along the lines,
@@ -419,7 +419,7 @@ src/app/                     pages, API routes, icons, manifest, social cards
   api/callers, api/me/*      caller board, your account, username, profile, calls and rank
   api/callers/[u]/[chain]/[addr]  GET one caller's call; .../card its share card (PNG)
   api/feed                   GET the feed: calls and milestones
-  api/trace/[chain]/[addr]   GET one wallet's trail (the Rankr tab)
+  api/trace/[chain]/[addr]   GET one wallet's trail (the Trace tab)
   login, account             guest / key sign-in, save or replace a key, rename
   api/tokens/[chain]/[addr]  GET one token (or a preview if untracked)
 src/components/              UI (PasteBox, Leaderboard, TokenDetail, MyCalls, Logo, Landing, SettingsMenu...)

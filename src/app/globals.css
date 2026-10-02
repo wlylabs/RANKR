@@ -466,7 +466,7 @@ body {
   mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
 }
 
-/* ---- Trace (the Rankr tab): the tree sits on a ledger of dots, money runs down its lines as packets ---- */
+/* ---- Trace (the Trace tab): the tree sits on a ledger of dots, money runs down its lines as packets ---- */
 .trace-grid {
   background-color: var(--bg);
   background-image: radial-gradient(color-mix(in srgb, var(--fg) 13%, transparent) 1px, transparent 1.2px);
