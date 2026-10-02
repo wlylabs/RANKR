@@ -10,7 +10,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:bundle": "node scripts/bundle-sql.mjs"
+    "db:bundle": "node scripts/bundle-sql.mjs",
+    "trace:labels": "node scripts/build-trace-labels.mjs"
   },
   "engines": {
     "node": ">=20.9.0"

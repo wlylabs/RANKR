@@ -14,6 +14,7 @@ const EXPLORER_CHAINS: Record<string, string> = {
   "bscscan.com": "bsc",
   "arbiscan.io": "arbitrum",
   "polygonscan.com": "polygon",
+  "optimistic.etherscan.io": "optimism",
 };
 
 export function isAddress(value: string): boolean {

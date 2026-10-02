@@ -466,6 +466,50 @@ body {
   mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
 }
 
+/* ---- Trace (the Rankr tab): the tree sits on a ledger of dots, money runs down its lines as packets ---- */
+.trace-grid {
+  background-color: var(--bg);
+  background-image: radial-gradient(color-mix(in srgb, var(--fg) 13%, transparent) 1px, transparent 1.2px);
+  background-size: 14px 14px;
+}
+/* A line draws itself down from the card above when it first appears (pathLength="1"). */
+@keyframes trace-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.trace-edge {
+  stroke-dasharray: 1;
+  animation: trace-draw 0.75s var(--ease-enter) backwards;
+  transition: d 0.5s var(--ease-emphasized);
+}
+/* Dashes running along a line, the way the money went. */
+@keyframes trace-packets {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+.trace-packets {
+  stroke-dasharray: 2 10;
+  animation: trace-packets 1.2s linear infinite;
+  transition: d 0.5s var(--ease-emphasized);
+}
+/* Cards glide when the tree makes room, and new ones resolve out of a blur. */
+@keyframes trace-node-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    scale: 0.94;
+  }
+}
+.trace-node {
+  transition: transform 0.5s var(--ease-emphasized);
+  animation: trace-node-in 0.55s var(--ease-enter) backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -480,6 +524,7 @@ body {
   .tilt-in,
   .twinkle,
   .ticker,
+  .trace-packets,
   .skeleton {
     animation: none !important;
   }

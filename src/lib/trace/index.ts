@@ -1,0 +1,39 @@
+// Reads one wallet for the trace page, from the right source for its chain, kept for a few minutes: a tree
+// asks for the same wallets again as it's opened and closed, and the free upstreams are rate-limited.
+import { MOCK } from "../dexscreener";
+import { traceChain, validWallet } from "./chains";
+import { TraceError } from "./errors";
+import { traceEvm } from "./evm";
+import { mockTrace } from "./mock";
+import { traceSolana } from "./solana";
+import type { TraceResponse } from "./types";
+
+const TTL = 5 * 60_000;
+const MAX_ENTRIES = 300;
+
+/** Finished reads, and reads in flight (two people opening the same wallet make one). */
+const cache = new Map<string, { at: number; value: Promise<TraceResponse> }>();
+
+export async function traceWallet(chainId: string, address: string, now = Date.now()): Promise<TraceResponse> {
+  const chain = traceChain(chainId);
+  if (!chain)
+    throw new TraceError("unsupported", "Tracing works on Solana, Ethereum, Base, Arbitrum, Optimism and Polygon.");
+  if (!validWallet(chain, address))
+    throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);
+  if (MOCK) return mockTrace(chain, address, now);
+
+  const key = `${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
+  const hit = cache.get(key);
+  if (hit && now - hit.at < TTL) return hit.value;
+
+  const value = chain.kind === "solana" ? traceSolana(address) : traceEvm(chain, address);
+  cache.set(key, { at: now, value });
+  // A failed read isn't kept: the next request tries again.
+  value.catch(() => cache.get(key)?.value === value && cache.delete(key));
+  if (cache.size > MAX_ENTRIES) {
+    for (const [k, v] of cache) if (now - v.at >= TTL || cache.size > MAX_ENTRIES) cache.delete(k);
+  }
+  return value;
+}
+
+export { TraceError } from "./errors";
