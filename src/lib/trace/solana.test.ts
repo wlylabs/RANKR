@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseTransaction, traceSolana, walletLegs, type ParsedTx } from "./solana";
+import { getTx, MAX_TX_VERSION, parseTransaction, traceSolana, walletLegs, type ParsedTx } from "./solana";
 
 // Real-looking jsonParsed transactions (the shape getTransaction returns with encoding "jsonParsed").
 const W = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
@@ -150,6 +150,51 @@ describe("walletLegs", () => {
   });
 });
 
+describe("getTx", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const rpcError = (code: number, message: string) =>
+    Response.json({ jsonrpc: "2.0", id: 1, error: { code, message } });
+
+  it("asks for v1 transactions (live on mainnet since Sep 2026)", async () => {
+    const versions: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        versions.push(JSON.parse(String(init?.body)).params[1].maxSupportedTransactionVersion);
+        return Response.json({ result: tx("v1sig", 1_790_000_000, {}) });
+      }),
+    );
+    expect(MAX_TX_VERSION).toBe(1);
+    expect((await getTx("v1sig"))?.transaction.signatures).toEqual(["v1sig"]);
+    expect(versions).toEqual([1]);
+  });
+
+  it("asks again in a newer version when the RPC names one, and skips a transaction it won't give", async () => {
+    const versions: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const version = JSON.parse(String(init?.body)).params[1].maxSupportedTransactionVersion;
+        versions.push(version);
+        return version < 2
+          ? rpcError(
+              -32015,
+              'Transaction version (2) is not supported by the requesting client. Please try the request again with the following configuration parameter: "maxSupportedTransactionVersion": 2',
+            )
+          : Response.json({ result: tx("v2sig", 1_790_000_000, {}) });
+      }),
+    );
+    expect(await getTx("v2sig")).not.toBeNull();
+    expect(versions).toEqual([1, 2]);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => rpcError(-32009, "Slot 1 was skipped, or missing in long-term storage")),
+    );
+    expect(await getTx("gone")).toBeNull();
+  });
+});
+
 describe("traceSolana", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -220,20 +265,27 @@ describe("traceSolana", () => {
         }
         if (method === "getSignaturesForAddress") {
           return Response.json({
-            result: ["s4", "s3", "s2", "s1"].map((signature, i) => ({
-              signature,
-              err: null,
-              blockTime: 1_790_000_300 - i * 100,
-            })),
+            result: [
+              ["s4", 300],
+              ["s0", 250],
+              ["s3", 200],
+              ["s2", 100],
+              ["s1", 0],
+            ].map(([signature, t]) => ({ signature, err: null, blockTime: 1_790_000_000 + Number(t) })),
           });
         }
-        if (method === "getTransaction") return Response.json({ result: txs[params[0]] });
+        if (method === "getTransaction") {
+          expect(params[1].maxSupportedTransactionVersion).toBe(1);
+          return params[0] === "s0"
+            ? Response.json({ error: { code: -32009, message: "missing in long-term storage" } })
+            : Response.json({ result: txs[params[0]] });
+        }
         throw new Error(`unexpected ${method}`);
       }),
     );
 
     const t = await traceSolana(W);
-    expect(calls.filter((m) => m === "getTransaction")).toHaveLength(4);
+    expect(calls.filter((m) => m === "getTransaction")).toHaveLength(5);
     expect(t.funder).toMatchObject({
       address: BINANCE_HOT,
       label: { kind: "cex", name: "Binance" },
@@ -248,7 +300,8 @@ describe("traceSolana", () => {
     ]);
     expect(t.swaps).toEqual({ txs: 1, usd: 300 });
     expect(t.balance).toEqual({ symbol: "SOL", amount: 5, usd: 750 });
-    expect(t.scanned).toMatchObject({ txs: 4, complete: true });
+    // One transaction the RPC wouldn't return: left out, the rest still read.
+    expect(t.scanned).toMatchObject({ txs: 5, complete: true, skipped: 1 });
   });
 
   it("turns down a token's address", async () => {

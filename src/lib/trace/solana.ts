@@ -29,6 +29,25 @@ const STABLES: Record<string, string> = {
   Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: "USDT",
 };
 
+/**
+ * The newest transaction format this reader asks for. v1 (4,096-byte transactions) went live on mainnet on
+ * Sep 15, 2026; asking for less makes getTransaction fail (-32015) on every v1 transaction. Its jsonParsed shape
+ * is v0's plus a `transactionConfig`, which nothing here reads.
+ */
+export const MAX_TX_VERSION = 1;
+/** The RPC's answer to a transaction in a newer format than asked for. */
+const UNSUPPORTED_VERSION = -32015;
+
+/** An error the RPC answered with (not a rate limit, not the network): about this one call. */
+class RpcError extends TraceError {
+  constructor(
+    readonly rpcCode: number | undefined,
+    message: string,
+  ) {
+    super("upstream", message);
+  }
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function rpc<T>(method: string, params: unknown[]): Promise<T> {
@@ -59,13 +78,13 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
       }
       throw new TraceError("upstream", `Solana RPC responded ${res.status}`);
     }
-    const body = (await res.json()) as { result?: T; error?: { message?: string } };
+    const body = (await res.json()) as { result?: T; error?: { code?: number; message?: string } };
     if (body.error) {
       if (attempt < 3 && /rate|too many/i.test(body.error.message ?? "")) {
         await sleep(700 * 2 ** attempt);
         continue;
       }
-      throw new TraceError("upstream", `Solana RPC: ${body.error.message ?? "error"}`);
+      throw new RpcError(body.error.code, `Solana RPC: ${body.error.message ?? "error"}`);
     }
     return body.result as T;
   }
@@ -251,11 +270,33 @@ async function signatures(address: string): Promise<{ sigs: Signature[]; complet
   return { sigs, complete: false };
 }
 
-const getTx = (signature: string) =>
-  rpc<ParsedTx | null>("getTransaction", [
-    signature,
-    { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
-  ]);
+/**
+ * One transaction, jsonParsed; null when the RPC can't give it (it's counted as skipped, and the trail goes on
+ * without it). A format newer than MAX_TX_VERSION is asked for again in the version the RPC names: jsonParsed
+ * reads every version alike.
+ */
+export async function getTx(signature: string): Promise<ParsedTx | null> {
+  let version = MAX_TX_VERSION;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await rpc<ParsedTx | null>("getTransaction", [
+        signature,
+        { encoding: "jsonParsed", maxSupportedTransactionVersion: version, commitment: "confirmed" },
+      ]);
+    } catch (err) {
+      if (!(err instanceof RpcError)) throw err;
+      const asked = Number(/maxSupportedTransactionVersion\W+(\d+)/.exec(err.message)?.[1]);
+      if (err.rpcCode === UNSUPPORTED_VERSION && asked > version) {
+        console.warn(`[rankr] trace: Solana transaction version ${asked} is newer than MAX_TX_VERSION`);
+        version = asked;
+        continue;
+      }
+      console.warn(`[rankr] trace: skipped a transaction: ${err.message}`);
+      return null;
+    }
+  }
+  return null;
+}
 
 export async function traceSolana(address: string): Promise<TraceResponse> {
   const [account, history, deposits] = await Promise.all([
@@ -313,6 +354,7 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
       from: times.length ? Math.min(...times) : null,
       to: times.length ? Math.max(...times) : null,
       complete: history.complete && ok.length <= recent.length,
+      skipped: txs.filter((tx) => !tx).length,
     },
     updatedAt: Date.now(),
   };

@@ -52,8 +52,16 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   `/trace/<chain>/<address>`: above it, who sent it money (its first money marked **1ST**); the wallet in the
   middle; below it, where its money went. Money always flows down the page, as dashes running along the lines,
   thicker for more money. Each wallet shows its three biggest counterparties that way (**+N more** shows up to
-  eight), and tapping one opens the next row, as deep as six hops each way; the tree makes room around it and the
-  card you tapped stays put. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
+  eight), and tapping one opens the next row, as deep as six hops each way. Opening a wallet folds the rest of
+  its row into one **+N others** card (tap to unfold), so the tree only widens along the trail you follow and
+  stays narrow enough for a phone. The tree sits in a frame that works like a map: drag to move it, pinch (or
+  Ctrl / ⌘ + scroll, or a trackpad pinch) to zoom, sideways scroll to pan, and buttons to zoom, fit the whole
+  trail, go back to the target and go **fullscreen**. Fullscreen fits the whole trail to the screen and keeps it
+  fitted as wallets open and fold, so there's nothing to zoom; zooming or dragging it yourself stops that until
+  you press Fit again. Zoomed out that far (a whole trail on a phone), each card turns to a compact face, its
+  glyph and name, with type sized to stay readable. The picked wallet sits in a strip along the bottom, its
+  details a tap away; Esc or ✕ leaves, back to the view the page had. Outside fullscreen, the card you tapped
+  stays put while the tree reshapes around it, and what it opened slides into view. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
   already higher up its branch isn't opened again (the money went round). Trades aren't followed: a transaction
   where the wallet sends one asset and gets another back is a swap, summed on a **Swaps** card (DEX pools are no
   one to follow). Dust under $1 and tokens with no price (where airdropped spam lives) are left out. Every
@@ -66,12 +74,20 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   scam, mixer or frozen address (each with its source), bridged out, reached an exchange, spread out to 5+
   wallets, emptied. It grows as wallets are opened. Names are quoted with their source and never turned into
   accusations: a label isn't an identity, and money passing through a wallet isn't proof of a crime.
+  **Share image** (next to Copy link, and in fullscreen's top bar): the trail as it's opened right now, as a
+  picture to post. 16:9 (the shape X shows uncropped), 3600x2025, dark, flat fills only (X and Telegram re-encode
+  images as JPEG): the mark and the case, the target, the tree fitted (compact cards when it's big), the case
+  file's flags and where the money ended up, the link and a line on what a label is. Drawn in the browser from
+  what's on screen, nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's
+  app takes it from there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops)
+  and Tornado Cash." and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`).
   Free data only:
   - **Solana**: its public RPC (`api.mainnet-beta.solana.com`, no key; about 40 calls per 10 seconds), or any RPC
     in `SOLANA_RPC_URL` (Helius, QuickNode... their free plans read more and faster). A wallet costs one
     `getAccountInfo`, one to three `getSignaturesForAddress` pages (its whole history up to 3,000 transactions,
-    for who funded it) and a `getTransaction` (jsonParsed) for each of its newest 30 transactions (80 on your own
-    RPC). Prices: DexScreener, stablecoins at $1.
+    for who funded it) and a `getTransaction` (jsonParsed, asking for up to v1, the 4,096-byte format live since
+    Sep 15, 2026) for each of its newest 30 transactions (80 on your own RPC); one the RPC won't return is left
+    out and counted. Prices: DexScreener, stablecoins at $1.
   - **Ethereum, Base, Arbitrum, Optimism, Polygon**: [Blockscout's API](https://api.blockscout.com), which since
     July 2026 needs a key (free at dev.blockscout.com: 100K credits a day; without one its public explorers allow
     about 10 requests per 16 minutes). A wallet costs four requests: the address and its newest 50 transactions,
@@ -89,7 +105,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
     `src/lib/trace/labels.ts`. Not used: Dune's Spellbook, whose license rules out data platforms.
   Each wallet read is kept 5 minutes per server and a minute in shared caches; 20 reads a minute per visitor.
   With `RANKR_MOCK=1`, made-up trails (the same for the same address). The page without a wallet shows a made-up
-  example.
+  example to play with: every wallet in it opens.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a
@@ -435,7 +451,7 @@ src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
-src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, tree layout, case file
+src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, tree layout, camera, case file, share text
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

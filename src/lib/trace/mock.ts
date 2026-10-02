@@ -101,16 +101,22 @@ export function mockTrace(chain: TraceChain, address: string, now = Date.now()):
   };
 }
 
-/** A made-up trail for the trace page's example: a target and one wallet below it opened. Nothing in it is real. */
-export function exampleTrail(now: number) {
-  const chain: TraceChain = { id: "solana", kind: "solana", native: "SOL", explorer: "" };
-  const root = mockAddress(chain, "rankr/example");
-  const top = mockTrace(chain, root, now);
+const EXAMPLE_CHAIN: TraceChain = { id: "solana", kind: "solana", native: "SOL", explorer: "" };
+/** A fixed clock: the server and the browser make the same example. */
+const EXAMPLE_NOW = Date.UTC(2026, 0, 1);
+
+/** A made-up wallet for the trace page's example, the same every time. Nothing in it is real. */
+export const exampleWallet = (address: string) => mockTrace(EXAMPLE_CHAIN, address, EXAMPLE_NOW);
+
+/** The example's start: a made-up target, and one wallet below it already opened. */
+export function exampleTrail() {
+  const root = mockAddress(EXAMPLE_CHAIN, "rankr/example");
+  const top = exampleWallet(root);
   const data = new Map([[root, top]]);
   const expanded = new Set<string>();
   const next = top.outflows.find((f) => !f.terminal);
   if (next) {
-    data.set(next.address, mockTrace(chain, next.address, now));
+    data.set(next.address, exampleWallet(next.address));
     expanded.add(`root/out:${next.address}`);
   }
   return { root, data, expanded };

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
-import { exampleTrail } from "@/lib/trace/mock";
-import { buildTree, layoutTree } from "@/lib/trace/tree";
+import { useCallback, useState } from "react";
 import { delay } from "@/lib/motion";
+import { exampleTrail, exampleWallet } from "@/lib/trace/mock";
+import type { TraceResponse } from "@/lib/trace/types";
 import { PageHeader } from "../PageHeader";
 import { TraceCanvas } from "./TraceCanvas";
 import { TraceInput } from "./TraceInput";
+import { useTrail } from "./useTrail";
 
 const STEPS = [
   ["↑ In", "Who sent it money, and who sent them theirs. Its first money is marked 1ST."],
@@ -14,16 +15,16 @@ const STEPS = [
   ["↓ Out", "Where its money went, hop by hop, until it reaches an exchange, a bridge or a mixer."],
 ] as const;
 
-/** The trace page before a wallet: the box, how the tree reads, and a made-up example of one. */
+const NO_ERRORS = new Map<string, string>();
+
+/** The trace page before a wallet: the box, how the tree reads, and a made-up example of one to play with. */
 export function TraceIntro() {
-  // A fixed clock: the server and the browser draw the same example.
-  const example = useMemo(() => {
-    const { root, data, expanded } = exampleTrail(Date.UTC(2026, 0, 1));
-    return {
-      layout: layoutTree(buildTree({ root, data, errors: new Map(), expanded, showAll: new Set() })),
-      root: data.get(root)!,
-    };
-  }, []);
+  // A playground: the wallets are made up on the spot (the same each time), so every one of them opens.
+  const [start] = useState(exampleTrail);
+  const [data, setData] = useState<Map<string, TraceResponse>>(start.data);
+  const read = useCallback((a: string) => setData((m) => new Map(m).set(a, exampleWallet(a))), []);
+  const [fullscreen, setFullscreen] = useState(false);
+  const trail = useTrail(start.root, data, NO_ERRORS, read, { expanded: start.expanded });
 
   return (
     <div className="space-y-8 pt-8 sm:pt-12">
@@ -43,17 +44,19 @@ export function TraceIntro() {
         ))}
       </ol>
       <section aria-label="Example" className="cine-in space-y-2" style={delay(320)}>
-        <p className="label text-subtle">Example · made-up wallets</p>
-        <div aria-hidden className="pointer-events-none select-none">
-          <TraceCanvas
-            layout={example.layout}
-            root={example.root}
-            selected={null}
-            anchor={null}
-            onPress={() => {}}
-            onRetry={() => {}}
-          />
-        </div>
+        <p className="label text-subtle">Example · made-up wallets · tap, drag, pinch</p>
+        <TraceCanvas
+          layout={trail.layout}
+          root={data.get(start.root)!}
+          selected={trail.picked.item.id}
+          anchor={trail.anchor}
+          onPress={trail.press}
+          onRetry={() => {}}
+          fullscreen={fullscreen}
+          onFullscreen={setFullscreen}
+          className="h-[420px] sm:h-[520px]"
+          title={<span className="label text-subtle">Example · made-up wallets</span>}
+        />
       </section>
     </div>
   );

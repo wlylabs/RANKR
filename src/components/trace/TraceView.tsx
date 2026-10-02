@@ -7,22 +7,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { shortAddress, tokenHref } from "@/lib/format";
 import { sha256Hex } from "@/lib/sha256";
 import { EVM_TRACE_CHAINS, traceChain, traceHref } from "@/lib/trace/chains";
-import { buildTree, dataOf, layoutTree, parentId, type Placed } from "@/lib/trace/tree";
+import { dataOf, parentId } from "@/lib/trace/tree";
 import type { TraceErrorCode, TraceResponse } from "@/lib/trace/types";
 import { CopyButton } from "../CopyButton";
 import { DecryptText } from "../DecryptText";
 import { CaseFile } from "./CaseFile";
-import { Inspector } from "./Inspector";
+import { Inspector, InspectorStrip } from "./Inspector";
 import { TraceCanvas } from "./TraceCanvas";
+import { ShareTrace } from "./ShareTrace";
 import { TraceInput } from "./TraceInput";
+import { useTrail } from "./useTrail";
 
 type ReadError = { message: string; code?: TraceErrorCode };
-
-const toggle = (set: Set<string>, id: string) => {
-  const next = new Set(set);
-  if (!next.delete(id)) next.add(id);
-  return next;
-};
 
 /** Reads wallets for the tree, each once (until it fails and is asked for again). */
 function useWallets(chain: string) {
@@ -108,10 +104,7 @@ function RootError({
 export function TraceView({ chain: chainId, address }: { chain: string; address: string }) {
   const chain = traceChain(chainId)!;
   const { data, errors, load } = useWallets(chainId);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [showAll, setShowAll] = useState<Set<string>>(() => new Set());
-  const [selected, setSelected] = useState("root");
-  const [anchor, setAnchor] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const [link, setLink] = useState("");
 
   useEffect(() => {
@@ -119,45 +112,12 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
     setLink(window.location.href);
   }, [address, load]);
 
-  const tree = useMemo(
-    () =>
-      buildTree({
-        root: address,
-        data,
-        errors: new Map([...errors].map(([a, e]) => [a, e.message])),
-        expanded,
-        showAll,
-      }),
-    [address, data, errors, expanded, showAll],
-  );
-  const layout = useMemo(() => layoutTree(tree), [tree]);
-  const byId = useMemo(() => new Map(layout.nodes.map((n) => [n.item.id, n])), [layout]);
-
-  const open = useCallback(
-    (placed: Placed) => {
-      const { item } = placed;
-      if (!item.expandable || !item.address) return;
-      if (!item.expanded && !dataOf(data, item.address)) void load(item.address);
-      setExpanded((s) => toggle(s, item.id));
-    },
-    [data, load],
-  );
-
-  const press = (placed: Placed) => {
-    const { item } = placed;
-    setAnchor(item.id);
-    if (item.type === "more") {
-      const parent = parentId(item.id);
-      if (parent) setShowAll((s) => new Set(s).add(parent));
-      return;
-    }
-    setSelected(item.id);
-    open(placed);
-  };
+  const messages = useMemo(() => new Map([...errors].map(([a, e]) => [a, e.message])), [errors]);
+  const read = useCallback((a: string) => void load(a), [load]);
+  const { layout, byId, picked, anchor, open, press } = useTrail(address, data, messages, read);
 
   const root = dataOf(data, address) ?? null;
   const rootError = !root ? errors.get(address) : undefined;
-  const picked = byId.get(selected) ?? byId.get("root")!;
   const pickedParent = parentId(picked.item.id);
   const caseId = useMemo(() => sha256Hex(`${chainId}:${address}`).slice(0, 8), [chainId, address]);
 
@@ -167,7 +127,10 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="label text-subtle">Case #{caseId}</span>
           <span className="label text-subtle">· {chain.id === "solana" ? "Solana" : chain.id}</span>
-          {link && <CopyButton value={link} label="Copy link" what="link" className="ml-auto" />}
+          <span className="ml-auto flex items-center gap-3">
+            {link && <CopyButton value={link} label="Copy link" what="link" />}
+            {root && <ShareTrace chain={chain} root={root} data={data} layout={layout} caseId={caseId} />}
+          </span>
         </div>
         <h1 className="cine-in text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
           <DecryptText text={root?.label?.name ?? shortAddress(address)} className="font-mono tracking-[-0.04em]" />
@@ -198,7 +161,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
         <>
           <p className="label flex flex-wrap gap-x-4 gap-y-1 text-subtle">
             <span>↓ Money flows down</span>
-            <span>Tap a wallet to open it</span>
+            <span>Tap to open · drag · pinch to zoom</span>
             <span>End: exchange, bridge, contract</span>
             <span className="text-down">Red: flagged on a public list</span>
           </p>
@@ -209,6 +172,32 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
             anchor={anchor}
             onPress={press}
             onRetry={(placed) => placed.item.address && void load(placed.item.address)}
+            fullscreen={fullscreen}
+            onFullscreen={setFullscreen}
+            className="h-[62svh] min-h-[420px] max-h-[780px]"
+            title={
+              <span className="flex items-baseline gap-2">
+                <span className="font-mono text-sm">{root?.label?.name ?? shortAddress(address)}</span>
+                <span className="label hidden text-subtle sm:inline">Case #{caseId}</span>
+              </span>
+            }
+            actions={
+              root && (
+                <ShareTrace chain={chain} root={root} data={data} layout={layout} caseId={caseId} variant="icon" />
+              )
+            }
+            footer={
+              root && (
+                <InspectorStrip
+                  key={picked.item.id}
+                  chain={chain}
+                  item={picked.item}
+                  parent={pickedParent ? (byId.get(pickedParent)?.item.address ?? null) : null}
+                  data={picked.item.address ? dataOf(data, picked.item.address) : undefined}
+                  onToggle={() => open(picked)}
+                />
+              )
+            }
           />
           {root && (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -217,10 +206,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
                 item={picked.item}
                 parent={pickedParent ? (byId.get(pickedParent)?.item.address ?? null) : null}
                 data={picked.item.address ? dataOf(data, picked.item.address) : undefined}
-                onToggle={() => {
-                  setAnchor(picked.item.id);
-                  open(picked);
-                }}
+                onToggle={() => open(picked)}
               />
               <CaseFile root={root} data={data} caseId={caseId} />
             </div>
