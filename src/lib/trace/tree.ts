@@ -53,6 +53,8 @@ export type TreeState = {
   showAll: Set<string>;
   /** Wallets whose row stays unfolded while one of its wallets is open, by node id. */
   unfolded?: Set<string>;
+  /** Every row whole: all its counterparties, nothing folded (the path view picks from them). */
+  full?: boolean;
 };
 
 /** The id of the card a card hangs from. */
@@ -81,7 +83,7 @@ function children(s: TreeState, parent: TreeItem, side: Side, path: string[]): T
   const funder = data.funder;
   // Where its first money came from leads the row above it, even when it was small.
   if (side === "in" && funder) list = [funder, ...list.filter((f) => !sameAddress(f.address, funder.address))];
-  const all = s.showAll.has(parent.id);
+  const all = s.full || s.showAll.has(parent.id);
   const shown = all ? list : list.slice(0, SHOWN);
 
   const items: TreeItem[] = shown.map((flow) =>
@@ -93,7 +95,7 @@ function children(s: TreeState, parent: TreeItem, side: Side, path: string[]): T
   // Following a trail: once a wallet in this row is open, the others fold into one card, so the tree only
   // widens along the path being followed. Unfolding shows the row as it was.
   const open = items.filter((i) => i.expanded);
-  if (open.length && !s.unfolded?.has(parent.id)) {
+  if (open.length && !s.full && !s.unfolded?.has(parent.id)) {
     const folded = items.length - open.length;
     if (folded > 0) {
       open.push({ id: `${parent.id}/${side}:others`, type: "others", side, depth, count: folded, children: [] });

@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { shortAddress } from "@/lib/format";
 import { caseFile } from "@/lib/trace/case";
 import { traceHref, type TraceChain } from "@/lib/trace/chains";
-import { trailPath } from "@/lib/trace/path";
+import { fold, type PathStep } from "@/lib/trace/path";
 import { traceImageFile, traceShareText } from "@/lib/trace/share";
 import type { Layout } from "@/lib/trace/tree";
 import type { TraceResponse } from "@/lib/trace/types";
@@ -18,7 +18,7 @@ import { drawPathImage, drawTraceImage } from "./traceImage";
 /** Tall: the trail as one line, for phones (the default). Wide: the whole tree as it's opened. */
 type Format = "tall" | "wide";
 const FORMATS: { id: Format; label: string; hint: string }[] = [
-  { id: "tall", label: "Tall", hint: "The trail as one line, 4:5: reads best on a phone" },
+  { id: "tall", label: "Tall", hint: "The path, as followed, 4:5: reads best on a phone" },
   { id: "wide", label: "Wide", hint: "The whole tree as it's opened, 16:9" },
 ];
 
@@ -27,6 +27,8 @@ type ShareTraceProps = {
   root: TraceResponse;
   data: Map<string, TraceResponse>;
   layout: Layout;
+  /** The trail as followed on the path view, every stop (the tall image folds a long one). */
+  steps: PathStep[];
   caseId: string;
   /** A labeled button (the page header), or an icon (fullscreen's top bar). */
   variant?: "button" | "icon";
@@ -62,7 +64,7 @@ export function ShareTrace({ variant = "button", ...props }: ShareTraceProps) {
   );
 }
 
-function ShareTraceDialog({ chain, root, data, layout, caseId }: ShareTraceProps) {
+function ShareTraceDialog({ chain, root, data, layout, steps, caseId }: ShareTraceProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -98,11 +100,7 @@ function ShareTraceDialog({ chain, root, data, layout, caseId }: ShareTraceProps
       exits,
       where: `${window.location.host}/trace/${chain.id}/${shortAddress(root.address)}`,
     };
-    const rootItem = layout.nodes.find((n) => n.item.id === "root")!.item;
-    (format === "tall"
-      ? drawPathImage({ ...common, steps: trailPath(rootItem) })
-      : drawTraceImage({ ...common, layout })
-    )
+    (format === "tall" ? drawPathImage({ ...common, steps: fold(steps) }) : drawTraceImage({ ...common, layout }))
       .then((blob) => {
         if (!blob) throw new Error("no canvas");
         if (!live) return;
@@ -159,7 +157,9 @@ function ShareTraceDialog({ chain, root, data, layout, caseId }: ShareTraceProps
           <div>
             <h2 className="font-semibold tracking-tight">Share the trail</h2>
             <p className="mt-0.5 text-sm text-muted">
-              The trail as it&apos;s opened right now. Open the wallets it went through first.
+              {format === "tall"
+                ? "The path as it's followed right now. Follow it further first for more of it."
+                : "The tree as it's opened right now. Open the wallets it went through first."}
             </p>
           </div>
           <button

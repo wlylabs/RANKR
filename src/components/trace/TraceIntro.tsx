@@ -7,6 +7,7 @@ import type { TraceResponse } from "@/lib/trace/types";
 import { PageHeader } from "../PageHeader";
 import { TraceCanvas } from "./TraceCanvas";
 import { TraceInput } from "./TraceInput";
+import { TracePath, useTraceView, ViewSwitch } from "./TracePath";
 import { useTrail } from "./useTrail";
 
 const STEPS = [
@@ -17,14 +18,16 @@ const STEPS = [
 
 const NO_ERRORS = new Map<string, string>();
 
-/** The trace page before a wallet: the box, how the tree reads, and a made-up example of one to play with. */
+/** The trace page before a wallet: the box, how a trail reads, and a made-up one to play with (path or tree). */
 export function TraceIntro() {
   // A playground: the wallets are made up on the spot (the same each time), so every one of them opens.
   const [start] = useState(exampleTrail);
   const [data, setData] = useState<Map<string, TraceResponse>>(start.data);
   const read = useCallback((a: string) => setData((m) => new Map(m).set(a, exampleWallet(a))), []);
   const [fullscreen, setFullscreen] = useState(false);
+  const [view, setView] = useTraceView();
   const trail = useTrail(start.root, data, NO_ERRORS, read, { expanded: start.expanded });
+  const title = <span className="label text-subtle">Example · made-up wallets</span>;
 
   return (
     <div className="space-y-8 pt-8 sm:pt-12">
@@ -43,20 +46,37 @@ export function TraceIntro() {
           </li>
         ))}
       </ol>
-      <section aria-label="Example" className="cine-in space-y-2" style={delay(320)}>
-        <p className="label text-subtle">Example · made-up wallets · tap, drag, pinch</p>
-        <TraceCanvas
-          layout={trail.layout}
-          root={data.get(start.root)!}
-          selected={trail.picked.item.id}
-          anchor={trail.anchor}
-          onPress={trail.press}
-          onRetry={() => {}}
-          fullscreen={fullscreen}
-          onFullscreen={setFullscreen}
-          className="h-[420px] sm:h-[520px]"
-          title={<span className="label text-subtle">Example · made-up wallets</span>}
-        />
+      <section aria-label="Example" className="cine-in space-y-3" style={delay(320)}>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <ViewSwitch view={view} onChange={setView} />
+          <p className="label text-subtle">
+            {view === "path" ? "Tap Follow the money, or Switch at a fork" : "Tap, drag, pinch"}
+          </p>
+        </div>
+        {view === "path" ? (
+          <TracePath
+            steps={trail.steps}
+            items={trail.items}
+            root={data.get(start.root)!}
+            onFollow={trail.follow}
+            onPick={trail.pick}
+            onRetry={() => {}}
+            header={title}
+          />
+        ) : (
+          <TraceCanvas
+            layout={trail.layout}
+            root={data.get(start.root)!}
+            selected={trail.picked.item.id}
+            anchor={trail.anchor}
+            onPress={trail.press}
+            onRetry={() => {}}
+            fullscreen={fullscreen}
+            onFullscreen={setFullscreen}
+            className="h-[420px] sm:h-[520px]"
+            title={title}
+          />
+        )}
       </section>
     </div>
   );

@@ -48,9 +48,16 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
 - **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
-  Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and the tree opens on it at
-  `/trace/<chain>/<address>`: above it, who sent it money (its first money marked **1ST**); the wallet in the
-  middle; below it, where its money went. Money always flows down the page, as dashes running along the lines,
+  Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and the trail opens on it at
+  `/trace/<chain>/<address>`, as a **Path** (the default) or a **Tree** (a toggle above it, remembered on the
+  device; the example on `/trace` has it too). **Path**: the trail as one line of cards, top to bottom, the way
+  the tall share card draws it: who funded the wallet (**1ST**), the wallet, and the wallets its money went
+  through, each arrow between two cards carrying what moved and when. **Follow the money** under the last card
+  reads it and goes a hop further, until an exchange, a bridge or a mixer ends the trail; **Switch** on an arrow
+  takes another wallet at that fork (every counterparty listed, biggest first), and above the top card the trail
+  follows up to who sent it its money. Tapping a card shows it in full under the path. **Tree**: above the
+  wallet, who sent it money (its first money marked **1ST**); the wallet in the middle; below it, where its
+  money went. Money always flows down the page, as dashes running along the lines,
   thicker for more money. Each wallet shows its three biggest counterparties that way (**+N more** shows up to
   eight), and tapping one opens the next row, as deep as six hops each way. Opening a wallet folds the rest of
   its row into one **+N others** card (tap to unfold), so the tree only widens along the trail you follow and
@@ -72,13 +79,13 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   money in and out, where the money ended up (exchanges, bridges, mixers, with the hop they were reached at), what
   was read, and flags: a fresh wallet (first seen under 7 days ago), money to or from a sanctioned, exploiter,
   scam, mixer or frozen address (each with its source), bridged out, reached an exchange, spread out to 5+
-  wallets, emptied. It grows as wallets are opened. Names are quoted with their source and never turned into
+  wallets, emptied. It grows as the money is followed. Names are quoted with their source and never turned into
   accusations: a label isn't an identity, and money passing through a wallet isn't proof of a crime.
-  **Share image** (next to Copy link, and in fullscreen's top bar): the trail as it's opened right now, as a
+  **Share image** (next to Copy link, and in fullscreen's top bar): the trail as it's followed right now, as a
   picture to post, in two shapes. **Tall** (the default, 4:5, 2160x2700, as tall as X shows a picture whole on a
-  phone): the trail as one line, a card per stop (who funded the target, or the senders opened above it; the
-  target, white; the hops opened below it, down to the most telling end: a flagged address, then an exchange,
-  bridge or mixer), the money and dates on the arrows between them, a long trail's middle folded into "⋯ 3 more
+  phone): the path as it is on screen, a card per stop (who funded the target, or the senders followed above it;
+  the target, white; the hops followed below it, down to the most telling end: a flagged address, then an
+  exchange, bridge or mixer), the money and dates on the arrows between them, a long trail's middle folded into "⋯ 3 more
   hops ⋯". **Wide** (16:9, 3600x2025): the whole tree as it's opened, fitted (compact cards when it's big). Both:
   dark, flat fills only (X and Telegram re-encode images as JPEG), the mark and the case, the case file's flags and
   where the money ended up, the link and a line on what a label is. Drawn in the browser from what's on screen,

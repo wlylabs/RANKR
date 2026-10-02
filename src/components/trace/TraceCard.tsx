@@ -48,7 +48,7 @@ export function LabelTag({ label, className }: { label: TraceLabel; className?: 
 const HEX = "0123456789abcdef";
 
 /** Hex that keeps changing: a wallet being read. */
-function Scramble({ length = 10 }: { length?: number }) {
+export function Scramble({ length = 10 }: { length?: number }) {
   const [text, setText] = useState("0x" + "·".repeat(length));
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;

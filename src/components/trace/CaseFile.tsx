@@ -18,7 +18,7 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
 
 /**
  * What the trail says so far, in words: who the wallet is, who funded it, how much went each way, where it
- * ended up, and the flags it raises. It grows as wallets are opened on the tree.
+ * ended up, and the flags it raises. It grows as the money is followed.
  */
 export function CaseFile({
   root,
@@ -115,7 +115,7 @@ export function CaseFile({
             </ul>
           ) : (
             <span className="text-muted">
-              No exchange, bridge or mixer yet. Open the wallets below the target to follow it.
+              No exchange, bridge or mixer yet. Follow the money further to see where it ends up.
             </span>
           )}
         </Row>

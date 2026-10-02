@@ -580,6 +580,21 @@ body {
   animation: trace-node-in 0.55s var(--ease-enter) backwards;
 }
 
+/* The path view: the trail as one line of cards. Money runs down the line between two of them, and a card
+   followed resolves out of a blur like one on the tree. */
+@keyframes trace-flow {
+  to {
+    background-position-y: 12px;
+  }
+}
+.trace-flow {
+  background: repeating-linear-gradient(to bottom, currentColor 0 3px, transparent 3px 12px);
+  animation: trace-flow 0.9s linear infinite;
+}
+.trace-stop {
+  animation: trace-node-in 0.55s var(--ease-enter) backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -595,6 +610,7 @@ body {
   .twinkle,
   .ticker,
   .trace-packets,
+  .trace-flow,
   .skeleton {
     animation: none !important;
   }
