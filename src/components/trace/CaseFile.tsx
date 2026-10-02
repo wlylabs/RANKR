@@ -127,7 +127,8 @@ export function CaseFile({
                 , {formatDay(root.scanned.from)} → {formatDay(root.scanned.to)}
               </>
             )}
-            . Amounts in dollars at today&apos;s prices.
+            {!!root.scanned.skipped && <> ({root.scanned.skipped} the chain wouldn&apos;t return, left out)</>}. Amounts
+            in dollars at today&apos;s prices.
           </span>
         </Row>
       </dl>

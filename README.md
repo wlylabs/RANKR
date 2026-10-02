@@ -70,8 +70,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   - **Solana**: its public RPC (`api.mainnet-beta.solana.com`, no key; about 40 calls per 10 seconds), or any RPC
     in `SOLANA_RPC_URL` (Helius, QuickNode... their free plans read more and faster). A wallet costs one
     `getAccountInfo`, one to three `getSignaturesForAddress` pages (its whole history up to 3,000 transactions,
-    for who funded it) and a `getTransaction` (jsonParsed) for each of its newest 30 transactions (80 on your own
-    RPC). Prices: DexScreener, stablecoins at $1.
+    for who funded it) and a `getTransaction` (jsonParsed, asking for up to v1, the 4,096-byte format live since
+    Sep 15, 2026) for each of its newest 30 transactions (80 on your own RPC); one the RPC won't return is left
+    out and counted. Prices: DexScreener, stablecoins at $1.
   - **Ethereum, Base, Arbitrum, Optimism, Polygon**: [Blockscout's API](https://api.blockscout.com), which since
     July 2026 needs a key (free at dev.blockscout.com: 100K credits a day; without one its public explorers allow
     about 10 requests per 16 minutes). A wallet costs four requests: the address and its newest 50 transactions,

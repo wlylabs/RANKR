@@ -65,8 +65,11 @@ export type TraceResponse = {
   more: { in: number; out: number };
   /** Trades (one asset out, another in, in one transaction), summed instead of drawn. */
   swaps: { txs: number; usd: number | null } | null;
-  /** How much history this read: the newest `txs` transactions, from `from` to `to`; complete if that's all. */
-  scanned: { txs: number; from: number | null; to: number | null; complete: boolean };
+  /**
+   * How much history this read: the newest `txs` transactions, from `from` to `to`; complete if that's all.
+   * `skipped`: transactions the chain wouldn't return, left out.
+   */
+  scanned: { txs: number; from: number | null; to: number | null; complete: boolean; skipped?: number };
   updatedAt: number;
 };
 
