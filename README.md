@@ -194,8 +194,8 @@ hairline borders), "decrypted text" reveal effects, and hash visualizations such
     lists cascading in row by row (`Cascade`; only on first show, so live re-ranks and new rows don't replay it);
     whole-number stats count up (`CountUp`); loading rows shimmer;
   - tab underlines, segmented controls and the header nav's current-page line glide to the picked option
-    (`src/components/Tabs.tsx`); a pill follows the pointer across the header nav; the phone's bottom nav marks
-    the current page with Material 3's indicator pill, opening out from the icon;
+    (`src/components/Tabs.tsx`); a pill follows the pointer across the header nav; the phone's bottom nav stays
+    still: the current page is the one in full color, its icon drawn bolder, with no pill behind it;
   - menus open out of their corner; Track rises as a sheet on phones and settles in as a dialog from sm up, over a
     blurred page, and plays backwards on close (where the browser can animate the top layer);
   - switching theme opens the new theme as a circle from the toggle (View Transitions).

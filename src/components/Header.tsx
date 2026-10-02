@@ -204,16 +204,9 @@ export function BottomNav() {
               )}
               aria-current={active ? "page" : undefined}
             >
-              {/* Material 3's active indicator: a pill that opens out from the icon's center. */}
-              <span className="relative grid h-7 w-14 place-items-center">
-                <span
-                  aria-hidden
-                  className={clsx(
-                    "absolute inset-0 rounded-full bg-surface-2 transition-[opacity,scale] duration-300 ease-emphasized",
-                    active ? "opacity-100" : "scale-x-50 opacity-0",
-                  )}
-                />
-                <Icon className="relative size-[18px]" strokeWidth={active ? 2.2 : 1.7} />
+              {/* No pill and no motion: the tab you're on is the one in full color, its icon drawn bolder. */}
+              <span className="grid h-7 w-14 place-items-center">
+                <Icon className="size-[18px]" strokeWidth={active ? 2.2 : 1.7} />
               </span>
               {label}
             </Link>
