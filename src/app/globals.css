@@ -491,6 +491,137 @@ body {
 }
 .trace-stop {
   animation: trace-stop-in 0.55s var(--ease-enter) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* The intro's backdrop: money dripping down the ledger, a packet of light falling down a few of its columns,
+   each on its own clock (after Magic UI's Animated Beam and Aceternity's Tracing Beam, in CSS). */
+@keyframes trail-drip {
+  0% {
+    transform: translateY(-120px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--h, 420px));
+    opacity: 0;
+  }
+}
+.trail-drip {
+  animation: trail-drip var(--t, 4s) cubic-bezier(0.55, 0, 0.75, 0.6) infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Opening a case, while the target is read: a log of what's being done, a line at a time. */
+@keyframes boot-line {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+    filter: blur(4px);
+  }
+}
+.boot-line {
+  animation: boot-line 0.45s var(--ease-enter) backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+.caret {
+  animation: caret 1s steps(1) infinite;
+}
+
+/* Target acquired: the brackets around the target close in on it, once. */
+@keyframes lock-on {
+  from {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+  60% {
+    opacity: 1;
+  }
+}
+.lock-on {
+  animation: lock-on 0.7s var(--ease-emphasized) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Where the trail ends: a stamp coming down on the case file. */
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.9) rotate(-14deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-3deg);
+  }
+}
+.stamp {
+  transform: rotate(-4deg);
+  animation: stamp 0.55s var(--ease-emphasized) backwards;
+  animation-delay: 0.35s;
+}
+
+/* The nav's Trace icon, on its page: a packet drops down the line into the dot, now and then. */
+@keyframes nav-drip {
+  0% {
+    transform: translateY(-7px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  28%,
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.nav-drip circle {
+  animation: nav-drip 4s var(--ease-enter) infinite;
+}
+
+/* Scrolling down a trail, the camera follows the money: each line between two cards draws itself down as it
+   comes into view, and each card comes up into focus (scroll-driven; elsewhere they simply stand). */
+@keyframes beam-draw {
+  from {
+    transform: scaleY(0);
+  }
+}
+/* A line just followed draws itself down to the new card, which arrives as it lands (.trace-stop's delay). */
+.beam-in {
+  transform-origin: 50% 0;
+  animation: beam-draw 0.45s var(--ease-enter) backwards;
+}
+@keyframes trace-focus {
+  from {
+    opacity: 0.25;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .trace-beam {
+      transform-origin: 50% 0;
+      animation: beam-draw linear both;
+      animation-timeline: view();
+      /* Done by the time it's wholly on screen, so a line at the foot of a page never stays half drawn. */
+      animation-range: entry 10% entry 100%;
+    }
+    .trace-focus {
+      animation: trace-focus linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -508,6 +639,9 @@ body {
   .twinkle,
   .ticker,
   .trace-flow,
+  .trail-drip,
+  .caret,
+  .nav-drip circle,
   .skeleton {
     animation: none !important;
   }

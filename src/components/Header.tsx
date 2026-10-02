@@ -213,7 +213,14 @@ export function BottomNav() {
                     active ? "opacity-100" : "scale-x-50 opacity-0",
                   )}
                 />
-                <Icon className="relative size-[18px]" strokeWidth={active ? 2.2 : 1.7} />
+                <Icon
+                  className={clsx(
+                    "relative size-[18px]",
+                    // On its page, Trace's icon has money dropping down its line into the dot, now and then.
+                    active && href === "/trace" && "nav-drip",
+                  )}
+                  strokeWidth={active ? 2.2 : 1.7}
+                />
               </span>
               {label}
             </Link>

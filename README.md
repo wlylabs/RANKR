@@ -65,6 +65,14 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   lives) are left out. Every wallet gets a matrix glyph from its address (like the avatars), addresses decrypt
   into place, the line sits on a dotted ledger; flagged addresses are drawn in red. The example on `/trace` is a
   made-up trail to try it on.
+  It moves like the rest of Rankr, in its own key (after Aceternity's Tracing Beam and Magic UI's Animated Beam,
+  written in CSS): behind the intro, money drips down a few columns of the ledger; while a wallet is read, the case
+  opens as a log, a line at a time ("Case #0317aa0d · Solana", "Target …", "Reading its newest transactions"…);
+  the trail then comes in top to bottom, a card at a time, and brackets close in on the target; scrolling down, each
+  line draws itself as it comes into view and each card comes up into focus (scroll-driven, Chrome and Safari 26+);
+  a wallet followed has its line draw down to it before it lands; where the trail ends, a **TRAIL ENDS · EXCHANGE**
+  (or MIXER, in red) stamp comes down; and on its page, the nav's Trace icon drops a packet into its dot now and
+  then. With reduced motion, all of it stands still.
   Under the path: the card you tapped in full (whole address, label and its source, what moved, links to the
   transaction and the explorer, and **Trace from here**), and the **case file**: who the wallet is, who funded it,
   money in and out, where the money ended up (exchanges, bridges, mixers, with the hop they were reached at), what

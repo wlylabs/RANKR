@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Check, ChevronDown, Crosshair, RotateCcw, Split } f
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { formatAmount, formatDay, formatUsd } from "@/lib/format";
+import { delay } from "@/lib/motion";
 import { traceHref, type TraceChain } from "@/lib/trace/chains";
 import { DANGER } from "@/lib/trace/kinds";
 import { branches, type PathStep, type PathStop } from "@/lib/trace/path";
@@ -31,6 +32,8 @@ type TracePathProps = {
   onRetry: (address: string) => void;
   /** Along the top of the frame. */
   header?: ReactNode;
+  /** In place of the trail while the target is read. */
+  loading?: ReactNode;
   className?: string;
 };
 
@@ -49,6 +52,15 @@ const END: Partial<Record<TraceLabel["kind"], string>> = {
   mixer: "a mixer, built to break the trail",
   dex: "a DEX: the money was swapped for something else",
   contract: "a contract",
+};
+
+/** What the stamp at the end of a trail says it reached. */
+const STAMP: Partial<Record<TraceLabel["kind"], string>> = {
+  cex: "Exchange",
+  bridge: "Bridge",
+  mixer: "Mixer",
+  dex: "DEX",
+  contract: "Contract",
 };
 
 const danger = (label: TraceLabel | null | undefined) => !!label && DANGER.has(label.kind);
@@ -70,6 +82,7 @@ export function TracePath({
   onPick,
   onRetry,
   header,
+  loading,
   className,
 }: TracePathProps) {
   const top = useRef<HTMLDivElement>(null);
@@ -89,6 +102,19 @@ export function TracePath({
     else if (was.first !== first) top.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [first, last, ready]);
 
+  // How each card arrives, fixed the first time it's drawn: the first line comes in top to bottom, a card at a
+  // time, as if traced; a card followed later waits for the line down to it to draw itself first.
+  const arrivals = useRef<Map<string, { delay: number; fresh: boolean }> | null>(null);
+  const firstBatch = ready && arrivals.current === null;
+  if (ready) arrivals.current ??= new Map();
+  const arrival = (key: string, i: number) => {
+    const map = arrivals.current;
+    if (!map) return { delay: 0, fresh: false };
+    let a = map.get(key);
+    if (!a) map.set(key, (a = firstBatch ? { delay: i * 110, fresh: false } : { delay: 320, fresh: true }));
+    return a;
+  };
+
   return (
     <div className={clsx("trace-grid overflow-hidden rounded-xl border border-border", className)}>
       {header && (
@@ -97,15 +123,17 @@ export function TracePath({
         </div>
       )}
       {!root ? (
-        <div className="mx-auto max-w-md px-4 py-10" role="status">
-          <div className="skeleton rounded-lg border border-border px-4 py-5 font-mono text-[13px] text-muted">
-            <Scramble length={16} />
-            <p className="label mt-1 text-subtle">Reading the chain…</p>
+        (loading ?? (
+          <div className="mx-auto max-w-md px-4 py-10" role="status">
+            <div className="skeleton rounded-lg border border-border px-4 py-5 font-mono text-[13px] text-muted">
+              <Scramble length={16} />
+              <p className="label mt-1 text-subtle">Reading the chain…</p>
+            </div>
           </div>
-        </div>
+        ))
       ) : (
         <div className="mx-auto max-w-md px-3 pt-5 pb-6 sm:px-4 sm:pt-7 sm:pb-8">
-          <div ref={top} className="scroll-my-24">
+          <div ref={top} className="trace-stop scroll-my-24" style={delay(arrival("top", 0).delay)}>
             <TopEnd steps={steps} items={items} onFollow={onFollow} onPick={onPick} onRetry={onRetry} />
           </div>
           <ol aria-label="The trail, top to bottom">
@@ -114,17 +142,28 @@ export function TracePath({
               if (stop.type !== "wallet") return null;
               const item = items.get(stop.id);
               const next = steps[i + 1]?.stop;
+              const card = arrival(stop.id, i);
+              const line = next?.type === "wallet" ? arrival(`${stop.id}>${next.id}`, i) : null;
               return (
-                <li key={stop.id} className="trace-stop">
-                  <StopCard stop={stop} item={item} root={root} selected={selected === stop.id} onSelect={onSelect} />
+                <li key={stop.id} className="trace-focus">
+                  <div className="trace-stop" style={delay(card.delay)}>
+                    <StopCard
+                      stop={stop}
+                      item={item}
+                      root={root}
+                      selected={selected === stop.id}
+                      onSelect={onSelect}
+                      arrive={card.delay}
+                    />
+                  </div>
                   {next?.type === "wallet" && step.down && (
-                    <Arrow flow={step.down} {...fork(items, stop.id, next.id)} onPick={onPick} />
+                    <Arrow flow={step.down} {...fork(items, stop.id, next.id)} onPick={onPick} fresh={!!line?.fresh} />
                   )}
                 </li>
               );
             })}
           </ol>
-          <div ref={bottom} className="scroll-my-24">
+          <div ref={bottom} className="trace-stop scroll-my-24" style={delay(arrival("end", steps.length).delay)}>
             <BottomEnd steps={steps} items={items} chain={chain} onFollow={onFollow} onRetry={onRetry} />
           </div>
         </div>
@@ -153,12 +192,15 @@ function StopCard({
   root,
   selected,
   onSelect,
+  arrive,
 }: {
   stop: Extract<PathStop, { type: "wallet" }>;
   item: TreeItem | undefined;
   root: TraceResponse;
   selected: boolean;
   onSelect?: (item: TreeItem) => void;
+  /** When it arrives, in ms (the target's brackets close in on it just after). */
+  arrive: number;
 }) {
   const target = stop.role === "target";
   const label = target ? root.label : stop.label;
@@ -179,9 +221,18 @@ function StopCard({
               Tag === "button" && !bad && "hover:border-border-strong",
               item?.loop && "border-dashed",
             ),
-        selected && "ring-1 ring-fg ring-offset-2 ring-offset-bg",
+        selected && !target && "ring-1 ring-fg ring-offset-2 ring-offset-bg",
       )}
     >
+      {/* Target acquired: brackets close in on it. */}
+      {target && (
+        <span aria-hidden className="lock-on pointer-events-none absolute -inset-2" style={delay(arrive + 260)}>
+          <span className="absolute top-0 left-0 size-3 rounded-tl-[7px] border-t-2 border-l-2 border-fg" />
+          <span className="absolute top-0 right-0 size-3 rounded-tr-[7px] border-t-2 border-r-2 border-fg" />
+          <span className="absolute bottom-0 left-0 size-3 rounded-bl-[7px] border-b-2 border-l-2 border-fg" />
+          <span className="absolute right-0 bottom-0 size-3 rounded-br-[7px] border-r-2 border-b-2 border-fg" />
+        </span>
+      )}
       <span className={clsx("label flex items-center gap-2", target ? "text-bg/60" : "text-subtle")}>
         <Avatar
           userId={stop.address}
@@ -220,6 +271,7 @@ function Arrow({
   current,
   tone,
   onPick,
+  fresh,
 }: {
   flow: TraceFlow;
   parent: TreeItem | undefined;
@@ -227,6 +279,8 @@ function Arrow({
   current: string;
   tone: TraceLabel | null | undefined;
   onPick: (item: TreeItem) => void;
+  /** Just followed: the line draws itself down to the new card. */
+  fresh?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const options = parent ? branches(parent, side) : [];
@@ -236,7 +290,7 @@ function Arrow({
   return (
     <div>
       <div className="flex min-h-[4.5rem]">
-        <Line tone={bad ? "danger" : flow.terminal ? "end" : "plain"} />
+        <Line tone={bad ? "danger" : flow.terminal ? "end" : "plain"} fresh={fresh} />
         <div className="min-w-0 flex-1 py-3">
           <p className={clsx("tabular truncate font-mono text-[13px]", bad && "text-down")}>
             {top ? `${formatAmount(top.amount)} ${top.symbol}` : "—"}
@@ -286,17 +340,21 @@ function Arrow({
 }
 
 /** A line running down between two cards, with the money moving along it. */
-function Line({ tone }: { tone: "danger" | "end" | "plain" | "faint" }) {
+function Line({ tone, fresh }: { tone: "danger" | "end" | "plain" | "faint"; fresh?: boolean }) {
   return (
     <div
       aria-hidden
       className={clsx(
         "relative w-[52px] shrink-0",
         tone === "danger" ? "text-down" : tone === "faint" ? "text-border-strong" : "text-fg",
+        fresh && "beam-in",
       )}
     >
-      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-current opacity-25" />
-      {tone !== "faint" && <span className="trace-flow absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2" />}
+      {/* Draws itself down as it scrolls into view: the camera following the money. */}
+      <span className={clsx("absolute inset-0", tone !== "faint" && "trace-beam")}>
+        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-current opacity-25" />
+        {tone !== "faint" && <span className="trace-flow absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2" />}
+      </span>
       <svg viewBox="0 0 10 6" className="absolute bottom-0.5 left-1/2 w-2.5 -translate-x-1/2">
         <path d="M0 0 5 6 10 0Z" fill="currentColor" />
       </svg>
@@ -515,10 +573,25 @@ function BottomEnd({
   }
   const label = item.flow?.label;
   if (item.flow?.terminal) {
+    const bad = danger(label);
     return end(
-      <Note danger={danger(label)}>
-        End of the trail. {label?.name ?? "This address"} is {END[label?.kind ?? "contract"] ?? "an end"}.
-      </Note>,
+      <>
+        {/* The payoff: a stamp coming down on the case where the money stopped. */}
+        <div className="mb-2 ml-[52px]">
+          <span
+            key={last.id}
+            className={clsx(
+              "stamp inline-block rounded-md border-2 px-2.5 py-1 font-mono text-[12px] font-semibold tracking-[0.2em] uppercase",
+              bad ? "border-down text-down" : "border-fg text-fg",
+            )}
+          >
+            Trail ends · {STAMP[label?.kind ?? "contract"] ?? "end"}
+          </span>
+        </div>
+        <Note danger={bad}>
+          {label?.name ?? "This address"} is {END[label?.kind ?? "contract"] ?? "an end"}.
+        </Note>
+      </>,
     );
   }
   if (item.loop) return end(<Note>↺ This wallet is already higher up on the trail: the money went round.</Note>);
