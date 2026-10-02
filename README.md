@@ -54,8 +54,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   ripple on the "N new" button. **Trace**: below. **Leaderboard**: two spotlights swaying over the stage, the top
   three ranks catching the light and a band of light over #1 as the board comes in. **You**: your own glyph, large
   and faint behind the page's top, its cells coming in under a scan; your rank on the caller board climbs to its
-  place from the foot of the board. In the bottom nav, each icon moves now and then on its own page: Home's door
-  draws itself, Feed's waves go out, Trace drops money down its line, Leaderboard raises the cup, You lifts its head.
+  place from the foot of the board. The nav itself stays still: its icons don't move.
 - **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
   Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and its trail opens at `/trace/<chain>/<address>`;
   with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. On a phone the
@@ -80,8 +79,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   the trail then comes in top to bottom, a card at a time, and brackets close in on the target; scrolling down, each
   line draws itself as it comes into view and each card comes up into focus (scroll-driven, Chrome and Safari 26+);
   a wallet followed has its line draw down to it before it lands; where the trail ends, a **TRAIL ENDS · EXCHANGE**
-  (or MIXER, in red) stamp comes down; and on its page, the nav's Trace icon drops a packet into its dot now and
-  then. With reduced motion, all of it stands still.
+  (or MIXER, in red) stamp comes down. With reduced motion, all of it stands still.
   Under the path: the card you tapped in full (whole address, label and its source, what moved, links to the
   transaction and the explorer, and **Trace from here**), and the **case file**: who the wallet is, who funded it,
   money in and out, where the money ended up (exchanges, bridges, mixers, with the hop they were reached at), what
@@ -196,8 +194,8 @@ hairline borders), "decrypted text" reveal effects, and hash visualizations such
     lists cascading in row by row (`Cascade`; only on first show, so live re-ranks and new rows don't replay it);
     whole-number stats count up (`CountUp`); loading rows shimmer;
   - tab underlines, segmented controls and the header nav's current-page line glide to the picked option
-    (`src/components/Tabs.tsx`); a pill follows the pointer across the header nav; the phone's bottom nav marks
-    the current page with Material 3's indicator pill, opening out from the icon;
+    (`src/components/Tabs.tsx`); a pill follows the pointer across the header nav; the phone's bottom nav stays
+    still: the current page is the one in full color, its icon drawn bolder, with no pill behind it;
   - menus open out of their corner; Track rises as a sheet on phones and settles in as a dialog from sm up, over a
     blurred page, and plays backwards on close (where the browser can animate the top layer);
   - switching theme opens the new theme as a circle from the toggle (View Transitions).

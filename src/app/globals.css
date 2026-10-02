@@ -570,25 +570,6 @@ body {
   animation-delay: 0.35s;
 }
 
-/* The nav's Trace icon, on its page: a packet drops down the line into the dot, now and then. */
-@keyframes nav-drip {
-  0% {
-    transform: translateY(-7px);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  28%,
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-.nav-drip circle {
-  animation: nav-drip 4s var(--ease-enter) infinite;
-}
-
 /* ---- Each app page's own cinema (Backdrops.tsx), and the moments that belong to it ---- */
 
 /* Feed: rings of signal going out, one after another. */
@@ -705,78 +686,6 @@ body {
 
 /* Home: a call sealed. Its hash decrypts and a SEALED stamp comes down (.stamp, as at the end of a trail). */
 
-/* The nav's icons, each on its own page, now and then. Home: the door draws itself, lights on. */
-@keyframes nav-door {
-  from {
-    stroke-dashoffset: 26;
-  }
-  30%,
-  100% {
-    stroke-dashoffset: 0;
-  }
-}
-.nav-home path:first-of-type {
-  stroke-dasharray: 26;
-  animation: nav-door 5s var(--ease-enter) infinite;
-}
-/* Feed: the waves go out, inner then outer. */
-@keyframes nav-wave {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  15% {
-    opacity: 0.2;
-  }
-  35% {
-    opacity: 1;
-  }
-}
-.nav-wave path {
-  animation: nav-wave 2.8s ease-in-out infinite;
-}
-.nav-wave path:nth-of-type(2),
-.nav-wave path:nth-of-type(3) {
-  animation-delay: 0.25s;
-}
-/* Leaderboard: the cup is raised. */
-@keyframes nav-raise {
-  0%,
-  30%,
-  100% {
-    transform: none;
-  }
-  8% {
-    transform: translateY(-2px) rotate(-10deg);
-  }
-  16% {
-    transform: translateY(-2px) rotate(8deg);
-  }
-  24% {
-    transform: rotate(-3deg);
-  }
-}
-.nav-raise {
-  transform-origin: 50% 90%;
-  animation: nav-raise 4.5s var(--ease-enter) infinite;
-}
-/* You: the head lifts, as if called. */
-@keyframes nav-you {
-  0%,
-  30%,
-  100% {
-    transform: none;
-  }
-  12% {
-    transform: translateY(-1.5px) scale(1.12);
-  }
-}
-.nav-you circle {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: nav-you 5s var(--ease-enter) infinite;
-}
-
 /* Scrolling down a trail, the camera follows the money: each line between two cards draws itself down as it
    comes into view, and each card comes up into focus (scroll-driven; elsewhere they simply stand). */
 @keyframes beam-draw {
@@ -829,15 +738,10 @@ body {
   .trace-flow,
   .trail-drip,
   .caret,
-  .nav-drip circle,
   .signal-ring,
   .spot,
   .id-scan,
   .sweep::after,
-  .nav-home path,
-  .nav-wave path,
-  .nav-raise,
-  .nav-you circle,
   .skeleton {
     animation: none !important;
   }
