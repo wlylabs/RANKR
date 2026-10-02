@@ -49,7 +49,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   filter picked on the feed page.
 - **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
   Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and its trail opens at `/trace/<chain>/<address>`;
-  with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. The trail is
+  with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. On a phone the
+  box isn't focused when the page opens, so the keyboard stays down until you tap it. The trail is
   one line of cards, top to bottom, the way the share image draws it: who funded the wallet (its first money,
   **1ST**), the wallet, and the wallets its money went through, each arrow between two cards carrying what moved
   and when, with the money running down it. **Follow the money** under the last card reads that wallet and goes a
