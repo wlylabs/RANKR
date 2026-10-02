@@ -57,7 +57,8 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   above the top card it follows up to who sent that wallet its money. **Switch** on an arrow takes another wallet
   at that fork (every counterparty listed, biggest first: up to eight each way, the rest counted). Where nothing
   was picked, the line goes on to the most telling counterparty: a flagged address, then an exchange, a bridge or
-  a mixer, then the most money. A wallet already higher up the trail isn't followed again (the money went round).
+  a mixer, then the most money. Addresses are shown whole, on one line, their type sized to fit (never cut with
+  "…"). A wallet already higher up the trail isn't followed again (the money went round).
   Trades aren't followed: a transaction where the wallet sends one asset and gets another back is a swap, summed
   on the case file (DEX pools are no one to follow). Dust under $1 and tokens with no price (where airdropped spam
   lives) are left out. Every wallet gets a matrix glyph from its address (like the avatars), addresses decrypt
@@ -73,10 +74,11 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   **Share image** (next to Copy link, and on the path's top bar): the path as it's followed right now, as a
   picture to post, 4:5 (2160x2700, as tall as X shows a picture whole on a phone): a card per stop (the target
   white), the money and dates on the arrows between them, a long trail's middle folded into "⋯ 3 more hops ⋯";
-  dark, flat fills only (X and Telegram re-encode images as JPEG), the mark and the case, the case file's flags and
+  every address whole (never cut with "…"), dark, flat fills only (X and Telegram re-encode images as JPEG), the mark and the case, the case file's flags and
   where the money ended up, the link and a line on what a label is. Drawn in the browser from what's on screen,
   nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's app takes it from
-  there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops) and Tornado Cash."
+  there), a post on X ("Following the money from GBERKNpahPnBGmeUGWQVjGBDBj6CcJKpGz34FqegmTgu on Rankr. It
+  reached OKX (2 hops) and Tornado Cash."
   and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`).
   Free data only:
   - **Solana**: free public RPCs, no key (Solana's own `api.mainnet-beta.solana.com`, then PublicNode's when one

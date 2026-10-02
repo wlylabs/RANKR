@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { ArrowUpRight, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { shortAddress, tokenHref } from "@/lib/format";
+import { tokenHref } from "@/lib/format";
 import { sha256Hex } from "@/lib/sha256";
 import { EVM_TRACE_CHAINS, traceChain, traceHref } from "@/lib/trace/chains";
 import { dataOf, parentId } from "@/lib/trace/tree";
@@ -13,6 +13,7 @@ import { CopyButton } from "../CopyButton";
 import { DecryptText } from "../DecryptText";
 import { CaseFile } from "./CaseFile";
 import { Inspector } from "./Inspector";
+import { FullAddress } from "./TraceCard";
 import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
 import { TraceInput } from "./TraceInput";
@@ -132,9 +133,15 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
             {root && <ShareTrace chain={chain} root={root} data={data} steps={steps} caseId={caseId} />}
           </span>
         </div>
+        {/* Its name when a list knows it, and always its whole address, on one line. */}
         <h1 className="cine-in text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
-          <DecryptText text={root?.label?.name ?? shortAddress(address)} className="font-mono tracking-[-0.04em]" />
+          {root?.label ? (
+            <DecryptText text={root.label.name} className="font-mono tracking-[-0.04em]" />
+          ) : (
+            <FullAddress address={address} decrypt max={30} className="tracking-[-0.02em]" />
+          )}
         </h1>
+        {root?.label && <FullAddress address={address} max={15} className="-mt-1 text-muted" />}
         {chain.kind === "evm" && (
           <nav aria-label="Chain" className="flex flex-wrap gap-1.5">
             {EVM_TRACE_CHAINS.map((c) => (
@@ -180,13 +187,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
             onRetry={(a) => void load(a)}
             header={
               <>
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-mono text-sm">{root?.label?.name ?? shortAddress(address)}</span>
-                  <span className="label ml-2 text-subtle">
-                    Case #{caseId}
-                    <span className="hidden sm:inline"> · following the money</span>
-                  </span>
-                </span>
+                <span className="label min-w-0 flex-1 truncate text-subtle">Case #{caseId} · following the money</span>
                 {root && (
                   <ShareTrace chain={chain} root={root} data={data} steps={steps} caseId={caseId} variant="icon" />
                 )}

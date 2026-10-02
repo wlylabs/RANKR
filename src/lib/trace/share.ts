@@ -3,8 +3,8 @@
 import type { CaseExit } from "./case";
 
 /**
- * "Following the money from 7xKX…9f2a on Rankr. It reached Binance deposit (2 hops) and OKX." Without an
- * exchange, bridge or mixer reached yet, just the first sentence.
+ * "Following the money from 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU on Rankr. It reached Binance deposit
+ * (2 hops) and OKX." Without an exchange, bridge or mixer reached yet, just the first sentence.
  */
 export function traceShareText(name: string, exits: CaseExit[]): string {
   const base = `Following the money from ${name} on Rankr.`;

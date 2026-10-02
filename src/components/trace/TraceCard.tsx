@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { DANGER } from "@/lib/trace/kinds";
 import type { TraceLabel } from "@/lib/trace/types";
+import { DecryptText } from "../DecryptText";
 
 const KIND: Record<TraceLabel["kind"], string> = {
   cex: "CEX",
@@ -54,4 +55,30 @@ export function Scramble({ length = 10 }: { length?: number }) {
     return () => clearInterval(id);
   }, [length]);
   return <span aria-hidden>{text}</span>;
+}
+
+/**
+ * A whole address on one line, never cut: its type is sized to the width it has (up to `max` px), so a 44-character
+ * Solana address fits a phone's card as it is. Geist Mono sets each character 0.6em wide.
+ */
+export function FullAddress({
+  address,
+  max = 14,
+  decrypt,
+  className,
+}: {
+  address: string;
+  max?: number;
+  /** Reveal it out of random hex on first show. */
+  decrypt?: boolean;
+  className?: string;
+}) {
+  const fontSize = `min(${max}px, calc(100cqw / ${(address.length * 0.61).toFixed(2)}))`;
+  return (
+    <span className="@container block min-w-0">
+      <span className={clsx("block font-mono whitespace-nowrap", className)} style={{ fontSize }}>
+        {decrypt ? <DecryptText text={address} duration={700} /> : address}
+      </span>
+    </span>
+  );
 }

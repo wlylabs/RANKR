@@ -4,15 +4,14 @@ import clsx from "clsx";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Crosshair, RotateCcw, Split } from "lucide-react";
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { formatAmount, formatDay, formatUsd, shortAddress } from "@/lib/format";
+import { formatAmount, formatDay, formatUsd } from "@/lib/format";
 import { traceHref, type TraceChain } from "@/lib/trace/chains";
 import { DANGER } from "@/lib/trace/kinds";
 import { branches, type PathStep, type PathStop } from "@/lib/trace/path";
 import { MAX_DEPTH, parentId, type Side, type TreeItem } from "@/lib/trace/tree";
 import type { TraceFlow, TraceLabel, TraceResponse } from "@/lib/trace/types";
 import { Avatar } from "../Avatar";
-import { DecryptText } from "../DecryptText";
-import { LabelTag, Scramble } from "./TraceCard";
+import { FullAddress, LabelTag, Scramble } from "./TraceCard";
 
 type TracePathProps = {
   steps: PathStep[];
@@ -105,7 +104,7 @@ export function TracePath({
           </div>
         </div>
       ) : (
-        <div className="mx-auto max-w-md px-4 pt-5 pb-6 sm:pt-7 sm:pb-8">
+        <div className="mx-auto max-w-md px-3 pt-5 pb-6 sm:px-4 sm:pt-7 sm:pb-8">
           <div ref={top} className="scroll-my-24">
             <TopEnd steps={steps} items={items} onFollow={onFollow} onPick={onPick} onRetry={onRetry} />
           </div>
@@ -171,7 +170,7 @@ function StopCard({
       onClick={Tag === "button" ? () => onSelect!(item!) : undefined}
       aria-pressed={Tag === "button" ? selected : undefined}
       className={clsx(
-        "relative flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-[border-color,box-shadow]",
+        "relative block w-full rounded-lg border px-3 py-2.5 text-left transition-[border-color,box-shadow]",
         target
           ? "border-fg bg-fg text-bg shadow-float"
           : clsx(
@@ -183,37 +182,32 @@ function StopCard({
         selected && "ring-1 ring-fg ring-offset-2 ring-offset-bg",
       )}
     >
-      <Avatar
-        userId={stop.address}
-        size={28}
-        className={clsx("shrink-0 rounded-[7px]", target && "bg-bg/15 text-bg")}
-      />
-      <span className="min-w-0 flex-1">
-        <span className={clsx("label flex items-center gap-2", target ? "text-bg/60" : "text-subtle")}>
-          {stop.role === "hop" ? `${ROLE.hop} ${String(stop.hop).padStart(2, "0")}` : ROLE[stop.role]}
-          {stop.role === "funded" && (
-            <span
-              className="rounded-[3px] border border-current px-1 font-mono text-[8.5px] leading-[14px] tracking-widest"
-              title="Its first money came from here"
-            >
-              1ST
-            </span>
-          )}
-          {item?.loop && <span className="normal-case">↺ already on this trail</span>}
-        </span>
-        <DecryptText
-          text={shortAddress(stop.address)}
-          className="mt-0.5 block truncate font-mono text-[13.5px] tracking-tight"
-          duration={700}
+      <span className={clsx("label flex items-center gap-2", target ? "text-bg/60" : "text-subtle")}>
+        <Avatar
+          userId={stop.address}
+          size={20}
+          className={clsx("shrink-0 rounded-[5px]", target && "bg-bg/15 text-bg")}
         />
-        {label && <LabelTag label={label} className={clsx("mt-1 text-[12px]", target && "text-bg/80")} />}
-        {target && root.balance && (
-          <span className="tabular mt-1 block truncate font-mono text-[11.5px] text-bg/70">
-            Holds {formatAmount(root.balance.amount)} {root.balance.symbol}
-            {root.balance.usd !== null && <> · {formatUsd(root.balance.usd)}</>}
+        {stop.role === "hop" ? `${ROLE.hop} ${String(stop.hop).padStart(2, "0")}` : ROLE[stop.role]}
+        {stop.role === "funded" && (
+          <span
+            className="rounded-[3px] border border-current px-1 font-mono text-[8.5px] leading-[14px] tracking-widest"
+            title="Its first money came from here"
+          >
+            1ST
           </span>
         )}
+        {item?.loop && <span className="normal-case">↺ already on this trail</span>}
       </span>
+      {/* The whole address, on one line: no "…" to hide which wallet it is. */}
+      <FullAddress address={stop.address} decrypt max={15} className="mt-1.5" />
+      {label && <LabelTag label={label} className={clsx("mt-1 text-[12px]", target && "text-bg/80")} />}
+      {target && root.balance && (
+        <span className="tabular mt-1 block truncate font-mono text-[11.5px] text-bg/70">
+          Holds {formatAmount(root.balance.amount)} {root.balance.symbol}
+          {root.balance.usd !== null && <> · {formatUsd(root.balance.usd)}</>}
+        </span>
+      )}
     </Tag>
   );
 }
@@ -276,7 +270,7 @@ function Arrow({
       </div>
       {open && parent && (
         <Choices
-          className="mb-2 ml-[52px]"
+          className="mb-2"
           parent={parent}
           side={side}
           options={options}
@@ -345,28 +339,26 @@ function Choices({
                 onClick={() => onPick(o)}
                 aria-pressed={on}
                 className={clsx(
-                  "flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-surface-2",
+                  "block w-full px-3 py-2 text-left transition-colors hover:bg-surface-2",
                   on && "bg-surface-2",
                 )}
               >
-                <Avatar userId={o.address!} size={20} className="shrink-0 rounded-[5px]" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 font-mono text-[12.5px]">
-                    {shortAddress(o.address!)}
-                    {o.funder && (
-                      <span className="rounded-[3px] border border-current px-1 text-[8.5px] leading-[14px] tracking-widest text-muted">
-                        1ST
-                      </span>
-                    )}
+                <FullAddress address={o.address!} max={12.5} />
+                <span className="mt-1 flex items-center gap-2 text-[11.5px] text-muted">
+                  <Avatar userId={o.address!} size={16} className="shrink-0 rounded-[4px]" />
+                  {o.funder && (
+                    <span className="shrink-0 rounded-[3px] border border-current px-1 font-mono text-[8.5px] leading-[14px] tracking-widest">
+                      1ST
+                    </span>
+                  )}
+                  {f.label && <LabelTag label={f.label} className="min-w-0" />}
+                  <span className="tabular ml-auto shrink-0 font-mono text-[12px]">
+                    {f.usd !== null
+                      ? formatUsd(f.usd)
+                      : `${formatAmount(f.assets[0]?.amount ?? 0)} ${f.assets[0]?.symbol ?? ""}`}
                   </span>
-                  {f.label && <LabelTag label={f.label} className="text-[11.5px] text-muted" />}
+                  <Check className={clsx("size-3.5 shrink-0", on ? "text-fg" : "invisible")} />
                 </span>
-                <span className="tabular shrink-0 text-right font-mono text-[12px] text-muted">
-                  {f.usd !== null
-                    ? formatUsd(f.usd)
-                    : `${formatAmount(f.assets[0]?.amount ?? 0)} ${f.assets[0]?.symbol ?? ""}`}
-                </span>
-                <Check className={clsx("size-3.5 shrink-0", on ? "text-fg" : "invisible")} />
               </button>
             </li>
           );
@@ -486,9 +478,7 @@ function TopEnd({
       className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border-strong bg-bg/80 px-3 py-2.5 text-left text-[13px] text-muted transition-colors hover:border-fg hover:text-fg"
     >
       <ArrowUp className="size-4 shrink-0" />
-      <span className="flex-1">
-        Who sent <span className="font-mono">{shortAddress(item.address!)}</span> its money? Follow it up
-      </span>
+      <span className="flex-1">Who sent this wallet its money? Follow it up</span>
     </button>,
   );
 }
@@ -559,7 +549,6 @@ function BottomEnd({
       className="flex w-full items-center justify-center gap-2 rounded-lg bg-fg px-4 py-3 text-sm font-medium text-bg shadow-float transition-opacity hover:opacity-90"
     >
       Follow the money <ArrowDown className="size-4" />
-      <span className="font-mono text-[12px] font-normal opacity-70">{shortAddress(item.address!)}</span>
     </button>,
   );
 }

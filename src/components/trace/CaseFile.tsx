@@ -2,14 +2,15 @@
 
 import clsx from "clsx";
 import { Flag, TriangleAlert } from "lucide-react";
-import { formatAmount, formatDay, formatUsd, shortAddress } from "@/lib/format";
-import { caseFile, nameOf } from "@/lib/trace/case";
+import { formatAmount, formatDay, formatUsd } from "@/lib/format";
+import { caseFile } from "@/lib/trace/case";
 import type { TraceResponse } from "@/lib/trace/types";
 import { TimeAgo } from "../TimeAgo";
+import { FullAddress } from "./TraceCard";
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 border-t border-border py-2.5 first:border-t-0">
+    <div className="grid gap-1 border-t border-border py-2.5 first:border-t-0 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:gap-3">
       <dt className="label pt-0.5 text-subtle">{k}</dt>
       <dd className="min-w-0 text-sm text-pretty">{children}</dd>
     </div>
@@ -59,18 +60,16 @@ export function CaseFile({
 
       <dl className="mt-3">
         <Row k="Wallet">
-          <span className="font-mono">{shortAddress(root.address)}</span>
-          {root.label && <> · {root.label.name}</>}
+          <FullAddress address={root.address} max={13} />
+          {root.label && <>{root.label.name} · </>}
           {root.firstSeen && (
             <>
-              {" "}
-              · first seen <TimeAgo at={root.firstSeen} />
+              first seen <TimeAgo at={root.firstSeen} />
             </>
           )}
           {root.balance && (
             <>
-              {" "}
-              · holds {formatAmount(root.balance.amount)} {root.balance.symbol}
+              {root.firstSeen && " · "}holds {formatAmount(root.balance.amount)} {root.balance.symbol}
               {root.balance.usd !== null && <> ({formatUsd(root.balance.usd)})</>}
             </>
           )}
@@ -78,7 +77,9 @@ export function CaseFile({
         <Row k="Funded by">
           {f ? (
             <>
-              {nameOf(f)} with {formatAmount(f.assets[0]?.amount ?? 0)} {f.assets[0]?.symbol}, {formatDay(f.first)}
+              <FullAddress address={f.address} max={13} />
+              {f.label && <>{f.label.name}, </>}
+              {formatAmount(f.assets[0]?.amount ?? 0)} {f.assets[0]?.symbol}, {formatDay(f.first)}
               {f.label && <span className="text-subtle"> ({f.label.source})</span>}
             </>
           ) : root.scanned.complete ? (

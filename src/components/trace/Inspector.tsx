@@ -2,14 +2,14 @@
 
 import { ArrowUpRight, Crosshair } from "lucide-react";
 import Link from "next/link";
-import { formatAmount, formatDate, formatUsd, shortAddress } from "@/lib/format";
+import { formatAmount, formatDate, formatUsd } from "@/lib/format";
 import { explorerAddress, explorerTx, traceHref, type TraceChain } from "@/lib/trace/chains";
 import type { TreeItem } from "@/lib/trace/tree";
 import type { TraceResponse } from "@/lib/trace/types";
 import { Avatar } from "../Avatar";
 import { CopyButton } from "../CopyButton";
 import { TimeAgo } from "../TimeAgo";
-import { LabelTag } from "./TraceCard";
+import { FullAddress, LabelTag } from "./TraceCard";
 
 const linkClass =
   "inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:border-border-strong hover:text-fg";
@@ -34,16 +34,15 @@ export function Inspector({ chain, item, parent, data, onToggle }: InspectorProp
       <div className="flex items-center gap-2">
         <span className="label text-fg">{item.type === "root" ? "Target" : "Selected"}</span>
         {parent && flow && (
-          <span className="label truncate text-subtle">
-            {item.side === "out" ? `received from ${shortAddress(parent)}` : `sent to ${shortAddress(parent)}`}
-          </span>
+          <span className="label text-subtle">{item.side === "out" ? "received from" : "sent to"}</span>
         )}
       </div>
+      {parent && flow && <FullAddress address={parent} max={12} className="mt-0.5 text-subtle" />}
 
       <div className="mt-3 flex items-start gap-3">
         <Avatar userId={address} size={36} className="rounded-[8px]" />
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[13px] leading-snug break-all">{address}</p>
+          <FullAddress address={address} max={13.5} className="leading-snug" />
           <div className="mt-1 flex items-center gap-3">
             <CopyButton value={address} label="Copy" />
             {label && <span className="text-[12px] text-subtle">via {label.source}</span>}

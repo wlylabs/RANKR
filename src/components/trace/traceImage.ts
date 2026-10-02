@@ -3,7 +3,7 @@
 // what's on screen, nothing to fetch. Flat fills and lines only, no gradients or glow: X and Telegram re-encode
 // images as JPEG, which breaks soft shading into bands (see the call card).
 import { avatarCells } from "@/lib/avatar";
-import { formatAmount, formatUsd, shortAddress } from "@/lib/format";
+import { formatAmount, formatUsd } from "@/lib/format";
 import type { CaseExit, CaseFlag } from "@/lib/trace/case";
 import { DANGER } from "@/lib/trace/kinds";
 import type { PathStep, PathStop } from "@/lib/trace/path";
@@ -42,7 +42,7 @@ export type TraceImageInput = {
   chainName: string;
   flags: CaseFlag[];
   exits: CaseExit[];
-  /** Where the trail lives, shown in the corner: "rankr.app/trace/solana/GBER…mTgu". */
+  /** Where the trail lives, shown whole under the verdict: "rankr.app/trace/solana/<address>". */
   where: string;
 };
 
@@ -62,6 +62,12 @@ function fit(ctx: CanvasRenderingContext2D, text: string, max: number): string {
   let s = text;
   while (s.length > 1 && ctx.measureText(`${s}…`).width > max) s = s.slice(0, -1);
   return `${s}…`;
+}
+
+/** The size `text` fits `max` px at, up to `size`: an address is shrunk to fit whole, never cut. */
+function fitted(ctx: CanvasRenderingContext2D, text: string, max: number, size: number, font: string): number {
+  ctx.font = `${size}px ${font}`;
+  return Math.min(size, Math.floor((size * max) / ctx.measureText(text).width));
 }
 
 function glyph(
@@ -252,10 +258,11 @@ export async function drawPathImage(input: PathImageInput): Promise<Blob | null>
       glyph(ctx, s.address, x + 32, y + (h - g) / 2, g, target ? "#d4d4d4" : C.surface2, target ? C.bg : C.fg);
       const tx = x + 32 + g + 28;
       const max = x + w - 32 - tx;
-      // The name: what a list calls it, else its address.
-      ctx.font = `500 ${h >= 120 ? 42 : 36}px ${f.mono}`;
+      // The name: what a list calls it, else its whole address (smaller if that's what it takes to fit).
+      const big = h >= 120 ? 42 : 36;
+      ctx.font = `500 ${label ? big : fitted(ctx, s.address, max, big, f.mono)}px ${f.mono}`;
       ctx.fillStyle = target ? C.bg : danger ? C.down : C.fg;
-      ctx.fillText(fit(ctx, label?.name ?? shortAddress(s.address), max), tx, y + h / 2 - 4);
+      ctx.fillText(label ? fit(ctx, label.name, max) : s.address, tx, y + h / 2 - 4);
       // Under it: its part in the trail, its tag, its address when it has a name.
       let lx = tx;
       const ly = y + h / 2 + 34;
@@ -266,9 +273,9 @@ export async function drawPathImage(input: PathImageInput): Promise<Blob | null>
       lx += ctx.measureText(role).width + 16;
       if (label) {
         lx += tag(ctx, f, label, lx, ly, 17) + 14;
-        ctx.font = `20px ${f.mono}`;
+        ctx.font = `${fitted(ctx, s.address, x + w - 32 - lx, 20, f.mono)}px ${f.mono}`;
         ctx.fillStyle = target ? "#555555" : C.subtle;
-        ctx.fillText(fit(ctx, shortAddress(s.address), x + w - 32 - lx), lx, ly);
+        ctx.fillText(s.address, lx, ly);
       } else if (target && root.balance) {
         ctx.font = `20px ${f.mono}`;
         const holds = `holds ${formatAmount(root.balance.amount)} ${root.balance.symbol}`;
@@ -353,9 +360,9 @@ export async function drawPathImage(input: PathImageInput): Promise<Blob | null>
     : "Nothing reached yet on the wallets opened";
   ctx.fillText(fit(ctx, ended, TW - 2 * TPAD - 130), TPAD + 130, 1263);
 
-  ctx.font = `20px ${f.mono}`;
+  ctx.font = `${fitted(ctx, where, TW - 2 * TPAD, 20, f.mono)}px ${f.mono}`;
   ctx.fillStyle = C.subtle;
-  ctx.fillText(fit(ctx, where, TW - 2 * TPAD), TPAD, 1306);
+  ctx.fillText(where, TPAD, 1306);
   ctx.font = `18px ${f.sans}`;
   ctx.fillText(
     "Names from public lists, each with its source. A label isn't an identity, or proof of a crime.",

@@ -4,7 +4,6 @@ import clsx from "clsx";
 import { Check, Download, Link2, Share, Share2, TriangleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { shortAddress } from "@/lib/format";
 import { caseFile } from "@/lib/trace/case";
 import { traceHref, type TraceChain } from "@/lib/trace/chains";
 import { fold, type PathStep } from "@/lib/trace/path";
@@ -63,7 +62,7 @@ function ShareTraceDialog({ chain, root, data, steps, caseId }: ShareTraceProps)
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const [url, setUrl] = useState("");
-  const name = root.label?.name ?? shortAddress(root.address);
+  const name = root.label?.name ?? root.address;
   const { flags, exits } = caseFile(root, data);
   const text = traceShareText(name, exits);
 
@@ -84,7 +83,7 @@ function ShareTraceDialog({ chain, root, data, steps, caseId }: ShareTraceProps)
       chainName: chain.id === "solana" ? "Solana" : chain.id,
       flags,
       exits,
-      where: `${window.location.host}/trace/${chain.id}/${shortAddress(root.address)}`,
+      where: `${window.location.host}/trace/${chain.id}/${root.address}`,
       steps: fold(steps),
     })
       .then((blob) => {
