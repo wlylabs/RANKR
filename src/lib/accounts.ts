@@ -1,5 +1,6 @@
 // Accounts (Supabase Auth: one-click guests that can save a sign-in key) with a public username, and
 // per-user calls. Server only.
+import { tokenId } from "./address";
 import { callerStats } from "./caller-stats";
 import { generateKey, isKeyEmail, keyEmail } from "./key";
 import { minCallsFor, type CallerSort } from "./params";
@@ -7,7 +8,7 @@ import { parsePostId, xCode, type ProfileFields } from "./profile";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
-import type { CallView, CallerAbout, CallerView, FeedItem, MyRankResponse, Season, TokenView } from "./types";
+import type { CallResponse, CallView, CallerAbout, CallerView, FeedItem, MyRankResponse, Season, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 import { readPost, type Post } from "./x-post";
 
@@ -224,11 +225,15 @@ export async function myCalls(account: Account): Promise<CallView[]> {
   return callsOf(account.id);
 }
 
-/** Every call of one user, newest first, each measured from that user's own entry. */
-async function callsOf(userId: string): Promise<CallView[]> {
+/**
+ * Every call of one user, newest first, each measured from that user's own entry. `only`: just the call on
+ * that token, so only its market data is fetched.
+ */
+async function callsOf(userId: string, only?: string): Promise<CallView[]> {
   const api = rest();
   if (!api) return [];
-  const rows = await api.rpc<(CallRow & { token: TokenRow })[]>("rankr_my_calls", { p_user: userId });
+  const all = await api.rpc<(CallRow & { token: TokenRow })[]>("rankr_my_calls", { p_user: userId });
+  const rows = only ? all.filter((r) => r.token_id === only) : all;
   const tokens = await viewsOf(rows.map((r) => fromRow(r.token)));
   const byId = new Map(tokens.map((t) => [t.id, t]));
   return rows.flatMap((r) => {
@@ -383,12 +388,7 @@ export async function callerRank(userId: string, sort: CallerSort): Promise<MyRa
 export async function callerProfile(
   name: string,
 ): Promise<{ caller: CallerView; about: CallerAbout; calls: CallView[] } | null> {
-  const api = rest();
-  if (!api || !/^\w{1,32}$/.test(name)) return null;
-  const rows = await api.select<ProfileRow[]>(
-    `profiles?select=*&username=ilike.${encodeURIComponent(name.replace(/_/g, "\\_"))}&limit=2`,
-  );
-  const row = rows.find((r) => r.username.toLowerCase() === name.toLowerCase());
+  const row = await profileNamed(name);
   if (!row) return null;
   const calls = await callsOf(row.user_id);
   const about = aboutOf(row);
@@ -397,6 +397,31 @@ export async function callerProfile(
     about: about.xVerified ? about : { ...about, x: null },
     calls,
   };
+}
+
+/** The profile with this username (any case), or null. */
+async function profileNamed(name: string): Promise<ProfileRow | null> {
+  const api = rest();
+  if (!api || !/^\w{1,32}$/.test(name)) return null;
+  const rows = await api.select<ProfileRow[]>(
+    `profiles?select=*&username=ilike.${encodeURIComponent(name.replace(/_/g, "\\_"))}&limit=2`,
+  );
+  return rows.find((r) => r.username.toLowerCase() === name.toLowerCase()) ?? null;
+}
+
+/**
+ * One caller's call on one token (the caller by username, any case), measured from their own entry: its
+ * public page and share card. Null when there's no such caller or they haven't called that token.
+ */
+export async function callerCall(
+  name: string,
+  chainId: string,
+  address: string,
+): Promise<{ caller: CallResponse["caller"]; call: CallView } | null> {
+  const row = await profileNamed(name);
+  if (!row) return null;
+  const [call] = await callsOf(row.user_id, tokenId(chainId, address));
+  return call ? { caller: { userId: row.user_id, username: row.username, official: !!row.official }, call } : null;
 }
 
 type SeasonRow = {

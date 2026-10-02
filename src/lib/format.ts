@@ -127,3 +127,8 @@ export function shortAddress(address: string): string {
 export function tokenHref(t: { chainId: string; address: string }): string {
   return `/t/${t.chainId}/${encodeURIComponent(t.address)}`;
 }
+
+/** A caller's call on a token: its public page, the link a shared call card points to. */
+export function callHref(username: string, t: { chainId: string; address: string }): string {
+  return `${callerHref(username)}/${t.chainId}/${encodeURIComponent(t.address)}`;
+}

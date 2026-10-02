@@ -8,11 +8,13 @@ import { useEffect, useRef, useState } from "react";
 import { parseInput } from "@/lib/address";
 import { formatDate, formatUsd, tokenHref } from "@/lib/format";
 import { loginHref, loginToPaste } from "@/lib/login";
+import { ratio } from "@/lib/metrics";
 import { PasteError, lookupPaste, rememberPendingPaste, takePendingPaste, trackPaste } from "@/lib/track";
 import type { LookupResponse, TrackResponse } from "@/lib/types";
 import { useWatchlist, watch, watchedFrom, type Watched } from "@/lib/watchlist";
 import { useAuth } from "./AuthProvider";
 import { MultipleBadge } from "./MultipleBadge";
+import { ShareCall } from "./ShareCall";
 import { TimeAgo } from "./TimeAgo";
 import { ChainTag } from "./Chain";
 import { TokenName } from "./TokenList";
@@ -288,6 +290,7 @@ export function PasteBox({
       {result && (
         <TrackResult
           result={result}
+          as={available && username ? username : null}
           keepAs={available && userId && username && !hasKey ? username : null}
           onClose={() => setResult(null)}
         />
@@ -393,10 +396,25 @@ function WatchSaved({ entry, onClose }: { entry: Watched; onClose: () => void })
   );
 }
 
-/** `keepAs`: a guest without a key, nudged to save one now that the account holds a call. */
-function TrackResult({ result, keepAs, onClose }: { result: Result; keepAs: string | null; onClose: () => void }) {
+/**
+ * `as`: the account the call went under, so it can be shared right away. `keepAs`: a guest without a key,
+ * nudged to save one now that the account holds a call.
+ */
+function TrackResult({
+  result,
+  as,
+  keepAs,
+  onClose,
+}: {
+  result: Result;
+  as: string | null;
+  keepAs: string | null;
+  onClose: () => void;
+}) {
   const t = result.token;
   const created = result.status === "created";
+  // Your call, from your own entry (an earlier one of yours, if you had called it before).
+  const yours = result.call && ratio(t.market?.priceUsd || t.entryPriceUsd, result.call.entryPriceUsd);
   return (
     <div role="status" className="animate-fade-in mt-3 overflow-hidden card bg-surface text-left">
       <Link href={tokenHref(t)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
@@ -433,6 +451,19 @@ function TrackResult({ result, keepAs, onClose }: { result: Result; keepAs: stri
           <X className="size-3.5" />
         </button>
       </div>
+      {as && yours && (
+        <ShareCall
+          variant="row"
+          className="border-t border-border"
+          call={{
+            username: as,
+            token: t,
+            // Market cap moves with the price: back from now to your entry.
+            entryMarketCap: t.marketCap !== null ? t.marketCap / yours : null,
+            multiple: yours,
+          }}
+        />
+      )}
       {keepAs && (
         <Link
           href="/account"

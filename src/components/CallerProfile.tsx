@@ -63,7 +63,7 @@ export function CallerProfile({ username }: { username: string }) {
               <RecentForm rows={rows} />
             </div>
           )}
-          <CallsView rows={rows} loading={isLoading} />
+          <CallsView rows={rows} loading={isLoading} shareAs={c?.username} />
         </>
       )}
     </div>

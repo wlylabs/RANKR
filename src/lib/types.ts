@@ -125,6 +125,9 @@ export type CallerAbout = {
   website: string | null;
 };
 
+/** One caller's call on one token, from their own entry: its public page and share card. */
+export type CallResponse = { caller: Pick<CallerView, "userId" | "username" | "official">; call: CallView; updatedAt: number };
+
 /** A caller's public profile: board numbers, bio and links, and calls, newest first. */
 export type CallerProfileResponse = { caller: CallerView; about: CallerAbout; calls: CallView[]; updatedAt: number };
 
