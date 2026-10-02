@@ -7,12 +7,20 @@ import { createPortal } from "react-dom";
 import { shortAddress } from "@/lib/format";
 import { caseFile } from "@/lib/trace/case";
 import { traceHref, type TraceChain } from "@/lib/trace/chains";
+import { trailPath } from "@/lib/trace/path";
 import { traceImageFile, traceShareText } from "@/lib/trace/share";
 import type { Layout } from "@/lib/trace/tree";
 import type { TraceResponse } from "@/lib/trace/types";
 import { ACTION, PRIMARY } from "../ShareCall";
 import { XLogo } from "../Social";
-import { drawTraceImage } from "./traceImage";
+import { drawPathImage, drawTraceImage } from "./traceImage";
+
+/** Tall: the trail as one line, for phones (the default). Wide: the whole tree as it's opened. */
+type Format = "tall" | "wide";
+const FORMATS: { id: Format; label: string; hint: string }[] = [
+  { id: "tall", label: "Tall", hint: "The trail as one line, 4:5: reads best on a phone" },
+  { id: "wide", label: "Wide", hint: "The whole tree as it's opened, 16:9" },
+];
 
 type ShareTraceProps = {
   chain: TraceChain;
@@ -66,38 +74,50 @@ function ShareTraceDialog({ chain, root, data, layout, caseId }: ShareTraceProps
   const { flags, exits } = caseFile(root, data);
   const text = traceShareText(name, exits);
 
-  // Opens as soon as it mounts (a click on the button), and draws the trail as it's opened now.
+  const [format, setFormat] = useState<Format>("tall");
+
+  // Opens as soon as it mounts (a click on the button).
   useEffect(() => {
     if (!ref.current?.open) ref.current?.showModal();
-    const link = `${window.location.origin}${traceHref(chain.id, root.address)}`;
-    setUrl(link);
+    setUrl(`${window.location.origin}${traceHref(chain.id, root.address)}`);
     setCanShare(typeof navigator.share === "function");
+  }, [chain.id, root.address]);
+
+  // Draws the trail as it's opened now, in the format picked (again when another is picked).
+  useEffect(() => {
     let objectUrl: string | null = null;
     let live = true;
-    drawTraceImage({
-      layout,
+    setPreview(null);
+    setFile(null);
+    setFailed(false);
+    const common = {
       root,
       caseId,
       chainName: chain.id === "solana" ? "Solana" : chain.id,
       flags,
       exits,
       where: `${window.location.host}/trace/${chain.id}/${shortAddress(root.address)}`,
-    })
+    };
+    const rootItem = layout.nodes.find((n) => n.item.id === "root")!.item;
+    (format === "tall"
+      ? drawPathImage({ ...common, steps: trailPath(rootItem) })
+      : drawTraceImage({ ...common, layout })
+    )
       .then((blob) => {
         if (!blob) throw new Error("no canvas");
         if (!live) return;
         objectUrl = URL.createObjectURL(blob);
         setPreview(objectUrl);
-        setFile(new File([blob], traceImageFile(root.address), { type: "image/png" }));
+        setFile(new File([blob], traceImageFile(root.address, format === "wide"), { type: "image/png" }));
       })
       .catch(() => live && setFailed(true));
     return () => {
       live = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-    // Drawn once per opening (the dialog is keyed by it).
+    // The trail is the one the dialog opened on; only the format changes while it's open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [format]);
 
   async function shareNative() {
     const withImage = file && navigator.canShare?.({ files: [file] });
@@ -139,7 +159,7 @@ function ShareTraceDialog({ chain, root, data, layout, caseId }: ShareTraceProps
           <div>
             <h2 className="font-semibold tracking-tight">Share the trail</h2>
             <p className="mt-0.5 text-sm text-muted">
-              The tree as it&apos;s opened right now. Open more wallets first to show more of it.
+              The trail as it&apos;s opened right now. Open the wallets it went through first.
             </p>
           </div>
           <button
@@ -152,7 +172,32 @@ function ShareTraceDialog({ chain, root, data, layout, caseId }: ShareTraceProps
           </button>
         </div>
 
-        <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-surface-2">
+        <div role="radiogroup" aria-label="Format" className="mb-3 inline-flex rounded-lg border border-border p-0.5">
+          {FORMATS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="radio"
+              aria-checked={format === f.id}
+              title={f.hint}
+              onClick={() => setFormat(f.id)}
+              className={clsx(
+                "rounded-md px-3 py-1 text-sm transition-colors",
+                format === f.id ? "bg-fg font-medium text-bg" : "text-muted hover:text-fg",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          className={clsx(
+            "relative mx-auto overflow-hidden rounded-lg border border-border bg-surface-2",
+            // Tall, kept short enough that the buttons stay on screen.
+            format === "tall" ? "aspect-[4/5] w-full max-w-[min(100%,46svh)]" : "aspect-video w-full",
+          )}
+        >
           {preview ? (
             <img src={preview} alt={text} className="animate-fade-in size-full object-cover" />
           ) : failed ? (

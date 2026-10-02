@@ -75,12 +75,16 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   wallets, emptied. It grows as wallets are opened. Names are quoted with their source and never turned into
   accusations: a label isn't an identity, and money passing through a wallet isn't proof of a crime.
   **Share image** (next to Copy link, and in fullscreen's top bar): the trail as it's opened right now, as a
-  picture to post. 16:9 (the shape X shows uncropped), 3600x2025, dark, flat fills only (X and Telegram re-encode
-  images as JPEG): the mark and the case, the target, the tree fitted (compact cards when it's big), the case
-  file's flags and where the money ended up, the link and a line on what a label is. Drawn in the browser from
-  what's on screen, nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's
-  app takes it from there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops)
-  and Tornado Cash." and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`).
+  picture to post, in two shapes. **Tall** (the default, 4:5, 2160x2700, as tall as X shows a picture whole on a
+  phone): the trail as one line, a card per stop (who funded the target, or the senders opened above it; the
+  target, white; the hops opened below it, down to the most telling end: a flagged address, then an exchange,
+  bridge or mixer), the money and dates on the arrows between them, a long trail's middle folded into "⋯ 3 more
+  hops ⋯". **Wide** (16:9, 3600x2025): the whole tree as it's opened, fitted (compact cards when it's big). Both:
+  dark, flat fills only (X and Telegram re-encode images as JPEG), the mark and the case, the case file's flags and
+  where the money ended up, the link and a line on what a label is. Drawn in the browser from what's on screen,
+  nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's app takes it from
+  there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops) and Tornado Cash."
+  and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`, `…-wide.png`).
   Free data only:
   - **Solana**: its public RPC (`api.mainnet-beta.solana.com`, no key; about 40 calls per 10 seconds), or any RPC
     in `SOLANA_RPC_URL` (Helius, QuickNode... their free plans read more and faster). A wallet costs one
