@@ -23,6 +23,7 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: "Track a token", short_name: "Track", url: "/app#paste", icons: icon },
+      { name: "Feed", url: "/feed", icons: icon },
       { name: "Trace a wallet", short_name: "Trace", url: "/trace", icons: icon },
       { name: "Leaderboard", url: "/leaderboard", icons: icon },
       { name: "My calls", url: "/me", icons: icon },
