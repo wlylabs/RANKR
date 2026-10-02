@@ -67,11 +67,27 @@ export type TraceResponse = {
   swaps: { txs: number; usd: number | null } | null;
   /**
    * How much history this read: the newest `txs` transactions, from `from` to `to`; complete if that's all.
-   * `skipped`: transactions the chain wouldn't return, left out.
+   * `skipped`: transactions the chain wouldn't return, left out. `limited`: the RPC's rate limit stopped the
+   * read halfway (what was read is all here).
    */
-  scanned: { txs: number; from: number | null; to: number | null; complete: boolean; skipped?: number };
+  scanned: {
+    txs: number;
+    from: number | null;
+    to: number | null;
+    complete: boolean;
+    skipped?: number;
+    limited?: boolean;
+  };
   updatedAt: number;
 };
 
 /** Why a wallet can't be traced. `token`: it's a token's address (open its page instead). */
-export type TraceErrorCode = "token" | "program" | "unsupported" | "invalid" | "upstream" | "nokey" | "limit";
+export type TraceErrorCode =
+  | "token"
+  | "program"
+  | "unsupported"
+  | "invalid"
+  | "upstream"
+  | "busy"
+  | "nokey"
+  | "limit";

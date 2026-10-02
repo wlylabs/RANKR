@@ -28,8 +28,9 @@ export async function traceWallet(chainId: string, address: string, now = Date.n
 
   const value = chain.kind === "solana" ? traceSolana(address) : traceEvm(chain, address);
   cache.set(key, { at: now, value });
-  // A failed read isn't kept: the next request tries again.
-  value.catch(() => cache.get(key)?.value === value && cache.delete(key));
+  // A failed read isn't kept, nor one the rate limit cut short: the next request tries again.
+  const drop = () => cache.get(key)?.value === value && cache.delete(key);
+  value.then((t) => t.scanned.limited && drop(), drop);
   if (cache.size > MAX_ENTRIES) {
     for (const [k, v] of cache) if (now - v.at >= TTL || cache.size > MAX_ENTRIES) cache.delete(k);
   }

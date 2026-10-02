@@ -75,19 +75,29 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   wallets, emptied. It grows as wallets are opened. Names are quoted with their source and never turned into
   accusations: a label isn't an identity, and money passing through a wallet isn't proof of a crime.
   **Share image** (next to Copy link, and in fullscreen's top bar): the trail as it's opened right now, as a
-  picture to post. 16:9 (the shape X shows uncropped), 3600x2025, dark, flat fills only (X and Telegram re-encode
-  images as JPEG): the mark and the case, the target, the tree fitted (compact cards when it's big), the case
-  file's flags and where the money ended up, the link and a line on what a label is. Drawn in the browser from
-  what's on screen, nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's
-  app takes it from there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops)
-  and Tornado Cash." and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`).
+  picture to post, in two shapes. **Tall** (the default, 4:5, 2160x2700, as tall as X shows a picture whole on a
+  phone): the trail as one line, a card per stop (who funded the target, or the senders opened above it; the
+  target, white; the hops opened below it, down to the most telling end: a flagged address, then an exchange,
+  bridge or mixer), the money and dates on the arrows between them, a long trail's middle folded into "⋯ 3 more
+  hops ⋯". **Wide** (16:9, 3600x2025): the whole tree as it's opened, fitted (compact cards when it's big). Both:
+  dark, flat fills only (X and Telegram re-encode images as JPEG), the mark and the case, the case file's flags and
+  where the money ended up, the link and a line on what a label is. Drawn in the browser from what's on screen,
+  nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's app takes it from
+  there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops) and Tornado Cash."
+  and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`, `…-wide.png`).
   Free data only:
-  - **Solana**: its public RPC (`api.mainnet-beta.solana.com`, no key; about 40 calls per 10 seconds), or any RPC
-    in `SOLANA_RPC_URL` (Helius, QuickNode... their free plans read more and faster). A wallet costs one
-    `getAccountInfo`, one to three `getSignaturesForAddress` pages (its whole history up to 3,000 transactions,
-    for who funded it) and a `getTransaction` (jsonParsed, asking for up to v1, the 4,096-byte format live since
-    Sep 15, 2026) for each of its newest 30 transactions (80 on your own RPC); one the RPC won't return is left
-    out and counted. Prices: DexScreener, stablecoins at $1.
+  - **Solana**: free public RPCs, no key (Solana's own `api.mainnet-beta.solana.com`, then PublicNode's when one
+    says 429), or any RPC in `SOLANA_RPC_URL` (several, comma-separated, are taken in turn). The public ones allow
+    about 40 calls of one method per 10 seconds per IP, and a server on a shared host shares its IP with other
+    sites, so calls are paced (3.5 a second on the public RPCs, 9 on your own; `SOLANA_RPC_RPS`), a 429 moves on
+    to the next RPC, and a read the rate limit cuts short keeps what it read (the case file says so, and it isn't
+    cached, so opening it again reads more). If nothing can be read: "Solana's RPC is busy right now (rate limit).
+    Try again in a minute." **For a live site, set `SOLANA_RPC_URL` to a free Helius key** (1M credits a month,
+    10 requests a second). A wallet costs one `getAccountInfo`, one to three `getSignaturesForAddress` pages (its
+    whole history up to 3,000 transactions, for who funded it) and a `getTransaction` (jsonParsed, asking for up to
+    v1, the 4,096-byte format live since Sep 15, 2026) for each of its newest 20 transactions (80 on your own RPC);
+    transactions already read for a neighbouring wallet come from memory. One the RPC won't return is left out and
+    counted. Prices: DexScreener, stablecoins at $1.
   - **Ethereum, Base, Arbitrum, Optimism, Polygon**: [Blockscout's API](https://api.blockscout.com), which since
     July 2026 needs a key (free at dev.blockscout.com: 100K credits a day; without one its public explorers allow
     about 10 requests per 16 minutes). A wallet costs four requests: the address and its newest 50 transactions,

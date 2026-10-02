@@ -19,5 +19,6 @@ describe("traceImageFile", () => {
   it("names the file after the wallet, short and safe", () => {
     expect(traceImageFile("GBERKNpahPnBGmeUGWQVjGBDBj6CcJKpGz34FqegmTgu")).toBe("rankr-trace-GBERmTgu.png");
     expect(traceImageFile("0x28C6c06298d514Db089934071355E5743bf21d60")).toBe("rankr-trace-0x281d60.png");
+    expect(traceImageFile("GBERKNpahPnBGmeUGWQVjGBDBj6CcJKpGz34FqegmTgu", true)).toBe("rankr-trace-GBERmTgu-wide.png");
   });
 });

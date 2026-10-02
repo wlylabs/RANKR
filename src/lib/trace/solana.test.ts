@@ -1,5 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { getTx, MAX_TX_VERSION, parseTransaction, traceSolana, walletLegs, type ParsedTx } from "./solana";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { getTx, MAX_TX_VERSION, parseTransaction, RPC_TIMING, traceSolana, walletLegs, type ParsedTx } from "./solana";
+
+// No pacing or waiting between retries here: the stubs answer at once.
+beforeAll(() => {
+  vi.stubEnv("SOLANA_RPC_RPS", "100000");
+  RPC_TIMING.backoffMs = 1;
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+  RPC_TIMING.backoffMs = 700;
+});
 
 // Real-looking jsonParsed transactions (the shape getTransaction returns with encoding "jsonParsed").
 const W = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
@@ -319,5 +329,67 @@ describe("traceSolana", () => {
       }),
     );
     await expect(traceSolana(MEME)).rejects.toMatchObject({ code: "token" });
+  });
+});
+
+describe("rate limits", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const busy = () => new Response("Too many requests", { status: 429 });
+  const side = (url: string) => {
+    if (url.includes("dexscreener")) return Response.json([]);
+    if (url.includes("githubusercontent")) return new Response("");
+    return null;
+  };
+
+  it("moves on to the next free RPC when one says 429", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        asked.push(new URL(url).host);
+        return url.includes("mainnet-beta") ? busy() : Response.json({ result: tx("rl1", 1_790_000_000, {}) });
+      }),
+    );
+    expect(await getTx("rl1")).not.toBeNull();
+    expect(asked).toEqual(["api.mainnet-beta.solana.com", "solana-rpc.publicnode.com"]);
+  });
+
+  it("keeps what it read when the rate limit cuts a wallet short, and says so", async () => {
+    let served = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const other = side(url);
+        if (other) return other;
+        const { method } = JSON.parse(String(init?.body));
+        if (method === "getAccountInfo") return Response.json({ result: { value: null } });
+        if (method === "getSignaturesForAddress") {
+          return Response.json({
+            result: ["b1", "b2", "b3", "b4"].map((signature) => ({ signature, err: null, blockTime: 1_790_000_000 })),
+          });
+        }
+        // The first transaction comes back; then the quota is gone, everywhere.
+        if (served++ === 0) {
+          return Response.json({
+            result: tx("b1", 1_790_000_000, { keys: [W, FRIEND], ixs: [solTransfer(W, FRIEND, 2e9)] }),
+          });
+        }
+        return busy();
+      }),
+    );
+    const t = await traceSolana(W);
+    expect(t.scanned).toMatchObject({ limited: true, txs: 1, complete: false });
+    expect(t.outflows.map((f) => f.address)).toEqual([FRIEND]);
+  });
+
+  it("says the RPC is busy, in words, when nothing can be read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => side(url) ?? busy()),
+    );
+    await expect(traceSolana(PAYER)).rejects.toMatchObject({
+      code: "busy",
+      message: expect.stringContaining("busy right now"),
+    });
   });
 });
