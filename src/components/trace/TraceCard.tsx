@@ -112,7 +112,6 @@ function FlowLine({ placed }: { placed: Placed }) {
 
 type CardProps = {
   placed: Placed;
-  offset: number;
   selected: boolean;
   root: TraceResponse | null;
   onPress: (placed: Placed) => void;
@@ -120,19 +119,21 @@ type CardProps = {
 };
 
 /** One card on the tree, at its place (centered on placed.x, placed.y). */
-export function TraceCard({ placed, offset, selected, root, onPress, onRetry }: CardProps) {
+export function TraceCard({ placed, selected, root, onPress, onRetry }: CardProps) {
   const { item } = placed;
   const style = {
     width: NODE_W,
     height: NODE_H,
-    transform: `translate(${placed.x + offset - NODE_W / 2}px, ${placed.y - NODE_H / 2}px)`,
+    transform: `translate(${placed.x - NODE_W / 2}px, ${placed.y - NODE_H / 2}px)`,
   };
   const base = "trace-node absolute top-0 left-0 rounded-lg text-left";
+  // Where it sits, and which card it is (the frame brings a card reached with Tab into view by it).
+  const at = { style, "data-node": item.id };
 
   if (item.type === "pending") {
     return (
       <div
-        style={style}
+        {...at}
         className={clsx(base, "skeleton flex flex-col justify-center gap-1 border border-border px-3")}
         role="status"
       >
@@ -146,7 +147,7 @@ export function TraceCard({ placed, offset, selected, root, onPress, onRetry }: 
   if (item.type === "error") {
     return (
       <div
-        style={style}
+        {...at}
         className={clsx(base, "flex flex-col justify-center gap-1 border border-dashed border-down/50 px-3")}
       >
         <span className="truncate text-[12px] text-down">{item.error ?? "Couldn't read this wallet"}</span>
@@ -163,7 +164,7 @@ export function TraceCard({ placed, offset, selected, root, onPress, onRetry }: 
   if (item.type === "swaps") {
     return (
       <div
-        style={style}
+        {...at}
         className={clsx(
           base,
           "flex flex-col justify-center gap-0.5 border border-dashed border-border-strong bg-bg/80 px-3",
@@ -179,12 +180,30 @@ export function TraceCard({ placed, offset, selected, root, onPress, onRetry }: 
       </div>
     );
   }
+  if (item.type === "others") {
+    return (
+      <button
+        type="button"
+        {...at}
+        onClick={() => onPress(placed)}
+        className={clsx(
+          base,
+          "flex flex-col justify-center gap-0.5 border border-dashed border-border px-3 transition-colors hover:border-fg",
+        )}
+      >
+        <span className="font-mono text-[13px]">
+          +{item.count} {item.count === 1 ? "other" : "others"}
+        </span>
+        <span className="label text-subtle">Folded · tap to show</span>
+      </button>
+    );
+  }
   if (item.type === "more") {
     const Tag = item.expandable ? "button" : "div";
     return (
       <Tag
         type={item.expandable ? "button" : undefined}
-        style={style}
+        {...at}
         onClick={item.expandable ? () => onPress(placed) : undefined}
         className={clsx(
           base,
@@ -205,7 +224,7 @@ export function TraceCard({ placed, offset, selected, root, onPress, onRetry }: 
   return (
     <button
       type="button"
-      style={style}
+      {...at}
       onClick={() => onPress(placed)}
       aria-expanded={item.expandable ? open : undefined}
       aria-label={`${label?.name ?? shortAddress(item.address!)}${item.expandable ? (open ? ", close" : ", open") : ""}`}

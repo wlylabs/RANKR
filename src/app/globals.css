@@ -472,6 +472,39 @@ body {
   background-image: radial-gradient(color-mix(in srgb, var(--fg) 13%, transparent) 1px, transparent 1.2px);
   background-size: 14px 14px;
 }
+/*
+ * The tree's frame works like a map: drag to pan, pinch (or Ctrl + scroll) to zoom. The camera is three
+ * variables set from script on the frame (--tx, --ty in px, --k the zoom); the stage, the row captions and the
+ * dots follow them without React re-rendering a card.
+ */
+.trace-viewport {
+  touch-action: none;
+  overscroll-behavior: contain;
+  cursor: grab;
+  background-position: calc(var(--tx, 0) * 1px) calc(var(--ty, 0) * 1px);
+  background-size: calc(14px * var(--k, 1)) calc(14px * var(--k, 1));
+}
+.trace-viewport.is-grabbing {
+  cursor: grabbing;
+}
+.trace-stage {
+  transform-origin: 0 0;
+  transform: translate(calc(var(--tx, 0) * 1px), calc(var(--ty, 0) * 1px)) scale(var(--k, 1));
+  will-change: transform;
+}
+.trace-caption {
+  top: calc(var(--ty, 0) * 1px + var(--row) * var(--k, 1) * 1px);
+  /* Zoomed far out the rows are too close for a caption: it fades out (gone below about 40%). */
+  opacity: clamp(0, calc((var(--k, 1) - 0.4) * 6), 1);
+}
+/* Same time and curve as a card gliding to its new place (.trace-node): the camera moving to keep a card
+   still and the card moving cancel out exactly, so the card stays put while the tree reshapes. */
+.trace-viewport.is-animating .trace-stage {
+  transition: transform 0.5s var(--ease-emphasized);
+}
+.trace-viewport.is-animating .trace-caption {
+  transition: top 0.5s var(--ease-emphasized);
+}
 /* A line draws itself down from the card above when it first appears (pathLength="1"). */
 @keyframes trace-draw {
   from {

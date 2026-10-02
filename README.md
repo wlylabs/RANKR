@@ -52,8 +52,13 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   `/trace/<chain>/<address>`: above it, who sent it money (its first money marked **1ST**); the wallet in the
   middle; below it, where its money went. Money always flows down the page, as dashes running along the lines,
   thicker for more money. Each wallet shows its three biggest counterparties that way (**+N more** shows up to
-  eight), and tapping one opens the next row, as deep as six hops each way; the tree makes room around it and the
-  card you tapped stays put. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
+  eight), and tapping one opens the next row, as deep as six hops each way. Opening a wallet folds the rest of
+  its row into one **+N others** card (tap to unfold), so the tree only widens along the trail you follow and
+  stays narrow enough for a phone. The tree sits in a frame that works like a map: drag to move it, pinch (or
+  Ctrl / ⌘ + scroll, or a trackpad pinch) to zoom, sideways scroll to pan, and buttons to zoom, fit the whole
+  trail, go back to the target and go **fullscreen** (the picked wallet in a strip along the bottom, its details
+  a tap away; Esc or ✕ to leave). The card you tapped stays put while the tree reshapes around it, and what it
+  opened slides into view. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
   already higher up its branch isn't opened again (the money went round). Trades aren't followed: a transaction
   where the wallet sends one asset and gets another back is a swap, summed on a **Swaps** card (DEX pools are no
   one to follow). Dust under $1 and tokens with no price (where airdropped spam lives) are left out. Every
@@ -90,7 +95,7 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
     `src/lib/trace/labels.ts`. Not used: Dune's Spellbook, whose license rules out data platforms.
   Each wallet read is kept 5 minutes per server and a minute in shared caches; 20 reads a minute per visitor.
   With `RANKR_MOCK=1`, made-up trails (the same for the same address). The page without a wallet shows a made-up
-  example.
+  example to play with: every wallet in it opens.
 - **Watchlist**: tokens saved from the paste box, or with Watch on a token page (also tokens Rankr doesn't track),
   under You → Watchlist, each measured from when you saved it. Kept in the browser; never a call.
 - **Milestone alerts** (settings menu): a notification when one of your calls or a watched token reaches a

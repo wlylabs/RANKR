@@ -19,7 +19,7 @@ export type Side = "in" | "out";
 
 export type TreeItem = {
   id: string;
-  type: "root" | "wallet" | "swaps" | "more" | "pending" | "error";
+  type: "root" | "wallet" | "swaps" | "more" | "others" | "pending" | "error";
   side: Side | "root";
   /** 0 for the target, +1, +2... below it, -1, -2... above it. */
   depth: number;
@@ -33,7 +33,10 @@ export type TreeItem = {
   loop?: boolean;
   expandable?: boolean;
   expanded?: boolean;
-  /** "more": counterparties not shown; `expandable` when they can be. */
+  /**
+   * "more": counterparties not shown, `expandable` when they can be. "others": the row's wallets folded away
+   * while one of them is open (the trail being followed).
+   */
   count?: number;
   swaps?: { txs: number; usd: number | null };
   error?: string;
@@ -48,15 +51,17 @@ export type TreeState = {
   expanded: Set<string>;
   /** Wallets showing every counterparty, by node id. */
   showAll: Set<string>;
+  /** Wallets whose row stays unfolded while one of its wallets is open, by node id. */
+  unfolded?: Set<string>;
 };
 
-/** Data for an address (EVM addresses are case-insensitive). */
 /** The id of the card a card hangs from. */
 export function parentId(id: string): string | null {
   const at = id.lastIndexOf("/");
   return at < 0 ? null : id.slice(0, at);
 }
 
+/** Data for an address (EVM addresses are case-insensitive). */
 export function dataOf(data: Map<string, TraceResponse>, address: string): TraceResponse | undefined {
   return data.get(address) ?? (address.startsWith("0x") ? data.get(address.toLowerCase()) : undefined);
 }
@@ -84,6 +89,18 @@ function children(s: TreeState, parent: TreeItem, side: Side, path: string[]): T
       funder: side === "in" && !!funder && sameAddress(flow.address, funder.address),
     }),
   );
+
+  // Following a trail: once a wallet in this row is open, the others fold into one card, so the tree only
+  // widens along the path being followed. Unfolding shows the row as it was.
+  const open = items.filter((i) => i.expanded);
+  if (open.length && !s.unfolded?.has(parent.id)) {
+    const folded = items.length - open.length;
+    if (folded > 0) {
+      open.push({ id: `${parent.id}/${side}:others`, type: "others", side, depth, count: folded, children: [] });
+    }
+    return open;
+  }
+
   if (side === "out" && data.swaps) {
     items.push({ id: `${parent.id}/out:swaps`, type: "swaps", side, depth, swaps: data.swaps, children: [] });
   }
@@ -204,7 +221,8 @@ function tone(item: TreeItem): Edge["tone"] {
   const kind: TraceLabelKind | undefined = item.flow?.label?.kind;
   if (kind && DANGER.has(kind)) return "danger";
   if (item.flow?.terminal) return "end";
-  if (item.type === "more" || item.type === "pending" || item.type === "error") return "faint";
+  if (item.type === "more" || item.type === "others" || item.type === "pending" || item.type === "error")
+    return "faint";
   return "plain";
 }
 

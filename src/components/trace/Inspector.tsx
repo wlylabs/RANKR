@@ -1,7 +1,9 @@
 "use client";
 
-import { ArrowUpRight, Crosshair } from "lucide-react";
+import clsx from "clsx";
+import { ArrowUpRight, ChevronDown, ChevronUp, Crosshair } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { formatAmount, formatDate, formatUsd, shortAddress } from "@/lib/format";
 import { explorerAddress, explorerTx, traceHref, type TraceChain } from "@/lib/trace/chains";
 import type { TreeItem } from "@/lib/trace/tree";
@@ -14,14 +16,7 @@ import { LabelTag } from "./TraceCard";
 const linkClass =
   "inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:border-border-strong hover:text-fg";
 
-/** The card picked on the tree, in full: whole address, label and source, what moved, links out. */
-export function Inspector({
-  chain,
-  item,
-  parent,
-  data,
-  onToggle,
-}: {
+type InspectorProps = {
   chain: TraceChain;
   item: TreeItem;
   /** The wallet it hangs from (none for the target). */
@@ -29,12 +24,17 @@ export function Inspector({
   /** Its own read, once opened (the target's always). */
   data: TraceResponse | undefined;
   onToggle: () => void;
-}) {
+  /** Without its card frame (inside the fullscreen panel). */
+  bare?: boolean;
+};
+
+/** The card picked on the tree, in full: whole address, label and source, what moved, links out. */
+export function Inspector({ chain, item, parent, data, onToggle, bare }: InspectorProps) {
   const address = item.address!;
   const flow = item.flow;
   const label = item.type === "root" ? (data?.label ?? null) : (flow?.label ?? null);
   return (
-    <section className="card p-4 sm:p-5" aria-label="Selected wallet">
+    <section className={bare ? "p-4" : "card p-4 sm:p-5"} aria-label="Selected wallet">
       <div className="flex items-center gap-2">
         <span className="label text-fg">{item.type === "root" ? "Target" : "Selected"}</span>
         {parent && flow && (
@@ -130,5 +130,63 @@ export function Inspector({
         </a>
       </div>
     </section>
+  );
+}
+
+/**
+ * The picked card along the bottom of the fullscreen tree: one line (who it is, what moved, open or close it),
+ * pulled up for the whole Inspector. Small, so the tree stays in view above it.
+ */
+export function InspectorStrip(props: InspectorProps) {
+  const [more, setMore] = useState(false);
+  const { item, data } = props;
+  const flow = item.flow;
+  const label = item.type === "root" ? (data?.label ?? null) : (flow?.label ?? null);
+  const top = flow?.assets[0];
+  return (
+    <div className="border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] shadow-float backdrop-blur-md">
+      {more && (
+        <div className="max-h-[55dvh] overflow-y-auto overscroll-contain border-b border-border">
+          <Inspector {...props} bare />
+        </div>
+      )}
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <Avatar userId={item.address!} size={28} className="rounded-[6px]" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-mono text-[13px]">{shortAddress(item.address!)}</p>
+          <div className="truncate text-[12px] text-muted">
+            {label ? (
+              <LabelTag label={label} />
+            ) : top ? (
+              `${formatAmount(top.amount)} ${top.symbol}${flow?.usd != null ? ` · ${formatUsd(flow.usd)}` : ""}`
+            ) : item.type === "root" ? (
+              "Target"
+            ) : (
+              "Wallet"
+            )}
+          </div>
+        </div>
+        {item.expandable && (
+          <button
+            type="button"
+            onClick={props.onToggle}
+            className="shrink-0 rounded-md bg-fg px-3 py-1.5 text-[13px] font-medium text-bg hover:opacity-85"
+          >
+            {item.expanded ? "Close" : "Open"}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setMore((m) => !m)}
+          aria-expanded={more}
+          className={clsx(
+            "inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[13px] text-muted hover:text-fg",
+            more && "border-border-strong text-fg",
+          )}
+        >
+          Details {more ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+        </button>
+      </div>
+    </div>
   );
 }
