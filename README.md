@@ -74,6 +74,13 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   scam, mixer or frozen address (each with its source), bridged out, reached an exchange, spread out to 5+
   wallets, emptied. It grows as wallets are opened. Names are quoted with their source and never turned into
   accusations: a label isn't an identity, and money passing through a wallet isn't proof of a crime.
+  **Share image** (next to Copy link, and in fullscreen's top bar): the trail as it's opened right now, as a
+  picture to post. 16:9 (the shape X shows uncropped), 3600x2025, dark, flat fills only (X and Telegram re-encode
+  images as JPEG): the mark and the case, the target, the tree fitted (compact cards when it's big), the case
+  file's flags and where the money ended up, the link and a line on what a label is. Drawn in the browser from
+  what's on screen, nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's
+  app takes it from there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops)
+  and Tornado Cash." and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`).
   Free data only:
   - **Solana**: its public RPC (`api.mainnet-beta.solana.com`, no key; about 40 calls per 10 seconds), or any RPC
     in `SOLANA_RPC_URL` (Helius, QuickNode... their free plans read more and faster). A wallet costs one
@@ -444,7 +451,7 @@ src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
-src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, tree layout, case file
+src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, tree layout, camera, case file, share text
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

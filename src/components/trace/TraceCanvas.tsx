@@ -55,6 +55,8 @@ type Props = {
   title?: ReactNode;
   /** Over the bottom of the frame in fullscreen: the picked card. */
   footer?: ReactNode;
+  /** More buttons for fullscreen's top bar (share). */
+  actions?: ReactNode;
   /** The frame's height on the page. */
   className?: string;
 };
@@ -105,6 +107,7 @@ export function TraceCanvas({
   onFullscreen,
   title,
   footer,
+  actions,
   className,
 }: Props) {
   const frame = useRef<HTMLDivElement>(null);
@@ -424,6 +427,7 @@ export function TraceCanvas({
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-4">
           <div className="min-w-0 flex-1 truncate">{title}</div>
           <div className="flex shrink-0 overflow-hidden rounded-lg">{controls}</div>
+          {actions}
           <button
             type="button"
             onClick={() => onFullscreen(false)}

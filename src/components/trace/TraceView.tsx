@@ -14,6 +14,7 @@ import { DecryptText } from "../DecryptText";
 import { CaseFile } from "./CaseFile";
 import { Inspector, InspectorStrip } from "./Inspector";
 import { TraceCanvas } from "./TraceCanvas";
+import { ShareTrace } from "./ShareTrace";
 import { TraceInput } from "./TraceInput";
 import { useTrail } from "./useTrail";
 
@@ -126,7 +127,10 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="label text-subtle">Case #{caseId}</span>
           <span className="label text-subtle">· {chain.id === "solana" ? "Solana" : chain.id}</span>
-          {link && <CopyButton value={link} label="Copy link" what="link" className="ml-auto" />}
+          <span className="ml-auto flex items-center gap-3">
+            {link && <CopyButton value={link} label="Copy link" what="link" />}
+            {root && <ShareTrace chain={chain} root={root} data={data} layout={layout} caseId={caseId} />}
+          </span>
         </div>
         <h1 className="cine-in text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
           <DecryptText text={root?.label?.name ?? shortAddress(address)} className="font-mono tracking-[-0.04em]" />
@@ -176,6 +180,11 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
                 <span className="font-mono text-sm">{root?.label?.name ?? shortAddress(address)}</span>
                 <span className="label hidden text-subtle sm:inline">Case #{caseId}</span>
               </span>
+            }
+            actions={
+              root && (
+                <ShareTrace chain={chain} root={root} data={data} layout={layout} caseId={caseId} variant="icon" />
+              )
             }
             footer={
               root && (
