@@ -1,5 +1,5 @@
 // Made-up trails for RANKR_MOCK=1, so the trace page works offline. Every address leads to the same made-up
-// counterparties each time (they come from a hash of it), so opening a wallet twice draws the same tree.
+// counterparties each time (they come from a hash of it), so following a wallet twice draws the same trail.
 import { isTerminal } from "./kinds";
 import type { TraceChain } from "./chains";
 import type { TraceFlow, TraceLabel, TraceResponse } from "./types";

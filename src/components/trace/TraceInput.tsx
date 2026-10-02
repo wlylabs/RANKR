@@ -1,18 +1,27 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, ClipboardPaste, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseWallet, traceHref } from "@/lib/trace/chains";
 
-/** The wallet box: paste an address or an explorer link, and the tree opens on it. */
+/**
+ * The wallet box: paste an address or an explorer link, and its trail opens. Empty, Trace pastes what's on the
+ * clipboard and goes, like Paste on the CA box.
+ */
 export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; size?: "md" | "lg" }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [canReadClipboard, setCanReadClipboard] = useState(false);
   const lg = size === "lg";
+  const pasteMode = !value && canReadClipboard;
+
+  useEffect(() => {
+    setCanReadClipboard(typeof navigator !== "undefined" && !!navigator.clipboard?.readText);
+  }, []);
 
   const go = (raw: string) => {
     const wallet = parseWallet(raw);
@@ -24,12 +33,29 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
     router.push(traceHref(wallet.chain, wallet.address));
   };
 
+  async function pasteAndGo() {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) {
+        setError("The clipboard is empty. Copy a wallet address first.");
+        inputRef.current?.focus();
+        return;
+      }
+      setValue(text);
+      go(text);
+    } catch {
+      // The browser said no to reading the clipboard: paste by hand.
+      inputRef.current?.focus();
+    }
+  }
+
   return (
     <div className="w-full">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           if (value.trim()) go(value);
+          else if (canReadClipboard) void pasteAndGo();
           else inputRef.current?.focus();
         }}
         className="flex items-center gap-1.5 rounded-lg border border-border bg-surface p-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors focus-within:border-border-strong"
@@ -77,13 +103,15 @@ export function TraceInput({ autoFocus, size = "md" }: { autoFocus?: boolean; si
         )}
         <button
           type="submit"
+          title={pasteMode ? "Paste from the clipboard and trace" : undefined}
           className={clsx(
             "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-fg font-medium text-bg transition-opacity hover:opacity-85",
             lg ? "h-10 px-4 text-sm" : "h-9 px-3.5 text-sm",
           )}
         >
+          {pasteMode && <ClipboardPaste className="size-3.5" />}
           Trace
-          <ArrowRight className="size-3.5" />
+          {!pasteMode && <ArrowRight className="size-3.5" />}
         </button>
       </form>
       {error && (

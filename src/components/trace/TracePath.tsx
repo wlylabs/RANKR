@@ -1,19 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  Crosshair,
-  GitCommitVertical,
-  Network,
-  RotateCcw,
-  Split,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Crosshair, RotateCcw, Split } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { formatAmount, formatDay, formatUsd, shortAddress } from "@/lib/format";
 import { traceHref, type TraceChain } from "@/lib/trace/chains";
 import { DANGER } from "@/lib/trace/kinds";
@@ -24,65 +14,9 @@ import { Avatar } from "../Avatar";
 import { DecryptText } from "../DecryptText";
 import { LabelTag, Scramble } from "./TraceCard";
 
-// ---- Path or tree
-
-export type TraceViewMode = "path" | "tree";
-const VIEW_KEY = "rankr:trace-view";
-
-/** Path (the default) or tree, remembered on this device. */
-export function useTraceView() {
-  const [view, setView] = useState<TraceViewMode>("path");
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(VIEW_KEY) === "tree") setView("tree");
-    } catch {
-      /* storage blocked */
-    }
-  }, []);
-  const change = (v: TraceViewMode) => {
-    setView(v);
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      /* storage blocked */
-    }
-  };
-  return [view, change] as const;
-}
-
-const VIEWS = [
-  { id: "path", label: "Path", icon: GitCommitVertical, hint: "The trail as one line, top to bottom" },
-  { id: "tree", label: "Tree", icon: Network, hint: "Every wallet opened, as a tree" },
-] as const;
-
-export function ViewSwitch({ view, onChange }: { view: TraceViewMode; onChange: (v: TraceViewMode) => void }) {
-  return (
-    <div role="radiogroup" aria-label="View" className="inline-flex shrink-0 rounded-lg border border-border p-0.5">
-      {VIEWS.map(({ id, label, icon: Icon, hint }) => (
-        <button
-          key={id}
-          type="button"
-          role="radio"
-          aria-checked={view === id}
-          title={hint}
-          onClick={() => onChange(id)}
-          className={clsx(
-            "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] transition-colors",
-            view === id ? "bg-fg font-medium text-bg" : "text-muted hover:text-fg",
-          )}
-        >
-          <Icon className="size-3.5" /> {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ---- The path
-
 type TracePathProps = {
   steps: PathStep[];
-  /** Every card of the trail by id, each row whole (from useTrail). */
+  /** Every wallet of the trail as read, by id (from useTrail). */
   items: Map<string, TreeItem>;
   /** The target's read (null while it's read). */
   root: TraceResponse | null;

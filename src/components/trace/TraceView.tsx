@@ -12,16 +12,15 @@ import type { TraceErrorCode, TraceResponse } from "@/lib/trace/types";
 import { CopyButton } from "../CopyButton";
 import { DecryptText } from "../DecryptText";
 import { CaseFile } from "./CaseFile";
-import { Inspector, InspectorStrip } from "./Inspector";
-import { TraceCanvas } from "./TraceCanvas";
-import { TracePath, useTraceView, ViewSwitch } from "./TracePath";
+import { Inspector } from "./Inspector";
+import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
 import { TraceInput } from "./TraceInput";
 import { useTrail } from "./useTrail";
 
 type ReadError = { message: string; code?: TraceErrorCode };
 
-/** Reads wallets for the tree, each once (until it fails and is asked for again). */
+/** Reads wallets for the trail, each once (until it fails and is asked for again). */
 function useWallets(chain: string) {
   const [data, setData] = useState<Map<string, TraceResponse>>(() => new Map());
   const [errors, setErrors] = useState<Map<string, ReadError>>(() => new Map());
@@ -99,15 +98,12 @@ function RootError({
 }
 
 /**
- * A wallet's trail: who sent it money (above), the wallet, where its money went (below), as deep as you follow
- * it, as one line of cards (the path, the default) or as a tree; the card you pick in full, and the case file of
- * what it all says.
+ * A wallet's trail as one line of cards: who sent it money (above), the wallet, where its money went (below),
+ * as deep as you follow it; the card you pick in full, and the case file of what it all says.
  */
 export function TraceView({ chain: chainId, address }: { chain: string; address: string }) {
   const chain = traceChain(chainId)!;
   const { data, errors, load } = useWallets(chainId);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [view, setView] = useTraceView();
   const [link, setLink] = useState("");
   const details = useRef<HTMLDivElement>(null);
 
@@ -118,16 +114,11 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
 
   const messages = useMemo(() => new Map([...errors].map(([a, e]) => [a, e.message])), [errors]);
   const read = useCallback((a: string) => void load(a), [load]);
-  const { layout, items, steps, picked, anchor, open, press, pick, follow, select } = useTrail(
-    address,
-    data,
-    messages,
-    read,
-  );
+  const { items, steps, picked, toggle, pick, follow, select } = useTrail(address, data, messages, read);
 
   const root = dataOf(data, address) ?? null;
   const rootError = !root ? errors.get(address) : undefined;
-  const pickedParent = parentId(picked.item.id);
+  const pickedParent = parentId(picked.id);
   const caseId = useMemo(() => sha256Hex(`${chainId}:${address}`).slice(0, 8), [chainId, address]);
 
   return (
@@ -138,7 +129,7 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
           <span className="label text-subtle">· {chain.id === "solana" ? "Solana" : chain.id}</span>
           <span className="ml-auto flex items-center gap-3">
             {link && <CopyButton value={link} label="Copy link" what="link" />}
-            {root && <ShareTrace chain={chain} root={root} data={data} layout={layout} steps={steps} caseId={caseId} />}
+            {root && <ShareTrace chain={chain} root={root} data={data} steps={steps} caseId={caseId} />}
           </span>
         </div>
         <h1 className="cine-in text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
@@ -168,111 +159,48 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
         <RootError chain={chainId} address={address} error={rootError} onRetry={() => void load(address)} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <ViewSwitch view={view} onChange={setView} />
-            <p className="label flex flex-wrap gap-x-4 gap-y-1 text-subtle">
-              <span>↓ Money flows down</span>
-              {view === "path" ? (
-                <span>Follow: one hop further · Switch: another wallet</span>
-              ) : (
-                <>
-                  <span>Tap to open · drag · pinch to zoom</span>
-                  <span>End: exchange, bridge, contract</span>
-                </>
-              )}
-              <span className="text-down">Red: flagged on a public list</span>
-            </p>
-          </div>
-          {view === "path" ? (
-            <TracePath
-              steps={steps}
-              items={items}
-              root={root}
-              chain={chain}
-              selected={picked.item.id}
-              onSelect={(item) => {
-                select(item.id);
-                // Its details are under the path: brought up on a phone, where they're out of sight.
-                requestAnimationFrame(() => details.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
-              }}
-              onFollow={follow}
-              onPick={pick}
-              onRetry={(a) => void load(a)}
-              header={
-                <>
-                  <span className="min-w-0 flex-1 truncate">
-                    <span className="font-mono text-sm">{root?.label?.name ?? shortAddress(address)}</span>
-                    <span className="label ml-2 text-subtle">
-                      Case #{caseId}
-                      <span className="hidden sm:inline"> · following the money</span>
-                    </span>
-                  </span>
-                  {root && (
-                    <ShareTrace
-                      chain={chain}
-                      root={root}
-                      data={data}
-                      layout={layout}
-                      steps={steps}
-                      caseId={caseId}
-                      variant="icon"
-                    />
-                  )}
-                </>
-              }
-            />
-          ) : (
-            <TraceCanvas
-              layout={layout}
-              root={root}
-              selected={picked.item.id}
-              anchor={anchor}
-              onPress={press}
-              onRetry={(placed) => placed.item.address && void load(placed.item.address)}
-              fullscreen={fullscreen}
-              onFullscreen={setFullscreen}
-              className="h-[62svh] min-h-[420px] max-h-[780px]"
-              title={
-                <span className="flex items-baseline gap-2">
+          <p className="label flex flex-wrap gap-x-4 gap-y-1 text-subtle">
+            <span>↓ Money flows down</span>
+            <span>Follow: one hop further · Switch: another wallet</span>
+            <span className="text-down">Red: flagged on a public list</span>
+          </p>
+          <TracePath
+            steps={steps}
+            items={items}
+            root={root}
+            chain={chain}
+            selected={picked.id}
+            onSelect={(item) => {
+              select(item.id);
+              // Its details are under the path: brought up on a phone, where they're out of sight.
+              requestAnimationFrame(() => details.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+            }}
+            onFollow={follow}
+            onPick={pick}
+            onRetry={(a) => void load(a)}
+            header={
+              <>
+                <span className="min-w-0 flex-1 truncate">
                   <span className="font-mono text-sm">{root?.label?.name ?? shortAddress(address)}</span>
-                  <span className="label hidden text-subtle sm:inline">Case #{caseId}</span>
+                  <span className="label ml-2 text-subtle">
+                    Case #{caseId}
+                    <span className="hidden sm:inline"> · following the money</span>
+                  </span>
                 </span>
-              }
-              actions={
-                root && (
-                  <ShareTrace
-                    chain={chain}
-                    root={root}
-                    data={data}
-                    layout={layout}
-                    steps={steps}
-                    caseId={caseId}
-                    variant="icon"
-                  />
-                )
-              }
-              footer={
-                root && (
-                  <InspectorStrip
-                    key={picked.item.id}
-                    chain={chain}
-                    item={picked.item}
-                    parent={pickedParent ? (items.get(pickedParent)?.address ?? null) : null}
-                    data={picked.item.address ? dataOf(data, picked.item.address) : undefined}
-                    onToggle={() => open(picked)}
-                  />
-                )
-              }
-            />
-          )}
+                {root && (
+                  <ShareTrace chain={chain} root={root} data={data} steps={steps} caseId={caseId} variant="icon" />
+                )}
+              </>
+            }
+          />
           {root && (
             <div ref={details} className="grid scroll-my-20 gap-4 lg:grid-cols-2">
               <Inspector
                 chain={chain}
-                item={picked.item}
+                item={picked}
                 parent={pickedParent ? (items.get(pickedParent)?.address ?? null) : null}
-                data={picked.item.address ? dataOf(data, picked.item.address) : undefined}
-                onToggle={() => open(picked)}
+                data={picked.address ? dataOf(data, picked.address) : undefined}
+                onToggle={() => toggle(picked)}
               />
               <CaseFile root={root} data={data} caseId={caseId} />
             </div>

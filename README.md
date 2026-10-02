@@ -48,50 +48,36 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
   land while you read wait behind an "N new" button instead of pushing the list down. The ticker shows the
   filter picked on the feed page.
 - **Trace** (`/trace`, in the nav): an on-chain trail, top to bottom. Paste a wallet (an address, or a Solscan,
-  Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and the trail opens on it at
-  `/trace/<chain>/<address>`, as a **Path** (the default) or a **Tree** (a toggle above it, remembered on the
-  device; the example on `/trace` has it too). **Path**: the trail as one line of cards, top to bottom, the way
-  the tall share card draws it: who funded the wallet (**1ST**), the wallet, and the wallets its money went
-  through, each arrow between two cards carrying what moved and when. **Follow the money** under the last card
-  reads it and goes a hop further, until an exchange, a bridge or a mixer ends the trail; **Switch** on an arrow
-  takes another wallet at that fork (every counterparty listed, biggest first), and above the top card the trail
-  follows up to who sent it its money. Tapping a card shows it in full under the path. **Tree**: above the
-  wallet, who sent it money (its first money marked **1ST**); the wallet in the middle; below it, where its
-  money went. Money always flows down the page, as dashes running along the lines,
-  thicker for more money. Each wallet shows its three biggest counterparties that way (**+N more** shows up to
-  eight), and tapping one opens the next row, as deep as six hops each way. Opening a wallet folds the rest of
-  its row into one **+N others** card (tap to unfold), so the tree only widens along the trail you follow and
-  stays narrow enough for a phone. The tree sits in a frame that works like a map: drag to move it, pinch (or
-  Ctrl / ⌘ + scroll, or a trackpad pinch) to zoom, sideways scroll to pan, and buttons to zoom, fit the whole
-  trail, go back to the target and go **fullscreen**. Fullscreen fits the whole trail to the screen and keeps it
-  fitted as wallets open and fold, so there's nothing to zoom; zooming or dragging it yourself stops that until
-  you press Fit again. Zoomed out that far (a whole trail on a phone), each card turns to a compact face, its
-  glyph and name, with type sized to stay readable. The picked wallet sits in a strip along the bottom, its
-  details a tap away; Esc or ✕ leaves, back to the view the page had. Outside fullscreen, the card you tapped
-  stays put while the tree reshapes around it, and what it opened slides into view. A trail ends (**END**) at an exchange, a bridge, a mixer or a contract, and a wallet
-  already higher up its branch isn't opened again (the money went round). Trades aren't followed: a transaction
-  where the wallet sends one asset and gets another back is a swap, summed on a **Swaps** card (DEX pools are no
-  one to follow). Dust under $1 and tokens with no price (where airdropped spam lives) are left out. Every
-  wallet gets a matrix glyph from its address (like the avatars), addresses decrypt into place, the rows sit on
-  a dotted ledger; flagged addresses are drawn in red.
-  Under the tree: the picked card in full (whole address, label and its source, what moved, links to the
+  Etherscan, Basescan, Arbiscan, Optimism or Polygonscan link) and its trail opens at `/trace/<chain>/<address>`;
+  with the box empty, **Trace** pastes what's on the clipboard and goes, like Paste on the CA box. The trail is
+  one line of cards, top to bottom, the way the share image draws it: who funded the wallet (its first money,
+  **1ST**), the wallet, and the wallets its money went through, each arrow between two cards carrying what moved
+  and when, with the money running down it. **Follow the money** under the last card reads that wallet and goes a
+  hop further, as deep as six hops, until an exchange, a bridge, a mixer or a contract ends the trail (**End**);
+  above the top card it follows up to who sent that wallet its money. **Switch** on an arrow takes another wallet
+  at that fork (every counterparty listed, biggest first: up to eight each way, the rest counted). Where nothing
+  was picked, the line goes on to the most telling counterparty: a flagged address, then an exchange, a bridge or
+  a mixer, then the most money. A wallet already higher up the trail isn't followed again (the money went round).
+  Trades aren't followed: a transaction where the wallet sends one asset and gets another back is a swap, summed
+  on the case file (DEX pools are no one to follow). Dust under $1 and tokens with no price (where airdropped spam
+  lives) are left out. Every wallet gets a matrix glyph from its address (like the avatars), addresses decrypt
+  into place, the line sits on a dotted ledger; flagged addresses are drawn in red. The example on `/trace` is a
+  made-up trail to try it on.
+  Under the path: the card you tapped in full (whole address, label and its source, what moved, links to the
   transaction and the explorer, and **Trace from here**), and the **case file**: who the wallet is, who funded it,
   money in and out, where the money ended up (exchanges, bridges, mixers, with the hop they were reached at), what
   was read, and flags: a fresh wallet (first seen under 7 days ago), money to or from a sanctioned, exploiter,
   scam, mixer or frozen address (each with its source), bridged out, reached an exchange, spread out to 5+
   wallets, emptied. It grows as the money is followed. Names are quoted with their source and never turned into
   accusations: a label isn't an identity, and money passing through a wallet isn't proof of a crime.
-  **Share image** (next to Copy link, and in fullscreen's top bar): the trail as it's followed right now, as a
-  picture to post, in two shapes. **Tall** (the default, 4:5, 2160x2700, as tall as X shows a picture whole on a
-  phone): the path as it is on screen, a card per stop (who funded the target, or the senders followed above it;
-  the target, white; the hops followed below it, down to the most telling end: a flagged address, then an
-  exchange, bridge or mixer), the money and dates on the arrows between them, a long trail's middle folded into "⋯ 3 more
-  hops ⋯". **Wide** (16:9, 3600x2025): the whole tree as it's opened, fitted (compact cards when it's big). Both:
+  **Share image** (next to Copy link, and on the path's top bar): the path as it's followed right now, as a
+  picture to post, 4:5 (2160x2700, as tall as X shows a picture whole on a phone): a card per stop (the target
+  white), the money and dates on the arrows between them, a long trail's middle folded into "⋯ 3 more hops ⋯";
   dark, flat fills only (X and Telegram re-encode images as JPEG), the mark and the case, the case file's flags and
   where the money ended up, the link and a line on what a label is. Drawn in the browser from what's on screen,
   nothing to fetch. Then, as for a call: the phone's share sheet with the image itself (X's app takes it from
   there), a post on X ("Following the money from GBER…mTgu on Rankr. It reached OKX (2 hops) and Tornado Cash."
-  and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`, `…-wide.png`).
+  and the link), the link, or the image saved (`rankr-trace-GBERmTgu.png`).
   Free data only:
   - **Solana**: free public RPCs, no key (Solana's own `api.mainnet-beta.solana.com`, then PublicNode's when one
     says 429), or any RPC in `SOLANA_RPC_URL` (several, comma-separated, are taken in turn). The public ones allow
@@ -424,7 +410,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `GET /api/me/rank?sort=rate\|avg\|hits\|best\|calls` | your place on the caller board: rank, your numbers and the caller one place up |
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
-| `GET /api/trace/:chain/:address` | one wallet for the trace tree: who funded it, its biggest counterparties in and out (named where a public list knows them), its trades summed, what was read |
+| `GET /api/trace/:chain/:address` | one wallet for a trail on the trace tab: who funded it, its biggest counterparties in and out (named where a public list knows them), its trades summed, what was read |
 | `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 
 ## How the numbers work
@@ -468,7 +454,7 @@ src/lib/sha256.ts            synchronous SHA-256 (avatars and codes, browser and
 src/lib/pwa.ts               install state: the browser's install prompt, iOS, installed
 src/lib/watchlist.ts         the watchlist (saved tokens with their price when saved, kept in the browser)
 src/lib/feed-scope.ts        the feed filter, everyone, top callers or yours (kept in the browser)
-src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, tree layout, camera, case file, share text
+src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, labels, flows, the trail and its path, case file, share text
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names

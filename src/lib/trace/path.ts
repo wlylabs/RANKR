@@ -8,7 +8,7 @@ import type { TraceFlow, TraceLabel } from "./types";
 export type PathStop =
   | {
       type: "wallet";
-      /** Its card's id on the tree ("root" for the target). */
+      /** Its id among the trail's wallets ("root" for the target). */
       id: string;
       address: string;
       label: TraceLabel | null;
@@ -80,7 +80,7 @@ function up(item: TreeItem, chosen: ReadonlySet<string>): TreeItem[] {
   return [kids.reduce((a, b) => (weight(b) > weight(a) ? b : a))];
 }
 
-/** The trail top to bottom, every stop of it, from the tree as it's opened and the wallets picked at its forks. */
+/** The trail top to bottom, every stop of it, from the wallets followed and the ones picked at its forks. */
 export function trailSteps(root: TreeItem, chosen: ReadonlySet<string> = new Set()): PathStep[] {
   const above = up(root, chosen).reverse();
   const below = down(root, chosen);

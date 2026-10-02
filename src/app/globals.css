@@ -466,122 +466,13 @@ body {
   mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
 }
 
-/* ---- Trace (the Trace tab): the tree sits on a ledger of dots, money runs down its lines as packets ---- */
+/* ---- Trace (the Trace tab): the trail as one line of cards on a ledger of dots, the money running down the
+   line between two of them, and a card followed resolving out of a blur ---- */
 .trace-grid {
   background-color: var(--bg);
   background-image: radial-gradient(color-mix(in srgb, var(--fg) 13%, transparent) 1px, transparent 1.2px);
   background-size: 14px 14px;
 }
-/*
- * The tree's frame works like a map: drag to pan, pinch (or Ctrl + scroll) to zoom. The camera is three
- * variables set from script on the frame (--tx, --ty in px, --k the zoom); the stage, the row captions and the
- * dots follow them without React re-rendering a card.
- */
-.trace-viewport {
-  touch-action: none;
-  overscroll-behavior: contain;
-  cursor: grab;
-  background-position: calc(var(--tx, 0) * 1px) calc(var(--ty, 0) * 1px);
-  background-size: calc(14px * var(--k, 1)) calc(14px * var(--k, 1));
-}
-.trace-viewport.is-grabbing {
-  cursor: grabbing;
-}
-.trace-stage {
-  transform-origin: 0 0;
-  transform: translate(calc(var(--tx, 0) * 1px), calc(var(--ty, 0) * 1px)) scale(var(--k, 1));
-  will-change: transform;
-}
-.trace-caption {
-  top: calc(var(--ty, 0) * 1px + var(--row) * var(--k, 1) * 1px);
-  /* Zoomed far out the rows are too close for a caption: it fades out (gone below about 40%). */
-  opacity: clamp(0, calc((var(--k, 1) - 0.4) * 6), 1);
-}
-/* Same time and curve as a card gliding to its new place (.trace-node): the camera moving to keep a card
-   still and the card moving cancel out exactly, so the card stays put while the tree reshapes. */
-.trace-viewport.is-animating .trace-stage {
-  transition: transform 0.5s var(--ease-emphasized);
-}
-.trace-viewport.is-animating .trace-caption {
-  transition: top 0.5s var(--ease-emphasized);
-}
-/*
- * Semantic zoom. Zoomed out below about 60% (fullscreen fits a whole trail to a phone), a card's full face is too
- * small to read, so it cross-fades to a compact one (glyph and name) whose type is sized against the zoom: on
- * screen it stays 10.5px. A card's frame keeps a 1px line on screen the same way.
- */
-.trace-full {
-  opacity: clamp(0, calc((var(--k, 1) - 0.55) * 8), 1);
-}
-.trace-mini {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(3px / var(--k, 1));
-  padding: 0 calc(3px / var(--k, 1));
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: calc(10.5px / var(--k, 1));
-  line-height: 1.15;
-  white-space: nowrap;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: clamp(0, calc((0.675 - var(--k, 1)) * 8), 1);
-}
-.trace-mini svg {
-  width: calc(11px / var(--k, 1));
-  height: calc(11px / var(--k, 1));
-  flex-shrink: 0;
-}
-.trace-mini .mini-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.trace-node {
-  border-width: calc(1px / var(--k, 1));
-}
-/* A line draws itself down from the card above when it first appears (pathLength="1"). */
-@keyframes trace-draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-.trace-edge {
-  stroke-dasharray: 1;
-  animation: trace-draw 0.75s var(--ease-enter) backwards;
-  transition: d 0.5s var(--ease-emphasized);
-}
-/* Dashes running along a line, the way the money went. */
-@keyframes trace-packets {
-  to {
-    stroke-dashoffset: -12;
-  }
-}
-.trace-packets {
-  stroke-dasharray: 2 10;
-  animation: trace-packets 1.2s linear infinite;
-  transition: d 0.5s var(--ease-emphasized);
-}
-/* Cards glide when the tree makes room, and new ones resolve out of a blur. */
-@keyframes trace-node-in {
-  from {
-    opacity: 0;
-    filter: blur(6px);
-    scale: 0.94;
-  }
-}
-.trace-node {
-  transition: transform 0.5s var(--ease-emphasized);
-  animation: trace-node-in 0.55s var(--ease-enter) backwards;
-}
-
-/* The path view: the trail as one line of cards. Money runs down the line between two of them, and a card
-   followed resolves out of a blur like one on the tree. */
 @keyframes trace-flow {
   to {
     background-position-y: 12px;
@@ -591,8 +482,15 @@ body {
   background: repeating-linear-gradient(to bottom, currentColor 0 3px, transparent 3px 12px);
   animation: trace-flow 0.9s linear infinite;
 }
+@keyframes trace-stop-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    scale: 0.94;
+  }
+}
 .trace-stop {
-  animation: trace-node-in 0.55s var(--ease-enter) backwards;
+  animation: trace-stop-in 0.55s var(--ease-enter) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -609,7 +507,6 @@ body {
   .tilt-in,
   .twinkle,
   .ticker,
-  .trace-packets,
   .trace-flow,
   .skeleton {
     animation: none !important;

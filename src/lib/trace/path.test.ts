@@ -30,14 +30,12 @@ const wallet = (address: string, over: Partial<TraceResponse> = {}): TraceRespon
   updatedAt: 0,
   ...over,
 });
-const tree = (data: TraceResponse[], expanded: string[] = [], full = false) =>
+const tree = (data: TraceResponse[], expanded: string[] = []) =>
   buildTree({
     root: "T",
     data: new Map(data.map((d) => [d.address, d])),
     errors: new Map(),
     expanded: new Set(expanded),
-    showAll: new Set(),
-    full,
   } satisfies TreeState);
 const stops = (steps: PathStep[]) =>
   steps.map((s) => (s.stop.type === "gap" ? `…${s.stop.count}` : `${s.stop.role}:${s.stop.address}`));
@@ -65,7 +63,7 @@ describe("trailPath", () => {
   });
 
   it("folds the middle of a long trail into a gap, keeping both ends", () => {
-    // Five hops opened (the deepest a tree goes is six), then an exchange.
+    // Five hops followed (the deepest a trail goes is six), then an exchange.
     const chain = ["H1", "H2", "H3", "H4", "H5"];
     const data = [
       wallet("T", { outflows: [flow("H1", 9)] }),
@@ -103,7 +101,7 @@ describe("following a path", () => {
 
   it("goes through the wallet picked at a fork, past the one opened there", () => {
     const x = wallet("X", { outflows: [flow("X1", 50)] });
-    const steps = trailSteps(tree([root, x], ["root/out:X"], true), choose(new Set(), "root/out:Y"));
+    const steps = trailSteps(tree([root, x], ["root/out:X"]), choose(new Set(), "root/out:Y"));
     expect(stops(steps)).toEqual(["funded:F", "target:T", "hop:Y"]);
     // Each stop carries its card's id, for the page to act on.
     expect(steps.map((s) => s.stop.type === "wallet" && s.stop.id)).toEqual(["root/in:F", "root", "root/out:Y"]);
@@ -111,24 +109,18 @@ describe("following a path", () => {
 
   it("stays on a wallet opened even when nothing went out of it, over a bigger end beside it", () => {
     const x = wallet("X");
-    expect(stops(trailSteps(tree([root, x], ["root/out:X"], true)))).toEqual(["funded:F", "target:T", "hop:X"]);
+    expect(stops(trailSteps(tree([root, x], ["root/out:X"])))).toEqual(["funded:F", "target:T", "hop:X"]);
   });
 
   it("takes the sender picked above the target, and goes on above it once it's opened", () => {
-    expect(stops(trailSteps(tree([root], [], true), new Set(["root/in:B"])))).toEqual([
-      "sent:B",
-      "target:T",
-      "end:CEX",
-    ]);
+    expect(stops(trailSteps(tree([root], []), new Set(["root/in:B"])))).toEqual(["sent:B", "target:T", "end:CEX"]);
     const b = wallet("B", { funder: flow("B0", 3) });
-    const steps = trailSteps(tree([root, b], ["root/in:B"], true), new Set(["root/in:B"]));
+    const steps = trailSteps(tree([root, b], ["root/in:B"]), new Set(["root/in:B"]));
     expect(stops(steps)).toEqual(["funded:B0", "sent:B", "target:T", "end:CEX"]);
   });
 
-  it("picks from every counterparty on a whole tree, not only the ones the tree shows", () => {
-    // The tree shows three a row; the fourth (Z) can still be followed on the path.
-    expect(stops(trailSteps(tree([root], [], true), new Set(["root/out:Z"])))).toContain("hop:Z");
-    expect(stops(trailSteps(tree([root]), new Set(["root/out:Z"])))).not.toContain("hop:Z");
+  it("picks from every counterparty listed, the smallest too", () => {
+    expect(stops(trailSteps(tree([root]), new Set(["root/out:Z"])))).toEqual(["funded:F", "target:T", "hop:Z"]);
   });
 
   it("keeps one pick per fork and side", () => {

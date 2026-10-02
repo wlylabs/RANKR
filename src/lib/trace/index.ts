@@ -1,4 +1,4 @@
-// Reads one wallet for the trace page, from the right source for its chain, kept for a few minutes: a tree
+// Reads one wallet for the trace page, from the right source for its chain, kept for a few minutes: a trail
 // asks for the same wallets again as it's opened and closed, and the free upstreams are rate-limited.
 import { MOCK } from "../dexscreener";
 import { traceChain, validWallet } from "./chains";

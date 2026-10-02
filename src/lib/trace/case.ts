@@ -1,4 +1,4 @@
-// The case file under the tree: what the trail says in plain words, and the flags it raises. Only from
+// The case file under the path: what the trail says in plain words, and the flags it raises. Only from
 // what has been read so far (the target, and each wallet opened), and only facts: a label is quoted with its
 // source, never turned into an accusation.
 import { shortAddress } from "../format";
