@@ -1,20 +1,15 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { buildTree, dataOf, layoutTree, parentId, type Placed } from "@/lib/trace/tree";
+import { choose, trailSteps } from "@/lib/trace/path";
+import { buildTree, dataOf, type TreeItem } from "@/lib/trace/tree";
 import type { TraceResponse } from "@/lib/trace/types";
 
-const toggle = (set: Set<string>, id: string) => {
-  const next = new Set(set);
-  if (!next.delete(id)) next.add(id);
-  return next;
-};
 const without = (set: Set<string>, id: string) => (set.has(id) ? new Set([...set].filter((x) => x !== id)) : set);
 
 /**
- * What a trail's tree shows and what a tap does to it: open or close a wallet (reading it first via `read`),
- * show a row's smaller counterparties, unfold the wallets folded away beside an open one. Shared by the trace
- * page and its made-up example.
+ * A trail's path and what a tap does to it: follow a wallet (read it via `read`, then go a hop further through
+ * it), take another wallet at a fork, or stop following one. Shared by the trace page and its made-up example.
  */
 export function useTrail(
   root: string,
@@ -24,53 +19,54 @@ export function useTrail(
   initial?: { expanded?: Set<string> },
 ) {
   const [expanded, setExpanded] = useState<Set<string>>(() => initial?.expanded ?? new Set());
-  const [showAll, setShowAll] = useState<Set<string>>(() => new Set());
-  const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
+  /** The wallet followed at each fork, by id: the path goes through these. */
+  const [chosen, setChosen] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState("root");
-  const [anchor, setAnchor] = useState<string | null>(null);
 
-  const tree = useMemo(
-    () => buildTree({ root, data, errors, expanded, showAll, unfolded }),
-    [root, data, errors, expanded, showAll, unfolded],
-  );
-  const layout = useMemo(() => layoutTree(tree), [tree]);
-  const byId = useMemo(() => new Map(layout.nodes.map((n) => [n.item.id, n])), [layout]);
+  const tree = useMemo(() => buildTree({ root, data, errors, expanded }), [root, data, errors, expanded]);
+  const items = useMemo(() => {
+    const map = new Map<string, TreeItem>();
+    const walk = (i: TreeItem) => {
+      map.set(i.id, i);
+      i.children.forEach(walk);
+    };
+    walk(tree);
+    return map;
+  }, [tree]);
+  const steps = useMemo(() => trailSteps(tree, chosen), [tree, chosen]);
 
-  /** Opens or closes a wallet; opening one folds its row's others away again. */
-  const open = useCallback(
-    (placed: Placed) => {
-      const { item } = placed;
+  /** Go a hop further through this wallet (read and opened), or stop following it when it's open. */
+  const toggle = useCallback(
+    (item: TreeItem) => {
       if (!item.expandable || !item.address) return;
-      setAnchor(item.id);
-      if (!item.expanded) {
-        if (!dataOf(data, item.address)) read(item.address);
-        const parent = parentId(item.id);
-        if (parent) setUnfolded((s) => without(s, parent));
+      if (item.expanded) {
+        setChosen((s) => without(s, item.id));
+        setExpanded((s) => without(s, item.id));
+        return;
       }
-      setExpanded((s) => toggle(s, item.id));
+      if (!dataOf(data, item.address)) read(item.address);
+      setChosen((s) => choose(s, item.id));
+      setExpanded((s) => new Set(s).add(item.id));
     },
     [data, read],
   );
 
-  const press = useCallback(
-    (placed: Placed) => {
-      const { item } = placed;
-      if (item.type === "more" || item.type === "others") {
-        // The wallet the row hangs from stays put while the row widens.
-        const parent = parentId(item.id);
-        if (!parent) return;
-        setAnchor(parent);
-        if (item.type === "more") setShowAll((s) => new Set(s).add(parent));
-        else setUnfolded((s) => new Set(s).add(parent));
-        return;
-      }
+  /** Take another wallet at its fork (the trail goes on from it once it's followed). */
+  const pick = useCallback((item: TreeItem) => {
+    setChosen((s) => choose(s, item.id));
+    setSelected(item.id);
+  }, []);
+
+  /** Go a hop further, through this wallet. */
+  const follow = useCallback(
+    (item: TreeItem) => {
       setSelected(item.id);
-      setAnchor(item.id);
-      open(placed);
+      if (item.expanded) setChosen((s) => choose(s, item.id));
+      else toggle(item);
     },
-    [open],
+    [toggle],
   );
 
-  const picked = byId.get(selected) ?? byId.get("root")!;
-  return { layout, byId, picked, anchor, open, press };
+  const picked = items.get(selected) ?? tree;
+  return { items, steps, picked, toggle, pick, follow, select: setSelected };
 }

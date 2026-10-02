@@ -28,6 +28,6 @@ export default async function TraceWalletPage({ params }: Props) {
   const address = decode(raw).trim();
   const meta = traceChain(chain);
   if (!meta || !validWallet(meta, address)) notFound();
-  // A new wallet starts a new tree.
+  // A new wallet starts a new trail.
   return <TraceView key={`${chain}:${address}`} chain={chain} address={address} />;
 }

@@ -5,8 +5,8 @@ import { delay } from "@/lib/motion";
 import { exampleTrail, exampleWallet } from "@/lib/trace/mock";
 import type { TraceResponse } from "@/lib/trace/types";
 import { PageHeader } from "../PageHeader";
-import { TraceCanvas } from "./TraceCanvas";
 import { TraceInput } from "./TraceInput";
+import { TracePath } from "./TracePath";
 import { useTrail } from "./useTrail";
 
 const STEPS = [
@@ -17,13 +17,12 @@ const STEPS = [
 
 const NO_ERRORS = new Map<string, string>();
 
-/** The trace page before a wallet: the box, how the tree reads, and a made-up example of one to play with. */
+/** The trace page before a wallet: the box, how a trail reads, and a made-up one to play with. */
 export function TraceIntro() {
   // A playground: the wallets are made up on the spot (the same each time), so every one of them opens.
   const [start] = useState(exampleTrail);
   const [data, setData] = useState<Map<string, TraceResponse>>(start.data);
   const read = useCallback((a: string) => setData((m) => new Map(m).set(a, exampleWallet(a))), []);
-  const [fullscreen, setFullscreen] = useState(false);
   const trail = useTrail(start.root, data, NO_ERRORS, read, { expanded: start.expanded });
 
   return (
@@ -44,18 +43,14 @@ export function TraceIntro() {
         ))}
       </ol>
       <section aria-label="Example" className="cine-in space-y-2" style={delay(320)}>
-        <p className="label text-subtle">Example · made-up wallets · tap, drag, pinch</p>
-        <TraceCanvas
-          layout={trail.layout}
+        <p className="label text-subtle">Example · made-up wallets · tap Follow the money, or Switch at a fork</p>
+        <TracePath
+          steps={trail.steps}
+          items={trail.items}
           root={data.get(start.root)!}
-          selected={trail.picked.item.id}
-          anchor={trail.anchor}
-          onPress={trail.press}
+          onFollow={trail.follow}
+          onPick={trail.pick}
           onRetry={() => {}}
-          fullscreen={fullscreen}
-          onFullscreen={setFullscreen}
-          className="h-[420px] sm:h-[520px]"
-          title={<span className="label text-subtle">Example · made-up wallets</span>}
         />
       </section>
     </div>

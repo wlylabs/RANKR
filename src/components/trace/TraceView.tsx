@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { ArrowUpRight, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { shortAddress, tokenHref } from "@/lib/format";
+import { tokenHref } from "@/lib/format";
 import { sha256Hex } from "@/lib/sha256";
 import { EVM_TRACE_CHAINS, traceChain, traceHref } from "@/lib/trace/chains";
 import { dataOf, parentId } from "@/lib/trace/tree";
@@ -12,15 +12,16 @@ import type { TraceErrorCode, TraceResponse } from "@/lib/trace/types";
 import { CopyButton } from "../CopyButton";
 import { DecryptText } from "../DecryptText";
 import { CaseFile } from "./CaseFile";
-import { Inspector, InspectorStrip } from "./Inspector";
-import { TraceCanvas } from "./TraceCanvas";
+import { Inspector } from "./Inspector";
+import { FullAddress } from "./TraceCard";
+import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
 import { TraceInput } from "./TraceInput";
 import { useTrail } from "./useTrail";
 
 type ReadError = { message: string; code?: TraceErrorCode };
 
-/** Reads wallets for the tree, each once (until it fails and is asked for again). */
+/** Reads wallets for the trail, each once (until it fails and is asked for again). */
 function useWallets(chain: string) {
   const [data, setData] = useState<Map<string, TraceResponse>>(() => new Map());
   const [errors, setErrors] = useState<Map<string, ReadError>>(() => new Map());
@@ -98,14 +99,14 @@ function RootError({
 }
 
 /**
- * A wallet's trail: who sent it money (above), the wallet, where its money went (below), as deep as you
- * open it; the card you pick in full, and the case file of what it all says.
+ * A wallet's trail as one line of cards: who sent it money (above), the wallet, where its money went (below),
+ * as deep as you follow it; the card you pick in full, and the case file of what it all says.
  */
 export function TraceView({ chain: chainId, address }: { chain: string; address: string }) {
   const chain = traceChain(chainId)!;
   const { data, errors, load } = useWallets(chainId);
-  const [fullscreen, setFullscreen] = useState(false);
   const [link, setLink] = useState("");
+  const details = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void load(address);
@@ -114,11 +115,11 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
 
   const messages = useMemo(() => new Map([...errors].map(([a, e]) => [a, e.message])), [errors]);
   const read = useCallback((a: string) => void load(a), [load]);
-  const { layout, byId, picked, anchor, open, press } = useTrail(address, data, messages, read);
+  const { items, steps, picked, toggle, pick, follow, select } = useTrail(address, data, messages, read);
 
   const root = dataOf(data, address) ?? null;
   const rootError = !root ? errors.get(address) : undefined;
-  const pickedParent = parentId(picked.item.id);
+  const pickedParent = parentId(picked.id);
   const caseId = useMemo(() => sha256Hex(`${chainId}:${address}`).slice(0, 8), [chainId, address]);
 
   return (
@@ -129,12 +130,18 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
           <span className="label text-subtle">· {chain.id === "solana" ? "Solana" : chain.id}</span>
           <span className="ml-auto flex items-center gap-3">
             {link && <CopyButton value={link} label="Copy link" what="link" />}
-            {root && <ShareTrace chain={chain} root={root} data={data} layout={layout} caseId={caseId} />}
+            {root && <ShareTrace chain={chain} root={root} data={data} steps={steps} caseId={caseId} />}
           </span>
         </div>
+        {/* Its name when a list knows it, and always its whole address, on one line. */}
         <h1 className="cine-in text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">
-          <DecryptText text={root?.label?.name ?? shortAddress(address)} className="font-mono tracking-[-0.04em]" />
+          {root?.label ? (
+            <DecryptText text={root.label.name} className="font-mono tracking-[-0.04em]" />
+          ) : (
+            <FullAddress address={address} decrypt max={30} className="tracking-[-0.02em]" />
+          )}
         </h1>
+        {root?.label && <FullAddress address={address} max={15} className="-mt-1 text-muted" />}
         {chain.kind === "evm" && (
           <nav aria-label="Chain" className="flex flex-wrap gap-1.5">
             {EVM_TRACE_CHAINS.map((c) => (
@@ -161,52 +168,40 @@ export function TraceView({ chain: chainId, address }: { chain: string; address:
         <>
           <p className="label flex flex-wrap gap-x-4 gap-y-1 text-subtle">
             <span>↓ Money flows down</span>
-            <span>Tap to open · drag · pinch to zoom</span>
-            <span>End: exchange, bridge, contract</span>
+            <span>Follow: one hop further · Switch: another wallet</span>
             <span className="text-down">Red: flagged on a public list</span>
           </p>
-          <TraceCanvas
-            layout={layout}
+          <TracePath
+            steps={steps}
+            items={items}
             root={root}
-            selected={picked.item.id}
-            anchor={anchor}
-            onPress={press}
-            onRetry={(placed) => placed.item.address && void load(placed.item.address)}
-            fullscreen={fullscreen}
-            onFullscreen={setFullscreen}
-            className="h-[62svh] min-h-[420px] max-h-[780px]"
-            title={
-              <span className="flex items-baseline gap-2">
-                <span className="font-mono text-sm">{root?.label?.name ?? shortAddress(address)}</span>
-                <span className="label hidden text-subtle sm:inline">Case #{caseId}</span>
-              </span>
-            }
-            actions={
-              root && (
-                <ShareTrace chain={chain} root={root} data={data} layout={layout} caseId={caseId} variant="icon" />
-              )
-            }
-            footer={
-              root && (
-                <InspectorStrip
-                  key={picked.item.id}
-                  chain={chain}
-                  item={picked.item}
-                  parent={pickedParent ? (byId.get(pickedParent)?.item.address ?? null) : null}
-                  data={picked.item.address ? dataOf(data, picked.item.address) : undefined}
-                  onToggle={() => open(picked)}
-                />
-              )
+            chain={chain}
+            selected={picked.id}
+            onSelect={(item) => {
+              select(item.id);
+              // Its details are under the path: brought up on a phone, where they're out of sight.
+              requestAnimationFrame(() => details.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+            }}
+            onFollow={follow}
+            onPick={pick}
+            onRetry={(a) => void load(a)}
+            header={
+              <>
+                <span className="label min-w-0 flex-1 truncate text-subtle">Case #{caseId} · following the money</span>
+                {root && (
+                  <ShareTrace chain={chain} root={root} data={data} steps={steps} caseId={caseId} variant="icon" />
+                )}
+              </>
             }
           />
           {root && (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div ref={details} className="grid scroll-my-20 gap-4 lg:grid-cols-2">
               <Inspector
                 chain={chain}
-                item={picked.item}
-                parent={pickedParent ? (byId.get(pickedParent)?.item.address ?? null) : null}
-                data={picked.item.address ? dataOf(data, picked.item.address) : undefined}
-                onToggle={() => open(picked)}
+                item={picked}
+                parent={pickedParent ? (items.get(pickedParent)?.address ?? null) : null}
+                data={picked.address ? dataOf(data, picked.address) : undefined}
+                onToggle={() => toggle(picked)}
               />
               <CaseFile root={root} data={data} caseId={caseId} />
             </div>

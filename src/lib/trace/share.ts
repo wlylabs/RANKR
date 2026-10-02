@@ -3,8 +3,8 @@
 import type { CaseExit } from "./case";
 
 /**
- * "Following the money from 7xKX…9f2a on Rankr. It reached Binance deposit (2 hops) and OKX." Without an
- * exchange, bridge or mixer reached yet, just the first sentence.
+ * "Following the money from 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU on Rankr. It reached Binance deposit
+ * (2 hops) and OKX." Without an exchange, bridge or mixer reached yet, just the first sentence.
  */
 export function traceShareText(name: string, exits: CaseExit[]): string {
   const base = `Following the money from ${name} on Rankr.`;
@@ -14,9 +14,9 @@ export function traceShareText(name: string, exits: CaseExit[]): string {
   return `${base} It reached ${b ? `${first} and ${b.name}` : first}.`;
 }
 
-/** The image's file name when saved: rankr-trace-GBERmTgu.png (the tall card), rankr-trace-GBERmTgu-wide.png. */
-export function traceImageFile(address: string, wide = false): string {
+/** The image's file name when saved: rankr-trace-GBERmTgu.png. */
+export function traceImageFile(address: string): string {
   const clean = address.replace(/[^\w]/g, "");
   const id = clean.length > 8 ? `${clean.slice(0, 4)}${clean.slice(-4)}` : clean;
-  return `rankr-trace-${id}${wide ? "-wide" : ""}.png`;
+  return `rankr-trace-${id}.png`;
 }

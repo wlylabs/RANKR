@@ -1,7 +1,6 @@
-// The case file under the tree: what the trail says in plain words, and the flags it raises. Only from
+// The case file under the path: what the trail says in plain words, and the flags it raises. Only from
 // what has been read so far (the target, and each wallet opened), and only facts: a label is quoted with its
 // source, never turned into an accusation.
-import { shortAddress } from "../format";
 import { DANGER } from "./kinds";
 import { dataOf } from "./tree";
 import type { TraceFlow, TraceLabelKind, TraceResponse } from "./types";
@@ -11,8 +10,6 @@ export type CaseFlag = { id: string; text: string; danger: boolean };
 export type CaseExit = { address: string; name: string; kind: TraceLabelKind; usd: number | null; hops: number };
 
 export const DAY = 86_400_000;
-
-export const nameOf = (f: Pick<TraceFlow, "address" | "label">) => f.label?.name ?? shortAddress(f.address);
 
 /**
  * Walks the opened wallets from the target, one way: every labelled counterparty met, with the hop it was
