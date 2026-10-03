@@ -2,6 +2,7 @@
 // asks for the same wallets again as it's opened and closed, and the free upstreams are rate-limited.
 import { MOCK } from "../dexscreener";
 import { traceChain, validWallet } from "./chains";
+import { isToken } from "./evm-rpc";
 import { TraceError } from "./errors";
 import { traceEvm } from "./evm";
 import { mockTrace } from "./mock";
@@ -20,7 +21,20 @@ export async function traceWallet(chainId: string, address: string, now = Date.n
     throw new TraceError("unsupported", "Tracing works on Solana, Ethereum, Base, Arbitrum, Optimism and Polygon.");
   if (!validWallet(chain, address))
     throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);
-  if (MOCK) return mockTrace(chain, address, now);
+  // BSC: its tokens have reports, its wallets no trail yet (no free explorer API to read them from).
+  if (chain.tokensOnly) {
+    const token = MOCK || (await isToken(chain.id, address));
+    if (token) throw new TraceError("token", "That's a token, not a wallet.");
+    throw new TraceError(
+      token === undefined ? "upstream" : "unsupported",
+      token === undefined ? "Couldn't reach BSC. Try again." : "BSC wallets can't be traced yet: paste a BSC token's CA for its report.",
+    );
+  }
+  if (MOCK) {
+    // Made up: a Solana address ending in "pump", like pump.fun's tokens, is a token (its report is made up too).
+    if (chain.kind === "solana" && address.endsWith("pump")) throw new TraceError("token", "That's a token, not a wallet.");
+    return mockTrace(chain, address, now);
+  }
 
   const key = `${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
   const hit = cache.get(key);
@@ -38,3 +52,4 @@ export async function traceWallet(chainId: string, address: string, now = Date.n
 }
 
 export { TraceError } from "./errors";
+export { traceToken } from "./token";

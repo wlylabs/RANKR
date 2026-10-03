@@ -1,4 +1,5 @@
 import { sameAddress, tokenId } from "./address";
+import { take } from "./budget";
 import { mockSnapshot } from "./mock";
 import type { Link, MarketSnapshot } from "./types";
 
@@ -15,9 +16,11 @@ export type Pair = {
   baseToken: { address: string; name: string; symbol: string };
   quoteToken: { address: string; name: string; symbol: string };
   priceUsd?: string;
-  volume?: { h24?: number };
-  txns?: { h24?: { buys?: number; sells?: number } };
-  priceChange?: { h24?: number };
+  volume?: Partial<Record<"m5" | "h1" | "h6" | "h24", number>>;
+  txns?: Partial<Record<"m5" | "h1" | "h6" | "h24", { buys?: number; sells?: number }>>;
+  priceChange?: Partial<Record<"m5" | "h1" | "h6" | "h24", number>>;
+  /** "v2", "v3", "DLMM"...: the kind of pool. */
+  labels?: string[];
   liquidity?: { usd?: number };
   fdv?: number;
   marketCap?: number;
@@ -29,9 +32,22 @@ export type Pair = {
   };
 };
 
-export class UpstreamError extends Error {}
+export class UpstreamError extends Error {
+  /** `limited`: Rankr's own per-minute budget for DexScreener turned the call down (it wasn't made). */
+  constructor(
+    message: string,
+    readonly limited = false,
+  ) {
+    super(message);
+  }
+}
+
+/** Its pairs, tokens and search endpoints allow 300 requests a minute; the others 60. */
+const FAST = /^\/(tokens\/v1|token-pairs\/v1|latest\/dex\/(pairs|search))\b/;
 
 async function getJson<T>(path: string): Promise<T> {
+  if (!(await take(FAST.test(path) ? "dexscreener" : "dexscreener-slow")))
+    throw new UpstreamError("DexScreener's rate limit is used up for this minute", true);
   let res: Response;
   try {
     res = await fetch(`${API}${path}`, {
@@ -130,6 +146,20 @@ export async function findToken(address: string, chainHint: string | null): Prom
     `/tokens/v1/${encodeURIComponent(match.chainId)}/${encodeURIComponent(match.baseToken.address)}`,
   );
   return toSnapshot(bestAcrossChains(tokenPairs ?? [], match.baseToken.address) ?? match);
+}
+
+/** Every pool a token trades in on one chain, the token as the base, most liquid first. */
+export async function tokenPairs(chainId: string, address: string): Promise<Pair[]> {
+  const pairs = await getJson<Pair[] | null>(`/tokens/v1/${encodeURIComponent(chainId)}/${encodeURIComponent(address)}`);
+  return (pairs ?? [])
+    .filter((p) => p.chainId === chainId && sameAddress(p.baseToken.address, address))
+    .sort((a, b) => pairScore(b) - pairScore(a));
+}
+
+/** Pairs DexScreener finds for a word (a symbol, a name), on every chain, most relevant first. */
+export async function searchPairs(q: string): Promise<Pair[]> {
+  if (MOCK) return [];
+  return (await getJson<{ pairs: Pair[] | null }>(`/latest/dex/search?q=${encodeURIComponent(q)}`)).pairs ?? [];
 }
 
 /** Live snapshots for many tokens, batched per chain. Keyed by tokenId. */

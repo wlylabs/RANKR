@@ -2,6 +2,8 @@
 // free at dev.blockscout.com (100K credits a day, 5 requests a second); without one the public explorers
 // allow about 10 requests per 16 minutes, too few for a trail. One wallet costs four requests: the address,
 // its transactions, its ERC-20 transfers and its internal transactions (the newest 50 of each).
+import { BLOCKSCOUT_CREDITS, resetOf, take } from "../budget";
+import { untilReset } from "../rate-limit";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
 import { labelOf } from "./labels";
 import { TraceError } from "./errors";
@@ -23,7 +25,7 @@ export type AddressParam = {
   public_tags?: { display_name?: string; label?: string }[] | null;
 };
 
-type Page<T> = { items: T[]; next_page_params: unknown | null };
+export type Page<T> = { items: T[]; next_page_params: unknown | null };
 
 type Tx = {
   hash: string;
@@ -61,19 +63,40 @@ type TokenTransfer = {
   } | null;
 };
 
-type AddressInfo = AddressParam & {
+export type AddressInfo = AddressParam & {
   coin_balance?: string | null;
   exchange_rate?: string | null;
   token?: unknown | null;
 };
 
-async function get<T>(chain: TraceChain, path: string): Promise<T | null> {
+/** Blockscout's free plan allows 5 requests a second: calls queue up at 4. */
+let nextAt = 0;
+async function pace() {
+  const now = Date.now();
+  const at = Math.max(now, nextAt);
+  nextAt = at + 250;
+  if (at > now) await new Promise((r) => setTimeout(r, at - now));
+}
+
+/** Takes one request's credits from today's Blockscout budget (BLOCKSCOUT_DAILY_CREDITS), or says it's used up. */
+async function budget() {
+  if (await take("blockscout", BLOCKSCOUT_CREDITS)) return;
+  throw new TraceError(
+    "quota",
+    `Today's Blockscout budget is used up. It comes back in ${untilReset(resetOf("blockscout"))} (00:00 UTC).`,
+  );
+}
+
+/** One Blockscout API v2 request on `chain`; null for an address it has never seen (404). */
+export async function blockscout<T>(chain: TraceChain, path: string): Promise<T | null> {
   const key = process.env.BLOCKSCOUT_API_KEY;
   if (!key)
     throw new TraceError(
       "nokey",
       "EVM wallets aren't switched on here yet: this site needs a (free) Blockscout API key.",
     );
+  await budget();
+  await pace();
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
@@ -93,6 +116,29 @@ async function get<T>(chain: TraceChain, path: string): Promise<T | null> {
     }
     if (!res.ok) throw new TraceError("upstream", `Blockscout responded ${res.status}`);
     return (await res.json()) as T;
+  }
+}
+
+/**
+ * Blockscout's Etherscan-compatible API (api.blockscout.com/v2/api?chain_id=...), for what its REST API can't do,
+ * like a token's transfers oldest first. Null when it answers with an error or nothing.
+ */
+export async function blockscoutRpc<T>(chain: TraceChain, params: Record<string, string>): Promise<T[] | null> {
+  const key = process.env.BLOCKSCOUT_API_KEY;
+  if (!key || !(await take("blockscout", BLOCKSCOUT_CREDITS))) return null;
+  await pace();
+  const q = new URLSearchParams({ chain_id: String(chain.chainId), ...params, apikey: key });
+  try {
+    const res = await fetch(`${api()}/v2/api?${q}`, {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { status?: string; result?: unknown };
+    return Array.isArray(body.result) ? (body.result as T[]) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -209,13 +255,29 @@ export function evmLegs(
   return legs;
 }
 
+/**
+ * Who sent a wallet its first ETH (or POL), when its whole history fits Blockscout's first page (50 transactions
+ * and internal transactions): two requests. Null for a busier wallet.
+ */
+export async function evmFunder(chain: TraceChain, address: string): Promise<string | null> {
+  const path = `/addresses/${address}`;
+  const [txs, internal] = await Promise.all([
+    blockscout<Page<Tx>>(chain, `${path}/transactions`),
+    blockscout<Page<InternalTx>>(chain, `${path}/internal-transactions`),
+  ]);
+  const complete = [txs, internal].every((p) => !p || p.next_page_params === null || p.next_page_params === undefined);
+  if (!complete) return null;
+  const legs = evmLegs(address, chain, { txs: txs?.items ?? [], internal: internal?.items ?? [], tokens: [] }, null);
+  return firstFunding(legs)?.address ?? null;
+}
+
 export async function traceEvm(chain: TraceChain, address: string): Promise<TraceResponse> {
   const path = `/addresses/${address}`;
   const [info, txs, internal, tokens] = await Promise.all([
-    get<AddressInfo>(chain, path),
-    get<Page<Tx>>(chain, `${path}/transactions`),
-    get<Page<InternalTx>>(chain, `${path}/internal-transactions`),
-    get<Page<TokenTransfer>>(chain, `${path}/token-transfers?type=ERC-20`),
+    blockscout<AddressInfo>(chain, path),
+    blockscout<Page<Tx>>(chain, `${path}/transactions`),
+    blockscout<Page<InternalTx>>(chain, `${path}/internal-transactions`),
+    blockscout<Page<TokenTransfer>>(chain, `${path}/token-transfers?type=ERC-20`),
   ]);
   if (info?.token) throw new TraceError("token", "That's a token, not a wallet.");
 

@@ -12,6 +12,8 @@ export type TraceChain = {
   chainId?: number;
   /** Block explorer, for "open in explorer". */
   explorer: string;
+  /** Only its tokens are read (BSC: no free explorer API for wallets), not its wallets' trails. */
+  tokensOnly?: boolean;
 };
 
 export const TRACE_CHAINS: TraceChain[] = [
@@ -21,14 +23,22 @@ export const TRACE_CHAINS: TraceChain[] = [
   { id: "arbitrum", kind: "evm", native: "ETH", chainId: 42161, explorer: "https://arbiscan.io" },
   { id: "optimism", kind: "evm", native: "ETH", chainId: 10, explorer: "https://optimistic.etherscan.io" },
   { id: "polygon", kind: "evm", native: "POL", chainId: 137, explorer: "https://polygonscan.com" },
+  { id: "bsc", kind: "evm", native: "BNB", chainId: 56, explorer: "https://bscscan.com", tokensOnly: true },
 ];
 
 export function traceChain(id: string): TraceChain | null {
   return TRACE_CHAINS.find((c) => c.id === id) ?? null;
 }
 
-/** The EVM chains, for switching an 0x address between them. */
+/** The EVM chains, for switching an 0x token between them. */
 export const EVM_TRACE_CHAINS = TRACE_CHAINS.filter((c) => c.kind === "evm");
+/** The EVM chains whose wallets are traced, for switching an 0x wallet between them. */
+export const EVM_WALLET_CHAINS = EVM_TRACE_CHAINS.filter((c) => !c.tokensOnly);
+
+/** "Solana", "Ethereum", "BSC". */
+export function chainLabel(chain: TraceChain): string {
+  return chain.id === "bsc" ? "BSC" : chain.id.charAt(0).toUpperCase() + chain.id.slice(1);
+}
 
 const SOLANA = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 

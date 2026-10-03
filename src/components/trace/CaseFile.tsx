@@ -128,9 +128,12 @@ export function CaseFile({
                 , {formatDay(root.scanned.from)} → {formatDay(root.scanned.to)}
               </>
             )}
-            {root.scanned.limited && (
-              <> (Solana&apos;s RPC was busy, so the rest wasn&apos;t read: open it again in a minute for more)</>
-            )}
+            {root.scanned.limited &&
+              (root.scanned.quota ? (
+                <> (the Solana RPC&apos;s budget ran out, so the rest wasn&apos;t read: open it again later for more)</>
+              ) : (
+                <> (Solana&apos;s RPC was busy, so the rest wasn&apos;t read: open it again in a minute for more)</>
+              ))}
             {!!root.scanned.skipped && <> ({root.scanned.skipped} the chain wouldn&apos;t return, left out)</>}. Amounts
             in dollars at today&apos;s prices.
           </span>

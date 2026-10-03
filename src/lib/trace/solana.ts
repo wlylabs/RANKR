@@ -9,6 +9,8 @@ import { fetchSnapshots } from "../dexscreener";
 import { tokenId } from "../address";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
 import { labelOf, solanaBridge, solanaDeposits, solanaDex } from "./labels";
+import { resetOf, solanaCredits, take } from "../budget";
+import { untilReset } from "../rate-limit";
 import { TraceError } from "./errors";
 import type { TraceResponse } from "./types";
 
@@ -23,10 +25,12 @@ const endpoints = () => {
   return own.length ? own : PUBLIC_RPCS;
 };
 const custom = () => !!process.env.SOLANA_RPC_URL?.trim();
+/** Its own RPC is set (SOLANA_RPC_URL): reads can go further. */
+export const ownRpc = custom;
 
 /** Transactions read per wallet, and at once. */
 const txLimit = () => (custom() ? 80 : 20);
-const concurrency = () => (custom() ? 8 : 3);
+export const concurrency = () => (custom() ? 8 : 3);
 /**
  * Calls per second per endpoint: under the public endpoint's 40 per method per 10 seconds, and Helius's free
  * 10 per second. SOLANA_RPC_RPS raises it for a paid plan.
@@ -39,8 +43,8 @@ export const RPC_TIMING = { backoffMs: 700 };
 const LAMPORTS = 1e9;
 /** Below this, an account creation only pays rent. */
 const RENT_FLOOR = 3_000_000;
-const WSOL = "So11111111111111111111111111111111111111112";
-const TOKEN_PROGRAMS = new Set([
+export const WSOL = "So11111111111111111111111111111111111111112";
+export const TOKEN_PROGRAMS = new Set([
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
 ]);
@@ -86,7 +90,13 @@ async function pace(url: string) {
  * One JSON-RPC call. A 429, 403 or 5xx moves on to the next endpoint; after a full round of them, a pause
  * (Retry-After when given). Three rounds and it gives up with "busy". Errors in the answer itself are RpcError.
  */
-async function rpc<T>(method: string, params: unknown[]): Promise<T> {
+export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
+  // Your own RPC's credits: within the budget set for it (SOLANA_RPC_MONTHLY_CREDITS), or not at all.
+  if (custom() && !(await take("solana", solanaCredits(method))))
+    throw new TraceError(
+      "quota",
+      `The Solana RPC's budget is used up for now. It comes back in ${untilReset(resetOf("solana"))}.`,
+    );
   const urls = endpoints();
   const tries = urls.length * 3;
   let unreachable = 0;
@@ -134,7 +144,7 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
 }
 
 /** Runs `fn` over `items`, `n` at a time, in order; once `stop()` says so, the rest aren't started. */
-async function mapLimit<T, R>(
+export async function mapLimit<T, R>(
   items: T[],
   n: number,
   fn: (item: T) => Promise<R>,
@@ -160,8 +170,14 @@ type ParsedIx = {
   programId?: string;
   parsed?: { type?: string; info?: Record<string, unknown> } | string;
 };
-type TokenBalance = { accountIndex: number; mint: string; owner?: string; uiTokenAmount?: { decimals?: number } };
+export type TokenBalance = {
+  accountIndex: number;
+  mint: string;
+  owner?: string;
+  uiTokenAmount?: { decimals?: number; amount?: string; uiAmountString?: string };
+};
 export type ParsedTx = {
+  slot?: number;
   blockTime?: number | null;
   meta?: {
     err?: unknown;
@@ -301,7 +317,7 @@ function priced(legs: RawLeg[], p: { usd: Map<string, number>; symbols: Map<stri
 
 // ---- A wallet
 
-type Signature = { signature: string; err: unknown; blockTime?: number | null };
+export type Signature = { signature: string; err: unknown; slot?: number; blockTime?: number | null };
 
 /** The wallet's signatures, newest first, up to 3 pages (3,000): its whole history unless it's busier than that. */
 async function signatures(address: string): Promise<{ sigs: Signature[]; complete: boolean }> {
@@ -360,41 +376,60 @@ export async function getTx(signature: string): Promise<ParsedTx | null> {
   return null;
 }
 
+/**
+ * Who sent a wallet its first SOL, when its whole history is in reach (up to 3,000 transactions): its newest
+ * signatures, then its three oldest transactions. Null for a busier wallet, or one first paid in a trade.
+ */
+export async function solanaFunder(address: string): Promise<string | null> {
+  const history = await signatures(address);
+  if (!history.complete) return null;
+  const oldest = history.sigs.filter((s) => !s.err).slice(-3);
+  const txs = await mapLimit(oldest, concurrency(), (s) => getTx(s.signature));
+  const legs = txs
+    .filter((tx): tx is ParsedTx => !!tx && !tx.meta?.err)
+    .flatMap((tx) => {
+      const r = walletLegs(tx, address);
+      return r.swap ? [] : r.legs.map((l) => ({ ...l, symbol: l.symbol ?? "", usd: null }));
+    });
+  return firstFunding(legs)?.address ?? null;
+}
+
 export async function traceSolana(address: string): Promise<TraceResponse> {
-  const [account, history, deposits] = await Promise.all([
-    rpc<{ value: { lamports: number; owner: string; executable: boolean; data: unknown } | null }>("getAccountInfo", [
-      address,
-      { encoding: "jsonParsed" },
-    ]),
-    signatures(address),
-    solanaDeposits(),
-  ]);
+  // The account first: a token's address (pasted on Trace, it opens the token's report) costs one call, not its
+  // whole busy history.
+  const deposits = solanaDeposits();
+  const account = await rpc<{ value: { lamports: number; owner: string; executable: boolean; data: unknown } | null }>(
+    "getAccountInfo",
+    [address, { encoding: "jsonParsed" }],
+  );
   const info = account.value;
   if (info?.executable) throw new TraceError("program", "That's a program, not a wallet.");
   const parsedType = (info?.data as { parsed?: { type?: string } } | undefined)?.parsed?.type;
   if (info && TOKEN_PROGRAMS.has(info.owner) && parsedType === "mint")
     throw new TraceError("token", "That's a token, not a wallet.");
+  const history = await signatures(address);
 
   const ok = history.sigs.filter((s) => !s.err);
   const recent = ok.slice(0, txLimit());
   // Its first transactions, for who funded it: read too when the history is in reach and they aren't recent.
   const oldest = history.complete ? ok.slice(-3).filter((s) => !recent.includes(s)) : [];
-  // Rate-limited for good halfway: stop asking, and draw what was read.
-  const progress = { limited: false };
+  // Rate-limited for good halfway, or out of budget: stop asking, and draw what was read.
+  const progress: { limited: boolean; stop: TraceError | null } = { limited: false, stop: null };
   const txs = await mapLimit(
     [...recent, ...oldest],
     concurrency(),
     (s) =>
       getTx(s.signature).catch((err) => {
-        if (err instanceof TraceError && err.code === "busy") {
+        if (err instanceof TraceError && (err.code === "busy" || err.code === "quota")) {
           progress.limited = true;
+          progress.stop = err;
           return undefined;
         }
         throw err;
       }),
     () => progress.limited,
   );
-  if (progress.limited && txs.every((tx) => !tx)) throw new TraceError("busy", BUSY);
+  if (progress.limited && txs.every((tx) => !tx)) throw progress.stop ?? new TraceError("busy", BUSY);
 
   const read = txs
     .filter((tx): tx is ParsedTx => !!tx && !tx.meta?.err)
@@ -405,9 +440,9 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
   // Its first money can't be a trade's proceeds: someone had to pay for the trade's fee first.
   const fundingLegs = read.filter((r) => !r.swap).flatMap((r) => r.legs);
 
-  const p = await prices([...raw, ...fundingLegs]);
+  const [p, depositList] = await Promise.all([prices([...raw, ...fundingLegs]), deposits]);
   const legs = priced(raw, p);
-  const label = (a: string) => labelOf("solana", a, deposits);
+  const label = (a: string) => labelOf("solana", a, depositList);
   const funder = history.complete ? firstFunding(priced(fundingLegs, p)) : null;
 
   const times = recent.map((s) => (s.blockTime ?? 0) * 1000).filter(Boolean);
@@ -434,6 +469,7 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
       complete: !progress.limited && history.complete && ok.length <= recent.length,
       skipped: txs.filter((tx) => tx === null).length,
       ...(progress.limited ? { limited: true } : {}),
+      ...(progress.stop?.code === "quota" ? { quota: true } : {}),
     },
     updatedAt: Date.now(),
   };

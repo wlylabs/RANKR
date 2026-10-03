@@ -4,7 +4,7 @@ import { isTerminal } from "./kinds";
 import type { TraceChain } from "./chains";
 import type { TraceFlow, TraceLabel, TraceResponse } from "./types";
 
-function hash(input: string): number {
+export function hash(input: string): number {
   let h = 2166136261;
   for (let i = 0; i < input.length; i++) {
     h ^= input.charCodeAt(i);
@@ -14,7 +14,7 @@ function hash(input: string): number {
 }
 
 /** A small seeded generator: the same seed, the same numbers. */
-function rng(seed: string) {
+export function rng(seed: string) {
   let s = hash(seed) || 1;
   return () => {
     s ^= s << 13;
@@ -27,7 +27,7 @@ function rng(seed: string) {
 const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const HEX = "0123456789abcdef";
 
-function mockAddress(chain: TraceChain, seed: string): string {
+export function mockAddress(chain: TraceChain, seed: string): string {
   const r = rng(seed);
   if (chain.kind === "evm") return `0x${Array.from({ length: 40 }, () => HEX[Math.floor(r() * 16)]).join("")}`;
   return Array.from({ length: 44 }, () => BASE58[Math.floor(r() * BASE58.length)]).join("");
