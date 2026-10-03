@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetBudgets, resetOf, solanaCredits, take, tracked } from "./budget";
+import { resetBudgets, resetOf, solanaCredits, take, tracked, usage } from "./budget";
 
 const at = (iso: string) => Date.parse(iso);
 
@@ -90,5 +90,42 @@ describe("readers within their budgets", () => {
     });
     await tokenPairs("solana", "Mint");
     await expect(tokenPairs("solana", "Mint")).rejects.toThrow("DexScreener's rate limit");
+  });
+});
+
+describe("usage", () => {
+  beforeEach(() => resetBudgets());
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("lists every budget with its limit, use, what's left and its reset, taking nothing", async () => {
+    vi.stubEnv("BLOCKSCOUT_API_KEY", "k");
+    vi.stubEnv("BLOCKSCOUT_DAILY_CREDITS", "1000");
+    vi.stubEnv("GECKOTERMINAL_PER_MINUTE", "25");
+    const t = at("2031-03-10T06:00:00Z");
+    await take("blockscout", 20, t);
+    await take("geckoterminal", 1, t);
+    await take("geckoterminal", 1, t + 5_000);
+    const rows = await usage(t + 10_000);
+    const blockscout = rows.find((r) => r.id === "blockscout")!;
+    // A block of 20 credits was leased for the request: that's what the shared count holds.
+    expect(blockscout).toMatchObject({ window: "day", unit: "credits", limit: 1000, used: 20, remaining: 980, scope: "shared" });
+    expect(blockscout.reset).toBe(at("2031-03-11T00:00:00Z"));
+    expect(rows.find((r) => r.id === "geckoterminal")).toMatchObject({
+      window: "minute",
+      used: 2,
+      remaining: 23,
+      reset: t + 60_000,
+      scope: "instance",
+    });
+    // Without your own RPC, Solana's is paced, with no quota to show.
+    expect(rows.find((r) => r.id === "solana")?.off).toContain("paced");
+    // Reading it took nothing.
+    expect((await usage(t + 10_000)).find((r) => r.id === "geckoterminal")?.used).toBe(2);
+  });
+
+  it("says when Blockscout isn't set up", async () => {
+    expect((await usage(at("2031-03-12T06:00:00Z"))).find((r) => r.id === "blockscout")?.off).toContain(
+      "BLOCKSCOUT_API_KEY",
+    );
   });
 });

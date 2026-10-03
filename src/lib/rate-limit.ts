@@ -83,6 +83,28 @@ export async function spend(
   return spendMemory(bucket, windowMs, max, cost, now);
 }
 
+/**
+ * What's been taken from each bucket so far (0 for one never touched), without taking anything: for the usage page.
+ * From Postgres when it's set up, else this instance's memory.
+ */
+export async function peek(buckets: string[]): Promise<Map<string, number>> {
+  const out = new Map(buckets.map((b) => [b, memory.get(b)?.hits ?? 0]));
+  const api = rest();
+  if (!api || !buckets.length) return out;
+  try {
+    // Bucket names hold ":", which PostgREST wants quoted in an in() list.
+    const list = buckets.map((b) => encodeURIComponent(`"${b}"`)).join(",");
+    const rows = await api.select<{ bucket: string; hits: number }[]>(
+      `rate_limits?select=bucket,hits&bucket=in.(${list})`,
+    );
+    for (const b of buckets) out.set(b, 0);
+    for (const r of rows) out.set(r.bucket, r.hits);
+  } catch (err) {
+    console.error("[rankr] budget: couldn't read the counters, showing this instance's", err);
+  }
+  return out;
+}
+
 /** "3h" / "25m" / "40s" until `resetAt`. */
 export function untilReset(resetAt: number, now = Date.now()): string {
   const s = Math.max(1, Math.ceil((resetAt - now) / 1000));

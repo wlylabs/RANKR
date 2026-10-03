@@ -538,7 +538,10 @@ export function TokenReport({ chain: chainId, address }: { chain: string; addres
               <CircleHelp className="mt-0.5 size-3.5 shrink-0 text-subtle" />
               <span>
                 Some parts weren&apos;t read, to stay within the free limits of {andList(report.skipped)}. Read again in a
-                minute (a daily limit comes back at 00:00 UTC).
+                minute (a daily limit comes back at 00:00 UTC).{" "}
+                <Link href="/trace/usage" className="underline hover:text-fg">
+                  See usage
+                </Link>
               </span>
             </p>
           )}

@@ -419,6 +419,13 @@ test site key `1x00000000000000000000AA` always passes (its secret is `1x0000000
   has its own); the daily and monthly ones in Postgres (`rankr_rate_spend`, taking units only when they fit, in
   one atomic update), shared by every instance, which leases a thousandth of the budget at a time so most calls
   don't wait on Postgres. Without Supabase, or before `…_rankr_budgets.sql` has run, they're counted in memory.
+  **API usage** (`/trace/usage`, linked from Trace and from a report that skipped something; official accounts
+  only, like the rest of Trace): a bar per budget, how much is used, what's left and a live countdown to its reset,
+  fine (green) to getting close (70%) to near the limit (90%, red) to used up, the shared day's and month's apart
+  from this server's minute ones, and what isn't budgeted (Blockscout without a key, Solana's public RPCs, paced).
+  Read every 10 seconds from `GET /api/trace/usage`, which answers in the shape of GitHub's `/rate_limit` (limit,
+  used, remaining, reset per resource) and takes nothing. It's Rankr's own count of what it asked for; each
+  provider's own is on its dashboard (Helius, Blockscout's dev portal).
   When a budget is spent: a token report leaves out the parts it couldn't read and says which limits it stayed
   within ("Read again in a minute"), and isn't kept, so the next read tries again; a wallet keeps what it read
   ("the RPC's budget ran out"); a read that can't start answers 429 with when the budget comes back; pasting
@@ -539,6 +546,7 @@ rolls everything back. Run it against a local or throwaway database:
 | `POST /api/me/profile` `{bio, x, telegram, website}`, `POST /api/me/x` `{url}` | your bio and links (`""` clears one), and verifying your X account from a link to your post |
 | `GET /api/username?name=` | is a username free |
 | `GET /api/trace/:chain/:address` | one wallet for a trail on the trace tab: who funded it, its biggest counterparties in and out (named where a public list knows them), its trades summed, what was read (official accounts only) |
+| `GET /api/trace/usage` | every free API's usage budget: window, limit, used, remaining, reset, shared or per server (official accounts only) |
 | `GET /api/trace/token/:chain/:address` | a token's report: the verdict and its checks (with what couldn't be read), buys and sells per window, the latest trades' top buyers and sellers, the biggest holders and linked groups, its launch (bundles, snipers, the deployer's buy), the deployer (official accounts only) |
 | `GET /api/feed?scope=all\|top\|you&kind=all\|call\|milestone&chain=&limit=&offset=` | the feed: calls and milestones, newest first (`you`: yours, with `Authorization: Bearer <access token>`) |
 

@@ -8,7 +8,7 @@
 //   to Postgres; a block left over when an instance stops is simply not used (the count errs on the safe side).
 // The defaults sit under the free plans' published limits; each can be set in the environment.
 import { AsyncLocalStorage } from "node:async_hooks";
-import { spend, type Quota } from "./rate-limit";
+import { peek, spend, type Quota } from "./rate-limit";
 
 type Window = "minute" | "day" | "month";
 type Rule = { window: Window; max: number };
@@ -146,6 +146,98 @@ export async function tracked<T>(fn: () => Promise<T>): Promise<{ value: T; refu
   const seen = new Set<Upstream>();
   const value = await refused.run(seen, fn);
   return { value, refused: [...seen] };
+}
+
+// ---- What's been used: the usage page, in the shape of GitHub's /rate_limit (limit, used, remaining, reset).
+
+/** What each upstream is read for, on the usage page. */
+const USES: Record<Upstream, string> = {
+  solana: "Solana wallets and token reports",
+  blockscout: "EVM wallets and token reports",
+  geckoterminal: "Trades and wallets in a token's pool",
+  honeypot: "Test buy and sell, taxes (Ethereum, Base, BSC)",
+  dexscreener: "Prices, pools, search: the whole app",
+  "dexscreener-slow": "A pasted address without its chain",
+  publicnode: "A token's owner(), BSC tokens",
+};
+
+export type UsageRow = {
+  id: Upstream;
+  name: string;
+  use: string;
+  window: Window;
+  unit: "credits" | "requests";
+  limit: number;
+  used: number;
+  remaining: number;
+  /** When the window starts over, ms. */
+  reset: number;
+  /** Counted for every server together (a day's or month's quota), or for this one (a provider's per-IP minute). */
+  scope: "shared" | "instance";
+  /** Why it isn't budgeted: not set up, or paced instead. */
+  off?: string;
+};
+
+const UNITS: Partial<Record<Upstream, "credits">> = { solana: "credits", blockscout: "credits" };
+
+/** Every budget, how much of it is used and when it starts over. Reads the shared counters, takes nothing. */
+export async function usage(now = Date.now()): Promise<UsageRow[]> {
+  const rows: UsageRow[] = [];
+  const shared: { row: UsageRow; bucket: string }[] = [];
+  for (const id of Object.keys(RULES) as Upstream[]) {
+    const name = id === "dexscreener-slow" ? "DexScreener (other endpoints)" : UPSTREAM_NAMES[id];
+    const base = { id, name, use: USES[id], unit: UNITS[id] ?? ("requests" as const) };
+    const rules = RULES[id]();
+    if (id === "solana" && !rules.length) {
+      rows.push({
+        ...base,
+        window: "minute",
+        limit: 0,
+        used: 0,
+        remaining: 0,
+        reset: now,
+        scope: "instance",
+        off: "Public RPCs: paced at 3.5 calls a second, no quota to spend. Set SOLANA_RPC_URL (a Helius key) for more.",
+      });
+      continue;
+    }
+    for (const rule of rules) {
+      if (rule.window === "minute") {
+        const cur = minutes.get(id);
+        const live = cur && now - cur.start < MINUTE;
+        const used = live ? cur.used : 0;
+        rows.push({
+          ...base,
+          window: "minute",
+          limit: rule.max,
+          used,
+          remaining: Math.max(0, rule.max - used),
+          reset: live ? cur.start + MINUTE : now + MINUTE,
+          scope: "instance",
+        });
+        continue;
+      }
+      const { key, ends } = period(rule.window, now);
+      const row: UsageRow = {
+        ...base,
+        window: rule.window,
+        limit: rule.max,
+        used: 0,
+        remaining: rule.max,
+        reset: ends,
+        scope: "shared",
+        ...(id === "blockscout" && !process.env.BLOCKSCOUT_API_KEY && { off: "Not set up: no BLOCKSCOUT_API_KEY." }),
+      };
+      shared.push({ row, bucket: `budget:${id}:${rule.window}:${key}` });
+      rows.push(row);
+    }
+  }
+  const counts = await peek(shared.map((s) => s.bucket));
+  for (const { row, bucket } of shared) {
+    row.used = Math.min(row.limit, counts.get(bucket) ?? 0);
+    row.remaining = Math.max(0, row.limit - row.used);
+  }
+  return rows;
 }
 
 /** For tests: forget every count. */

@@ -1,5 +1,7 @@
 "use client";
 
+import { Gauge } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { delay } from "@/lib/motion";
 import { exampleTrail, exampleWallet } from "@/lib/trace/mock";
@@ -38,6 +40,13 @@ export function TraceIntro() {
         <div className="cine-in max-w-2xl" style={delay(160)}>
           <TraceInput size="lg" autoFocus />
         </div>
+        <Link
+          href="/trace/usage"
+          className="cine-in inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-fg"
+          style={delay(200)}
+        >
+          <Gauge className="size-3.5" /> API usage: how much of each free limit is used
+        </Link>
         <ol className="cine-in grid gap-3 sm:grid-cols-3" style={delay(240)}>
           {STEPS.map(([k, v]) => (
             <li key={k} className="border-t border-border bg-bg/60 pt-3 backdrop-blur-[1px]">
