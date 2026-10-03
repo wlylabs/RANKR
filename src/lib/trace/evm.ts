@@ -2,6 +2,8 @@
 // free at dev.blockscout.com (100K credits a day, 5 requests a second); without one the public explorers
 // allow about 10 requests per 16 minutes, too few for a trail. One wallet costs four requests: the address,
 // its transactions, its ERC-20 transfers and its internal transactions (the newest 50 of each).
+import { BLOCKSCOUT_CREDITS, resetOf, take } from "../budget";
+import { untilReset } from "../rate-limit";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
 import { labelOf } from "./labels";
 import { TraceError } from "./errors";
@@ -67,6 +69,24 @@ export type AddressInfo = AddressParam & {
   token?: unknown | null;
 };
 
+/** Blockscout's free plan allows 5 requests a second: calls queue up at 4. */
+let nextAt = 0;
+async function pace() {
+  const now = Date.now();
+  const at = Math.max(now, nextAt);
+  nextAt = at + 250;
+  if (at > now) await new Promise((r) => setTimeout(r, at - now));
+}
+
+/** Takes one request's credits from today's Blockscout budget (BLOCKSCOUT_DAILY_CREDITS), or says it's used up. */
+async function budget() {
+  if (await take("blockscout", BLOCKSCOUT_CREDITS)) return;
+  throw new TraceError(
+    "quota",
+    `Today's Blockscout budget is used up. It comes back in ${untilReset(resetOf("blockscout"))} (00:00 UTC).`,
+  );
+}
+
 /** One Blockscout API v2 request on `chain`; null for an address it has never seen (404). */
 export async function blockscout<T>(chain: TraceChain, path: string): Promise<T | null> {
   const key = process.env.BLOCKSCOUT_API_KEY;
@@ -75,6 +95,8 @@ export async function blockscout<T>(chain: TraceChain, path: string): Promise<T 
       "nokey",
       "EVM wallets aren't switched on here yet: this site needs a (free) Blockscout API key.",
     );
+  await budget();
+  await pace();
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
@@ -103,7 +125,8 @@ export async function blockscout<T>(chain: TraceChain, path: string): Promise<T 
  */
 export async function blockscoutRpc<T>(chain: TraceChain, params: Record<string, string>): Promise<T[] | null> {
   const key = process.env.BLOCKSCOUT_API_KEY;
-  if (!key) return null;
+  if (!key || !(await take("blockscout", BLOCKSCOUT_CREDITS))) return null;
+  await pace();
   const q = new URLSearchParams({ chain_id: String(chain.chainId), ...params, apikey: key });
   try {
     const res = await fetch(`${api()}/v2/api?${q}`, {

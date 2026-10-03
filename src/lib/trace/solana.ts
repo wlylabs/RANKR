@@ -9,6 +9,8 @@ import { fetchSnapshots } from "../dexscreener";
 import { tokenId } from "../address";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
 import { labelOf, solanaBridge, solanaDeposits, solanaDex } from "./labels";
+import { resetOf, solanaCredits, take } from "../budget";
+import { untilReset } from "../rate-limit";
 import { TraceError } from "./errors";
 import type { TraceResponse } from "./types";
 
@@ -89,6 +91,12 @@ async function pace(url: string) {
  * (Retry-After when given). Three rounds and it gives up with "busy". Errors in the answer itself are RpcError.
  */
 export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
+  // Your own RPC's credits: within the budget set for it (SOLANA_RPC_MONTHLY_CREDITS), or not at all.
+  if (custom() && !(await take("solana", solanaCredits(method))))
+    throw new TraceError(
+      "quota",
+      `The Solana RPC's budget is used up for now. It comes back in ${untilReset(resetOf("solana"))}.`,
+    );
   const urls = endpoints();
   const tries = urls.length * 3;
   let unreachable = 0;
@@ -405,22 +413,23 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
   const recent = ok.slice(0, txLimit());
   // Its first transactions, for who funded it: read too when the history is in reach and they aren't recent.
   const oldest = history.complete ? ok.slice(-3).filter((s) => !recent.includes(s)) : [];
-  // Rate-limited for good halfway: stop asking, and draw what was read.
-  const progress = { limited: false };
+  // Rate-limited for good halfway, or out of budget: stop asking, and draw what was read.
+  const progress: { limited: boolean; stop: TraceError | null } = { limited: false, stop: null };
   const txs = await mapLimit(
     [...recent, ...oldest],
     concurrency(),
     (s) =>
       getTx(s.signature).catch((err) => {
-        if (err instanceof TraceError && err.code === "busy") {
+        if (err instanceof TraceError && (err.code === "busy" || err.code === "quota")) {
           progress.limited = true;
+          progress.stop = err;
           return undefined;
         }
         throw err;
       }),
     () => progress.limited,
   );
-  if (progress.limited && txs.every((tx) => !tx)) throw new TraceError("busy", BUSY);
+  if (progress.limited && txs.every((tx) => !tx)) throw progress.stop ?? new TraceError("busy", BUSY);
 
   const read = txs
     .filter((tx): tx is ParsedTx => !!tx && !tx.meta?.err)
@@ -460,6 +469,7 @@ export async function traceSolana(address: string): Promise<TraceResponse> {
       complete: !progress.limited && history.complete && ok.length <= recent.length,
       skipped: txs.filter((tx) => tx === null).length,
       ...(progress.limited ? { limited: true } : {}),
+      ...(progress.stop?.code === "quota" ? { quota: true } : {}),
     },
     updatedAt: Date.now(),
   };

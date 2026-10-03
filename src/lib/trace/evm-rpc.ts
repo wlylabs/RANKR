@@ -10,6 +10,8 @@ const PUBLIC: Record<string, string> = {
   bsc: "https://bsc-rpc.publicnode.com",
 };
 
+import { take } from "../budget";
+
 const endpoint = (chain: string) => process.env[`${chain.toUpperCase()}_RPC_URL`]?.trim() || PUBLIC[chain];
 
 /** owner(), totalSupply() */
@@ -20,7 +22,7 @@ const BURNED = /^0x0{40}$|^0x0{36}dead$/i;
 /** eth_call: the result's hex, "revert" when the call reverts, undefined when the chain can't be asked. */
 async function call(chain: string, to: string, data: string): Promise<string | "revert" | undefined> {
   const url = endpoint(chain);
-  if (!url) return undefined;
+  if (!url || !(await take("publicnode"))) return undefined;
   try {
     const res = await fetch(url, {
       method: "POST",

@@ -9,6 +9,7 @@ const STATUS: Record<TraceErrorCode, number> = {
   upstream: 502,
   busy: 503,
   limit: 429,
+  quota: 429,
 };
 
 /** A wallet that can't be traced, and why; `status` is the API's answer. */

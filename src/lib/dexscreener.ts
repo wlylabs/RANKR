@@ -1,4 +1,5 @@
 import { sameAddress, tokenId } from "./address";
+import { take } from "./budget";
 import { mockSnapshot } from "./mock";
 import type { Link, MarketSnapshot } from "./types";
 
@@ -31,9 +32,22 @@ export type Pair = {
   };
 };
 
-export class UpstreamError extends Error {}
+export class UpstreamError extends Error {
+  /** `limited`: Rankr's own per-minute budget for DexScreener turned the call down (it wasn't made). */
+  constructor(
+    message: string,
+    readonly limited = false,
+  ) {
+    super(message);
+  }
+}
+
+/** Its pairs, tokens and search endpoints allow 300 requests a minute; the others 60. */
+const FAST = /^\/(tokens\/v1|token-pairs\/v1|latest\/dex\/(pairs|search))\b/;
 
 async function getJson<T>(path: string): Promise<T> {
+  if (!(await take(FAST.test(path) ? "dexscreener" : "dexscreener-slow")))
+    throw new UpstreamError("DexScreener's rate limit is used up for this minute", true);
   let res: Response;
   try {
     res = await fetch(`${API}${path}`, {

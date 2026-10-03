@@ -112,8 +112,9 @@ and shows how far it has moved since the paste: 2x, 5x, 10x, 100x... or the draw
     transactions already read for a neighbouring wallet come from memory. One the RPC won't return is left out and
     counted. Prices: DexScreener, stablecoins at $1.
   - **Ethereum, Base, Arbitrum, Optimism, Polygon**: [Blockscout's API](https://api.blockscout.com), which since
-    July 2026 needs a key (free at dev.blockscout.com: 100K credits a day; without one its public explorers allow
-    about 10 requests per 16 minutes). A wallet costs four requests: the address and its newest 50 transactions,
+    July 2026 needs a key (free at dev.blockscout.com: 100K credits a UTC day at 20 a request, so about 5,000
+    requests, 5 a second; without one its public explorers allow about 10 requests per 16 minutes). Calls go out
+    4 a second, within a daily budget (**Usage limits** below). A wallet costs four requests: the address and its newest 50 transactions,
     ERC-20 transfers and internal transactions. Blockscout's own tags (exchanges, contract names, ENS names,
     scam flags) name what the lists below don't. Without the key, EVM wallets say so.
   - **Names** (`src/lib/trace/labels.json`, built by `npm run trace:labels` from datasets pinned to a commit):
@@ -400,6 +401,28 @@ test site key `1x00000000000000000000AA` always passes (its secret is `1x0000000
   if that call fails, an in-memory counter takes over, so the limiter itself never blocks a paste.
 - **Caller board**: ranked by **hit rate** by default (the share of calls at 2x or more, among callers with
   5+ calls). Counting 2x calls alone would reward pasting every new token; that count is still a tab.
+- **Usage limits** (`src/lib/budget.ts`): every call to a free API takes from that API's budget first, and a
+  call the budget can't cover isn't made, so Rankr never runs past a free plan's quota. The defaults sit under
+  the published limits; each can be set in the environment:
+
+  | API | Budget (default) | Its free limit | Set with |
+  | --- | --- | --- | --- |
+  | Blockscout | 90,000 credits a UTC day (4,500 requests at 20), 4 requests a second | 100K credits a day, 5 a second | `BLOCKSCOUT_DAILY_CREDITS` |
+  | Your own Solana RPC (`SOLANA_RPC_URL`) | 900,000 credits a month, and a 25th of that a UTC day; getTransaction, getSignaturesForAddress, getBlock and getProgramAccounts count 10, other calls 1 | Helius: 1M credits a month | `SOLANA_RPC_MONTHLY_CREDITS`, `SOLANA_RPC_DAILY_CREDITS` |
+  | Solana's public RPCs | paced, 3.5 calls a second (no monthly quota) | about 40 a method per 10 seconds per IP | `SOLANA_RPC_RPS` |
+  | DexScreener | 270 a minute (tokens, pairs, search); 55 for its other endpoints | 300 / 60 a minute | `DEXSCREENER_PER_MINUTE`, `DEXSCREENER_SLOW_PER_MINUTE` |
+  | GeckoTerminal | 25 a minute | about 30 a minute | `GECKOTERMINAL_PER_MINUTE` |
+  | Honeypot.is | 60 a minute | 100 a minute | `HONEYPOT_PER_MINUTE` |
+  | PublicNode's EVM RPCs | 120 a minute | not published | `EVM_RPC_PER_MINUTE` |
+
+  The per-minute limits are counted per server instance (the providers count them per IP, and every instance
+  has its own); the daily and monthly ones in Postgres (`rankr_rate_spend`, taking units only when they fit, in
+  one atomic update), shared by every instance, which leases a thousandth of the budget at a time so most calls
+  don't wait on Postgres. Without Supabase, or before `…_rankr_budgets.sql` has run, they're counted in memory.
+  When a budget is spent: a token report leaves out the parts it couldn't read and says which limits it stayed
+  within ("Read again in a minute"), and isn't kept, so the next read tries again; a wallet keeps what it read
+  ("the RPC's budget ran out"); a read that can't start answers 429 with when the budget comes back; pasting
+  says "Too many lookups this minute".
 
 How it works:
 
@@ -565,6 +588,7 @@ src/lib/trace/               the trace tab: Solana RPC and Blockscout readers, l
                              token reports (token.ts; token-assess.ts the checks and their LIMITS; token-solana.ts, token-evm.ts, gecko.ts,
                              honeypot.ts, evm-rpc.ts the readers; solana-pda.ts base58 and program addresses)
 src/lib/alerts.ts            milestone alerts: which milestones are new, notifications
+src/lib/budget.ts            usage limits for the free APIs (per minute, per UTC day or month), so none runs past its quota
 src/lib/caller-stats.ts      a caller's numbers from their calls (same rules as the caller board), spread and recent form
 src/lib/season.ts            the monthly reset: when the next one is, month names
 src/lib/share.ts             what a shared call says, and its card's file name

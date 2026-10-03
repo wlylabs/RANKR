@@ -2,6 +2,7 @@
 // sells with the wallets behind them, and its latest trades (up to 300, within 24 hours), each with the wallet
 // that made it. Shown as "Powered by GeckoTerminal", as its terms ask. Two calls per token report.
 import { sameAddress } from "../address";
+import { take } from "../budget";
 import type { PoolWindows, RawTrade } from "./token-assess";
 import type { TokenWindow } from "./types";
 
@@ -18,7 +19,9 @@ export const GECKO_NETWORKS: Record<string, string> = {
   bsc: "bsc",
 };
 
+/** One request; null for something it doesn't know, or when its per-minute budget is used up (not asked). */
 async function gecko<T>(path: string): Promise<T | null> {
+  if (!(await take("geckoterminal"))) return null;
   const res = await fetch(`${API()}${path}`, {
     headers: { accept: "application/json" },
     cache: "no-store",

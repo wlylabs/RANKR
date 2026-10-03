@@ -141,6 +141,8 @@ export type TokenFacts = {
   /** A bigger, older token by the same symbol (or name) this one may copy; null: none found; undefined: unread. */
   copycat?: { chain: string; address: string; symbol: string; liquidityUsd: number; times: number } | null;
   creator: string | null;
+  /** Upstreams whose usage budget ran out during the read (named), so parts were skipped. */
+  skipped?: string[];
   label: (address: string) => TraceLabel | null;
   now: number;
 };
@@ -1109,6 +1111,7 @@ export function assessToken(f: TokenFacts): TokenReport {
     clusters: clusters ?? [],
     notes,
     creator,
+    skipped: f.skipped ?? [],
     updatedAt: f.now,
   };
 }

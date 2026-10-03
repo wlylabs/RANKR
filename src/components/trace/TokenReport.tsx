@@ -75,6 +75,9 @@ function span(ms: number): string {
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** "A", "A and B", "A, B and C". */
+const andList = (names: string[]) =>
+  names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
 // ---- Status, the same marks everywhere: red for a warning sign, a ring to check, grey unread, green fine.
 
@@ -530,6 +533,15 @@ export function TokenReport({ chain: chainId, address }: { chain: string; addres
       ) : (
         <>
           <Verdict report={report} />
+          {report.skipped.length > 0 && (
+            <p className="flex gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-[12.5px] text-muted">
+              <CircleHelp className="mt-0.5 size-3.5 shrink-0 text-subtle" />
+              <span>
+                Some parts weren&apos;t read, to stay within the free limits of {andList(report.skipped)}. Read again in a
+                minute (a daily limit comes back at 00:00 UTC).
+              </span>
+            </p>
+          )}
           <Areas report={report} />
           <MoneyFlow report={report} chain={chain} />
           <Holders report={report} chain={chain} />

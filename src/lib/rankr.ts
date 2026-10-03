@@ -39,7 +39,10 @@ async function lookup(address: string, chainHint: string | null) {
   try {
     return await findToken(address, chainHint);
   } catch (err) {
-    if (err instanceof UpstreamError) throw new RankrError("Couldn't reach DexScreener. Try again in a moment.", 502);
+    if (err instanceof UpstreamError)
+      throw err.limited
+        ? new RankrError("Too many lookups this minute (DexScreener's limit). Try again in a minute.", 429)
+        : new RankrError("Couldn't reach DexScreener. Try again in a moment.", 502);
     throw err;
   }
 }

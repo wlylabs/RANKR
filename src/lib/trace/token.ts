@@ -1,7 +1,9 @@
 // A token's report for the trace page: a contract address pasted on Trace opens this instead of a trail. Reads
 // DexScreener (its pools, buys and sells), GeckoTerminal (the main pool's wallets and latest trades), and the
 // chain itself (Solana's RPC; Blockscout and Honeypot.is on EVM), then runs the checks (token-assess.ts). Kept a
-// minute: trades move fast, and the free upstreams are rate-limited.
+// minute: trades move fast, and the free upstreams are rate-limited. Every call is within its upstream's usage
+// budget (src/lib/budget.ts): what a spent budget skipped, the report names.
+import { tracked, UPSTREAM_NAMES } from "../budget";
 import { MOCK, searchPairs, tokenPairs, type Pair } from "../dexscreener";
 import { traceChain, validWallet, type TraceChain } from "./chains";
 import { TraceError } from "./errors";
@@ -70,9 +72,14 @@ export async function traceToken(chainId: string, address: string, now = Date.no
   const key = `${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
   const hit = cache.get(key);
   if (hit && now - hit.at < TTL) return hit.value;
-  const value = readToken(chain, address, now);
+  const value = tracked(() => readToken(chain, address, now)).then(({ value: report, refused }) => ({
+    ...report,
+    skipped: [...new Set(refused.map((u) => UPSTREAM_NAMES[u]))],
+  }));
   cache.set(key, { at: now, value });
-  value.catch(() => cache.get(key)?.value === value && cache.delete(key));
+  // A failed read isn't kept, nor one a spent budget cut short: the next request tries again.
+  const drop = () => cache.get(key)?.value === value && cache.delete(key);
+  value.then((r) => r.skipped.length && drop(), drop);
   if (cache.size > MAX_ENTRIES) {
     for (const [k, v] of cache) if (now - v.at >= TTL || cache.size > MAX_ENTRIES) cache.delete(k);
   }

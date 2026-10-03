@@ -1,6 +1,7 @@
 // Honeypot.is (api.honeypot.is, no key): it simulates a buy and a sell of a token and reports whether the sell
 // went through, the taxes taken, whether its code is open source or a proxy, and its holders. Ethereum, Base and
 // BSC among Trace's chains. One call per EVM token report.
+import { take } from "../budget";
 import type { EvmContract } from "./token-assess";
 
 const API = () => (process.env.HONEYPOT_API_URL ?? "https://api.honeypot.is").replace(/\/+$/, "");
@@ -25,6 +26,8 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : n
 export async function simulateTrade(chain: string, token: string, pair?: string): Promise<EvmContract["sim"]> {
   const id = HONEYPOT_CHAINS[chain];
   if (!id) return undefined;
+  // Over its per-minute budget: not run, like a simulation that couldn't.
+  if (!(await take("honeypot"))) return null;
   try {
     const q = new URLSearchParams({ address: token, chainID: String(id), ...(pair && { pair }) });
     const res = await fetch(`${API()}/v2/IsHoneypot?${q}`, {

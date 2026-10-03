@@ -68,7 +68,7 @@ export type TraceResponse = {
   /**
    * How much history this read: the newest `txs` transactions, from `from` to `to`; complete if that's all.
    * `skipped`: transactions the chain wouldn't return, left out. `limited`: the RPC's rate limit stopped the
-   * read halfway (what was read is all here).
+   * read halfway (what was read is all here); `quota`: Rankr's own budget for the RPC did (src/lib/budget.ts).
    */
   scanned: {
     txs: number;
@@ -77,6 +77,7 @@ export type TraceResponse = {
     complete: boolean;
     skipped?: number;
     limited?: boolean;
+    quota?: boolean;
   };
   updatedAt: number;
 };
@@ -90,7 +91,8 @@ export type TraceErrorCode =
   | "upstream"
   | "busy"
   | "nokey"
-  | "limit";
+  | "limit"
+  | "quota";
 
 // ---- A token's report: a contract address pasted on Trace opens this instead of a trail.
 
@@ -228,5 +230,7 @@ export type TokenReport = {
   notes: TokenNote[];
   /** Who deployed it (EVM: Blockscout; Solana: whoever signed its first transaction), to follow its money. */
   creator: string | null;
+  /** Upstreams whose usage budget ran out during the read: the parts they'd have read were skipped. */
+  skipped: string[];
   updatedAt: number;
 };
