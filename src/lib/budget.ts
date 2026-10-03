@@ -33,6 +33,9 @@ const RULES = {
         ]
       : [],
   blockscout: (): Rule[] => [{ window: "day", max: env("BLOCKSCOUT_DAILY_CREDITS", 90_000) }],
+  // A wallet's token balances are an extra: capped on their own, inside Blockscout's budget (they take from both),
+  // so they never eat into what trails need. 10K credits is 500 wallets a day, a ninth of the default budget.
+  "blockscout-holdings": (): Rule[] => [{ window: "day", max: env("BLOCKSCOUT_HOLDINGS_DAILY_CREDITS", 10_000) }],
   geckoterminal: (): Rule[] => [{ window: "minute", max: env("GECKOTERMINAL_PER_MINUTE", 25) }],
   honeypot: (): Rule[] => [{ window: "minute", max: env("HONEYPOT_PER_MINUTE", 60) }],
   // Its pairs, tokens and search endpoints allow 300 a minute; the rest 60.
@@ -47,6 +50,7 @@ export type Upstream = keyof typeof RULES;
 export const UPSTREAM_NAMES: Record<Upstream, string> = {
   solana: "Solana RPC",
   blockscout: "Blockscout",
+  "blockscout-holdings": "Blockscout (token balances)",
   geckoterminal: "GeckoTerminal",
   honeypot: "Honeypot.is",
   dexscreener: "DexScreener",
@@ -154,6 +158,7 @@ export async function tracked<T>(fn: () => Promise<T>): Promise<{ value: T; refu
 const USES: Record<Upstream, string> = {
   solana: "Solana wallets and token reports",
   blockscout: "EVM wallets and token reports",
+  "blockscout-holdings": "Tokens held by the wallet a trail starts at (also counted in Blockscout's)",
   geckoterminal: "Trades and wallets in a token's pool",
   honeypot: "Test buy and sell, taxes (Ethereum, Base, BSC)",
   dexscreener: "Prices, pools, search: the whole app",
@@ -178,7 +183,11 @@ export type UsageRow = {
   off?: string;
 };
 
-const UNITS: Partial<Record<Upstream, "credits">> = { solana: "credits", blockscout: "credits" };
+const UNITS: Partial<Record<Upstream, "credits">> = {
+  solana: "credits",
+  blockscout: "credits",
+  "blockscout-holdings": "credits",
+};
 
 /** Every budget, how much of it is used and when it starts over. Reads the shared counters, takes nothing. */
 export async function usage(now = Date.now()): Promise<UsageRow[]> {
@@ -226,7 +235,8 @@ export async function usage(now = Date.now()): Promise<UsageRow[]> {
         remaining: rule.max,
         reset: ends,
         scope: "shared",
-        ...(id === "blockscout" && !process.env.BLOCKSCOUT_API_KEY && { off: "Not set up: no BLOCKSCOUT_API_KEY." }),
+        ...(id.startsWith("blockscout") &&
+          !process.env.BLOCKSCOUT_API_KEY && { off: "Not set up: no BLOCKSCOUT_API_KEY." }),
       };
       shared.push({ row, bucket: `budget:${id}:${rule.window}:${key}` });
       rows.push(row);

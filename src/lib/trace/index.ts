@@ -4,10 +4,10 @@ import { MOCK } from "../dexscreener";
 import { traceChain, validWallet } from "./chains";
 import { isToken } from "./evm-rpc";
 import { TraceError } from "./errors";
-import { traceEvm } from "./evm";
+import { evmHoldings, traceEvm } from "./evm";
 import { mockTrace } from "./mock";
 import { traceSolana } from "./solana";
-import type { TraceResponse } from "./types";
+import type { TraceHoldings, TraceResponse } from "./types";
 
 const TTL = 5 * 60_000;
 const MAX_ENTRIES = 300;
@@ -47,6 +47,32 @@ export async function traceWallet(chainId: string, address: string, now = Date.n
   value.then((t) => t.scanned.limited && drop(), drop);
   if (cache.size > MAX_ENTRIES) {
     for (const [k, v] of cache) if (now - v.at >= TTL || cache.size > MAX_ENTRIES) cache.delete(k);
+  }
+  return value;
+}
+
+/** Token balances read lately: a trail's target is read again as it's reopened and shared. */
+const held = new Map<string, { at: number; value: Promise<TraceHoldings | "budget" | null> }>();
+
+/**
+ * The tokens a wallet holds now, for the wallet a trail starts at (EVM only: undefined elsewhere). Kept for a few
+ * minutes, like its trail; a spent budget or a failed read isn't kept.
+ */
+export async function walletHoldings(
+  chainId: string,
+  address: string,
+  now = Date.now(),
+): Promise<TraceHoldings | "budget" | null | undefined> {
+  const chain = traceChain(chainId);
+  if (!chain || chain.kind !== "evm" || chain.tokensOnly || MOCK || !validWallet(chain, address)) return undefined;
+  const key = `${chain.id}:${address.toLowerCase()}`;
+  const hit = held.get(key);
+  if (hit && now - hit.at < TTL) return hit.value;
+  const value = evmHoldings(chain, address);
+  held.set(key, { at: now, value });
+  value.then((h) => (h === null || h === "budget") && held.get(key)?.value === value && held.delete(key));
+  if (held.size > MAX_ENTRIES) {
+    for (const [k, v] of held) if (now - v.at >= TTL || held.size > MAX_ENTRIES) held.delete(k);
   }
   return value;
 }

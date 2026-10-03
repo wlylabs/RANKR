@@ -408,6 +408,7 @@ test site key `1x00000000000000000000AA` always passes (its secret is `1x0000000
   | API | Budget (default) | Its free limit | Set with |
   | --- | --- | --- | --- |
   | Blockscout | 90,000 credits a UTC day (4,500 requests at 20), 4 requests a second | 100K credits a day, 5 a second | `BLOCKSCOUT_DAILY_CREDITS` |
+  | Blockscout, token balances | 10,000 credits a UTC day of the above (500 wallets): only the wallet a trail starts at; past it the trail still loads, without its tokens | (within Blockscout's) | `BLOCKSCOUT_HOLDINGS_DAILY_CREDITS` |
   | Your own Solana RPC (`SOLANA_RPC_URL`) | 900,000 credits a month, and a 25th of that a UTC day; getTransaction, getSignaturesForAddress, getBlock and getProgramAccounts count 10, other calls 1 | Helius: 1M credits a month | `SOLANA_RPC_MONTHLY_CREDITS`, `SOLANA_RPC_DAILY_CREDITS` |
   | Solana's public RPCs | paced, 3.5 calls a second (no monthly quota) | about 40 a method per 10 seconds per IP | `SOLANA_RPC_RPS` |
   | DexScreener | 270 a minute (tokens, pairs, search); 55 for its other endpoints | 300 / 60 a minute | `DEXSCREENER_PER_MINUTE`, `DEXSCREENER_SLOW_PER_MINUTE` |

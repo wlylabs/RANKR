@@ -4,6 +4,7 @@ import { ArrowUpRight, Crosshair } from "lucide-react";
 import Link from "next/link";
 import { formatAmount, formatDate, formatUsd } from "@/lib/format";
 import { explorerAddress, explorerTx, traceHref, type TraceChain } from "@/lib/trace/chains";
+import { holdingsText } from "@/lib/trace/case";
 import type { TreeItem } from "@/lib/trace/tree";
 import type { TraceResponse } from "@/lib/trace/types";
 import { Avatar } from "../Avatar";
@@ -86,12 +87,7 @@ export function Inspector({ chain, item, parent, data, onToggle }: InspectorProp
 
       {data && (
         <p className="mt-3 text-[12px] text-muted">
-          {data.balance && (
-            <>
-              Holds {formatAmount(data.balance.amount)} {data.balance.symbol}
-              {data.balance.usd !== null && <> ({formatUsd(data.balance.usd)})</>}.{" "}
-            </>
-          )}
+          {data.balance && <>Holds {holdingsText(data)}. </>}
           {data.firstSeen && (
             <>
               First seen <TimeAgo at={data.firstSeen} />.

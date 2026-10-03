@@ -1,6 +1,8 @@
 // The case file under the path: what the trail says in plain words, and the flags it raises. Only from
 // what has been read so far (the target, and each wallet opened), and only facts: a label is quoted with its
 // source, never turned into an accusation.
+import { formatAmount, formatUsd } from "../format";
+import { chainLabel, traceChain } from "./chains";
 import { DANGER } from "./kinds";
 import { dataOf } from "./tree";
 import type { TraceFlow, TraceLabelKind, TraceResponse } from "./types";
@@ -10,6 +12,26 @@ export type CaseFlag = { id: string; text: string; danger: boolean };
 export type CaseExit = { address: string; name: string; kind: TraceLabelKind; usd: number | null; hops: number };
 
 export const DAY = 86_400_000;
+
+/**
+ * What a wallet holds now, in words, saying which chain and what's left out: "0.0018 ETH ($4.85) on Ethereum +
+ * $30K in 2 tokens (USDC, PEPE)", or "...; tokens not counted" when they weren't read. Null without a balance.
+ */
+export function holdingsText(t: TraceResponse): string | null {
+  const b = t.balance;
+  if (!b) return null;
+  const chain = traceChain(t.chain);
+  let text = `${formatAmount(b.amount)} ${b.symbol}${b.usd !== null ? ` (${formatUsd(b.usd)})` : ""}`;
+  if (chain) text += ` on ${chainLabel(chain)}`;
+  const h = t.holdings;
+  if (h === undefined) return `${text}; tokens not counted`;
+  if (h === null) return `${text}; its tokens couldn't be read`;
+  if (h === "budget") return `${text}; tokens not read (today's budget for them is used)`;
+  if (!h.count) return `${text}, no priced tokens`;
+  const names = h.top.map((a) => a.symbol).join(", ");
+  const n = `${h.count}${h.partial ? "+" : ""} ${h.count === 1 && !h.partial ? "token" : "tokens"}`;
+  return `${text} + ${formatUsd(h.usd)} in ${n} (${names}${h.count > h.top.length ? ", …" : ""})`;
+}
 
 /**
  * Walks the opened wallets from the target, one way: every labelled counterparty met, with the hop it was
@@ -80,7 +102,13 @@ export function caseFile(root: TraceResponse, data: Map<string, TraceResponse>, 
     }
   }
   const bridge = exits.find((e) => e.kind === "bridge");
-  if (bridge) flags.push({ id: "bridge", text: `Bridged out through ${bridge.name}`, danger: false });
+  if (bridge) {
+    flags.push({
+      id: "bridge",
+      text: `Bridged out through ${bridge.name}: the money may sit on another chain now`,
+      danger: false,
+    });
+  }
   const cex = exits.filter((e) => e.kind === "cex");
   if (cex.length) {
     flags.push({
@@ -91,7 +119,8 @@ export function caseFile(root: TraceResponse, data: Map<string, TraceResponse>, 
   }
   const spread = root.outflows.filter((f) => !f.label).length + root.more.out;
   if (spread >= 5) flags.push({ id: "spread", text: `Spread out to ${spread} wallets`, danger: false });
-  if (root.balance && root.balance.usd !== null && root.balance.usd < 1 && root.outflows.length) {
+  const tokensUsd = typeof root.holdings === "object" && root.holdings ? root.holdings.usd : 0;
+  if (root.balance && root.balance.usd !== null && root.balance.usd + tokensUsd < 1 && root.outflows.length) {
     flags.push({ id: "empty", text: "Emptied: holds almost nothing now", danger: false });
   }
 

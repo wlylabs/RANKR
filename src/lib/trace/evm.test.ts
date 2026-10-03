@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetBudgets } from "../budget";
 import { traceChain } from "./chains";
-import { blockscoutLabel, traceEvm, units } from "./evm";
+import { blockscoutLabel, evmHoldings, summarizeHoldings, traceEvm, units } from "./evm";
 
 const W = "0x1111111111111111111111111111111111111111";
 const BINANCE_14 = "0x28C6c06298d514Db089934071355E5743bf21d60";
@@ -41,6 +42,10 @@ describe("blockscoutLabel", () => {
       name: "someone.eth",
     });
     expect(blockscoutLabel(addr(W))).toBeNull();
+    // A cross-chain aggregator in front of bridges counts as one: its money left the chain.
+    expect(blockscoutLabel(addr(W, { is_contract: true, metadata: { tags: [{ name: "LI.FI: Permit2 Proxy 2" }] } })))
+      .toMatchObject({ kind: "bridge", name: "LI.FI: Permit2 Proxy 2" });
+    expect(blockscoutLabel(addr(W, { is_contract: true, name: "GelatoRelayer" }))?.kind).toBe("contract");
   });
 });
 
@@ -168,5 +173,79 @@ describe("traceEvm", () => {
       ),
     );
     await expect(traceEvm(ethereum, USDC)).rejects.toMatchObject({ code: "token" });
+  });
+});
+
+describe("summarizeHoldings", () => {
+  const bal = (symbol: string, value: string, decimals: string, rate: string | null, extra: object = {}) => ({
+    value,
+    token: { address_hash: USDC, symbol, decimals, exchange_rate: rate, ...extra },
+  });
+
+  it("sums the priced tokens, biggest first, leaving out scams and unpriced airdrops", () => {
+    const h = summarizeHoldings(
+      [
+        bal("PEPE", "1000000000000000000000000", "18", "0.00001"),
+        bal("USDC", "30000000000", "6", "1"),
+        bal("LINK", "10000000000000000000", "18", "12"),
+        bal("WETH", "1000000000000000000", "18", "2500"),
+        bal("FAKE", "1000000", "6", "1", { reputation: "scam" }),
+        bal("AIRDROP", "1000000", "6", null),
+      ],
+      false,
+    );
+    expect(h.count).toBe(4);
+    expect(h.usd).toBeCloseTo(30000 + 2500 + 120 + 10);
+    expect(h.top.map((t) => t.symbol)).toEqual(["USDC", "WETH", "LINK"]);
+    expect(h.partial).toBe(false);
+  });
+});
+
+describe("evmHoldings", () => {
+  const ethereum = traceChain("ethereum")!;
+  beforeEach(() => {
+    vi.stubEnv("BLOCKSCOUT_API_KEY", "test-key");
+    resetBudgets();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    resetBudgets();
+  });
+
+  it("reads the first page of tokens, one request", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        items: [{ value: "30000000000", token: { address_hash: USDC, symbol: "USDC", decimals: "6", exchange_rate: "1" } }],
+        next_page_params: { items_count: 50 },
+      }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const h = await evmHoldings(ethereum, W);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0]).toEqual([
+      `https://api.blockscout.com/1/api/v2/addresses/${W}/tokens?type=ERC-20`,
+      expect.anything(),
+    ]);
+    expect(h).toMatchObject({ usd: 30000, count: 1, partial: true });
+  });
+
+  it("stops at its own daily budget, before Blockscout's runs short", async () => {
+    vi.stubEnv("BLOCKSCOUT_HOLDINGS_DAILY_CREDITS", "40");
+    // A day of its own: the counters outlive the other tests' reads.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2030, 0, 1));
+    const fetch = vi.fn(async () => Response.json({ items: [], next_page_params: null }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await evmHoldings(ethereum, W)).toMatchObject({ count: 0 });
+    expect(await evmHoldings(ethereum, W)).toMatchObject({ count: 0 });
+    expect(await evmHoldings(ethereum, W)).toBe("budget");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("says nothing without a key", async () => {
+    vi.stubEnv("BLOCKSCOUT_API_KEY", "");
+    expect(await evmHoldings(ethereum, W)).toBeNull();
   });
 });

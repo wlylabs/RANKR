@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caseFile, DAY } from "./case";
+import { caseFile, DAY, holdingsText } from "./case";
 import type { TraceFlow, TraceLabel, TraceResponse } from "./types";
 
 const NOW = Date.UTC(2026, 9, 2);
@@ -68,5 +68,27 @@ describe("caseFile", () => {
     });
     const ids = caseFile(root, new Map(), NOW).flags.map((f) => f.id);
     expect(ids).toEqual(["fresh", "in:OFAC", "spread", "empty"]);
+  });
+});
+
+describe("holdingsText", () => {
+  const eth = (over: Partial<TraceResponse> = {}) =>
+    wallet("0x9f", { chain: "ethereum", balance: { symbol: "ETH", amount: 0.0018, usd: 4.85 }, ...over });
+
+  it("says the chain, and that tokens weren't counted when they weren't read", () => {
+    expect(holdingsText(eth())).toBe("0.0018 ETH ($4.85) on Ethereum; tokens not counted");
+    expect(holdingsText(eth({ holdings: "budget" }))).toMatch(/tokens not read \(today's budget/);
+    expect(holdingsText(wallet("T"))).toBeNull();
+  });
+
+  it("adds the tokens it holds", () => {
+    const top = [
+      { symbol: "USDC", amount: 30000, usd: 30000 },
+      { symbol: "WETH", amount: 1, usd: 2500 },
+    ];
+    expect(holdingsText(eth({ holdings: { usd: 32500, top, count: 2, partial: false } }))).toMatch(
+      /^0\.0018 ETH \(\$4\.85\) on Ethereum \+ \$32\.5K in 2 tokens \(USDC, WETH\)$/,
+    );
+    expect(holdingsText(eth({ holdings: { usd: 0, top: [], count: 0, partial: false } }))).toMatch(/no priced tokens$/);
   });
 });

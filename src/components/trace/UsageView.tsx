@@ -66,7 +66,7 @@ function Row({ r, now }: { r: UsageRow; now: number }) {
       <div className="tabular mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 font-mono text-[12px]">
         <span>
           {n(r.used)} <span className="text-subtle">/ {n(r.limit)} {r.unit} {WINDOW[r.window]}</span>
-          {r.id === "blockscout" && <span className="text-subtle"> · ≈ {n(r.used / 20)} requests</span>}
+          {r.id.startsWith("blockscout") && <span className="text-subtle"> · ≈ {n(r.used / 20)} requests</span>}
         </span>
         <span className="text-muted">
           {n(r.remaining)} left{r.used > 0 && <> · resets in {countdown(r.reset, now)}</>}
