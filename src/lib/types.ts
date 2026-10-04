@@ -82,6 +82,27 @@ export type CallView = {
 
 export type MyCallsResponse = { calls: CallView[] };
 
+/**
+ * A month that ended, as one caller's private recap (public.recaps): their calls' numbers when the reset
+ * cleared them, each call measured from the caller's own entry. Only the caller sees it.
+ */
+export type Recap = {
+  /** The month's first day, "2026-09-01". */
+  month: string;
+  calls: number;
+  /** Calls at 2x or more when the month ended. */
+  hits: number;
+  /** Calls above entry when the month ended. */
+  wins: number;
+  avgMultiple: number;
+  bestMultiple: number;
+  bestToken: { id: string; address: string; symbol: string; name: string; chainId: string } | null;
+  /** The highest milestone any call reached during the month (2, 3, 5, 10...); null when none did. */
+  topTier: number | null;
+};
+
+export type MyRecapsResponse = { recaps: Recap[] };
+
 export type CallerView = {
   userId: string;
   username: string;

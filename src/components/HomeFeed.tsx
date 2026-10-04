@@ -5,7 +5,7 @@ import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatMultiple, tokenHref } from "@/lib/format";
-import { useFeed, useNow, useStats } from "@/lib/hooks";
+import { useFeed, useMounted, useNow, useStats } from "@/lib/hooks";
 import { monthLabel, nextResetAt, resetDay, untilLabel } from "@/lib/reset";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
@@ -123,6 +123,8 @@ function StatsGrid() {
 /** This month and when Rankr resets (only with accounts: the reset runs in Supabase). */
 function MonthBar() {
   const now = useNow(60_000);
+  // The month and the countdown are the visitor's (the page is prerendered): nothing until mounted.
+  if (!useMounted()) return <div className="h-5" aria-hidden />;
   const resetsAt = nextResetAt(now);
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

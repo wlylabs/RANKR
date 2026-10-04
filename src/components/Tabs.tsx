@@ -41,7 +41,8 @@ export function TabBar<K extends string>({
   className,
 }: {
   label: string;
-  options: Record<K, ReactNode>;
+  /** In order; a key left out isn't shown. */
+  options: Partial<Record<K, ReactNode>>;
   value: K;
   onChange: (key: K) => void;
   className?: string;

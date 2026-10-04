@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { callerStats } from "@/lib/caller-stats";
 import { callerHref, formatMultiple, formatUsd, tokenHref } from "@/lib/format";
-import { useAccountCalls, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
+import { useAccountCalls, useMounted, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
 import { loginHref } from "@/lib/login";
 import { ratio, tierOf } from "@/lib/metrics";
 import { nextResetAt, resetDay } from "@/lib/reset";
@@ -21,6 +21,7 @@ import { CountUp } from "./CountUp";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { PageHeader } from "./PageHeader";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
+import { Recaps } from "./Recaps";
 import { SaveAvatar } from "./SaveAvatar";
 import { ShareCall } from "./ShareCall";
 import { Segmented, TabBar } from "./Tabs";
@@ -170,6 +171,7 @@ function AccountCalls({
       rows={rows}
       loading={isLoading}
       shareAs={username}
+      recapsOf={userId}
     />
   );
 }
@@ -186,7 +188,7 @@ function DeviceCalls() {
   return <Page intro="Saved on this device." rows={rows} loading={isLoading && calls.length > 0} />;
 }
 
-const TABS = { calls: "Calls", stats: "Stats", watchlist: "Watchlist" } as const;
+const TABS = { calls: "Calls", stats: "Stats", recaps: "Recaps", watchlist: "Watchlist" } as const;
 type TabKey = keyof typeof TABS;
 
 /** The tab in the URL (?tab=stats), so it survives a reload and can be linked to. */
@@ -195,7 +197,7 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   const router = useRouter();
   const pathname = usePathname();
   const picked = params.get("tab");
-  const tab: TabKey = picked === "stats" || picked === "watchlist" ? picked : "calls";
+  const tab: TabKey = picked === "stats" || picked === "recaps" || picked === "watchlist" ? picked : "calls";
   // Old links: /me#watchlist.
   useEffect(() => {
     if (window.location.hash === "#watchlist") router.replace(`${pathname}?tab=watchlist`, { scroll: false });
@@ -203,13 +205,14 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   return [tab, (next) => router.replace(next === "calls" ? pathname : `${pathname}?tab=${next}`, { scroll: false })];
 }
 
-/** "You": your calls, how they're doing, and your watchlist. */
+/** "You": your calls, how they're doing, your past months and your watchlist. */
 function Page({
   header,
   intro,
   rows,
   loading = false,
   shareAs,
+  recapsOf,
   children,
 }: {
   /** Above the tabs; a plain "You" heading when there's no account to show. */
@@ -219,11 +222,17 @@ function Page({
   loading?: boolean;
   /** The account the calls are under, so each can be shared (calls on this device only can't). */
   shareAs?: string;
+  /** The signed-in account whose monthly recaps get a tab (only with accounts: the reset keeps them). */
+  recapsOf?: string;
   /** Shown instead of the calls and the stats (e.g. "Sign in"). */
   children?: React.ReactNode;
 }) {
   const watching = useWatchlist().length;
-  const [tab, setTab] = useTab();
+  const [picked, setTab] = useTab();
+  // The reset day is the visitor's (the page is prerendered): said once mounted.
+  const mounted = useMounted();
+  // No account, no recaps: a ?tab=recaps link opens the calls.
+  const tab = picked === "recaps" && !recapsOf ? "calls" : picked;
   const { userId } = useAuth();
 
   return (
@@ -235,7 +244,9 @@ function Page({
       <TabBar
         label="You"
         options={{
-          ...TABS,
+          calls: TABS.calls,
+          stats: TABS.stats,
+          ...(recapsOf && { recaps: TABS.recaps }),
           watchlist: (
             <>
               {TABS.watchlist}
@@ -250,6 +261,8 @@ function Page({
 
       {tab === "watchlist" ? (
         <Watchlist />
+      ) : tab === "recaps" && recapsOf ? (
+        <Recaps userId={recapsOf} />
       ) : children ? (
         children
       ) : tab === "stats" ? (
@@ -258,8 +271,12 @@ function Page({
         <>
           <p className="mt-4 text-sm text-muted">
             Measured from the moment <em>you</em> pasted. {intro && <span className="text-subtle">{intro}</span>}
-            {accountsAvailable && (
-              <span className="text-subtle"> Calls are cleared on {resetDay(nextResetAt())}, 00:00 UTC.</span>
+            {accountsAvailable && mounted && (
+              <span className="text-subtle">
+                {" "}
+                Calls are cleared on {resetDay(nextResetAt())}, 00:00 UTC
+                {recapsOf ? "; your month is kept as a private recap." : "."}
+              </span>
             )}
           </p>
           {!rows.length && !loading ? <NoCalls /> : <CallsView rows={rows} loading={loading} shareAs={shareAs} />}

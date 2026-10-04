@@ -9,6 +9,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { APP_HOME } from "@/lib/login";
 import { alertsSupported, setAlerts, useAlertsOn } from "@/lib/alerts";
 import { promptInstall, useInstallState } from "@/lib/pwa";
+import { accountsAvailable } from "@/lib/supabase-browser";
 import { CopyButton } from "./CopyButton";
 
 const ITEM = "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
@@ -206,7 +207,9 @@ function AlertsSwitch() {
         <div className="mt-0.5 text-xs text-subtle">
           {blocked
             ? "Notifications are blocked for this site in your browser settings."
-            : "2x, 5x, 10x and up on your calls and watchlist, while Rankr is open."}
+            : accountsAvailable
+              ? "2x, 5x, 10x and up on your calls and watchlist, and a heads-up the day before the monthly reset, while Rankr is open."
+              : "2x, 5x, 10x and up on your calls and watchlist, while Rankr is open."}
         </div>
       </div>
       <button

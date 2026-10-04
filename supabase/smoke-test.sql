@@ -302,13 +302,18 @@ begin
   raise notice 'rankr smoke test: no leaderboard ok';
 end $$;
 
--- Monthly reset (needs all migrations): every token, call and milestone goes, accounts stay, nothing is kept.
+-- Monthly reset (needs all migrations): each caller's own recap is kept, every token, call and milestone
+-- goes, accounts stay.
 do $$
 declare
+  a uuid := '00000000-0000-4000-8000-00000000000a';
+  b uuid := '00000000-0000-4000-8000-00000000000b';
   r jsonb;
+  k public.recaps;
   v_profiles int := (select count(*) from public.profiles);
 begin
   assert (select count(*) from public.calls) > 0 and (select count(*) from public.call_milestones) > 0, 'something to reset';
+  -- A: BRAVO at 11x and CHAR at 5.6x from its entries (CHAR reached 2x, 3x and 5x). B: CHAR at 0.28x.
   r := public.rankr_end_month('2026-10-01 00:05+00');
   assert (r->>'ok')::boolean and r->>'month' = '2026-09-01', 'the month that just ended: ' || r::text;
   assert (r->>'tokens')::int > 0 and (r->>'calls')::int > 0 and (r->>'callers')::int > 0, r::text;
@@ -318,15 +323,48 @@ begin
   assert (select count(*) from public.profiles) = v_profiles, 'accounts stay';
   assert jsonb_array_length(public.rankr_feed()) = 0, 'the feed starts from zero';
 
+  -- Recaps: one per caller for the month that ended, measured from each caller's own entry.
+  assert (select count(*) from public.recaps) = 2, 'one recap per caller';
+  select * into k from public.recaps where user_id = a and month = '2026-09-01';
+  assert k.calls = 2 and k.hits = 2 and k.wins = 2, 'A: ' || to_jsonb(k)::text;
+  assert abs(k.avg_multiple - 8.3) < 1e-9 and k.best_multiple = 11, 'A: ' || to_jsonb(k)::text;
+  assert k.best_token->>'symbol' = 'BRAVO' and k.best_token->>'chain_id' = 'base' and k.best_token->>'address' = '0xBBB';
+  assert k.top_tier = 5, 'the highest milestone reached: ' || to_jsonb(k)::text;
+  select * into k from public.recaps where user_id = b and month = '2026-09-01';
+  assert k.calls = 1 and k.hits = 0 and k.wins = 0 and abs(k.best_multiple - 0.28) < 1e-9 and k.top_tier is null,
+         'B: ' || to_jsonb(k)::text;
+
   r := public.rankr_end_month('2026-10-01 00:06+00');
   assert (r->>'skipped')::boolean, 'nothing to clear: ' || r::text;
+  assert (select count(*) from public.recaps) = 2, 'nothing to clear, nothing kept';
   assert date_trunc('month', timestamptz '2026-09-15 12:00+00' - interval '12 hours')::date = '2026-09-01', 'by hand mid-month: this month';
 
+  -- Run again in the same month (by hand): the new calls join the recap already kept.
+  perform public.rankr_record_paste(jsonb_build_object(
+    'id', 'solana:DDD', 'chain_id', 'solana', 'address', 'DDD', 'name', 'Delta', 'symbol', 'DELTA',
+    'entry_price_usd', 1, 'entry_market_cap', 1000, 'first_pasted_at', now(), 'last_pasted_at', now(),
+    'peak_price_usd', 30, 'peak_at', now(), 'low_price_usd', 1, 'low_at', now(),
+    'last_price_usd', 30, 'market', '{}', 'last_checked_at', now()));
+  perform public.rankr_record_call(a, 'solana:DDD', 1, 1000, now());
+  r := public.rankr_end_month('2026-10-01 00:07+00');
+  assert r->>'month' = '2026-09-01' and (select count(*) from public.recaps) = 2, r::text;
+  select * into k from public.recaps where user_id = a and month = '2026-09-01';
+  assert k.calls = 3 and k.hits = 3 and k.wins = 3, 'merged: ' || to_jsonb(k)::text;
+  assert abs(k.avg_multiple - (8.3 * 2 + 30) / 3) < 1e-9, 'weighted average: ' || to_jsonb(k)::text;
+  assert k.best_multiple = 30 and k.best_token->>'symbol' = 'DELTA' and k.top_tier = 5, 'merged best: ' || to_jsonb(k)::text;
+
+  -- Private: no policies, so browsers (anon, authenticated) read nothing; deleting an account deletes its recaps.
+  assert (select relrowsecurity from pg_class where oid = 'public.recaps'::regclass), 'row level security on';
+  assert not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'recaps'), 'no policies';
   if exists (select 1 from pg_roles where rolname = 'anon') then
+    assert not has_table_privilege('anon', 'public.recaps', 'select');
+    assert not has_table_privilege('authenticated', 'public.recaps', 'select');
     assert not has_function_privilege('anon', 'public.rankr_end_month(timestamptz)', 'execute');
     assert not has_function_privilege('authenticated', 'public.rankr_end_month(timestamptz)', 'execute');
     assert has_function_privilege('service_role', 'public.rankr_end_month(timestamptz)', 'execute');
   end if;
+  delete from public.profiles where user_id = b;
+  assert not exists (select 1 from public.recaps where user_id = b), 'recaps go with the account';
 
   raise notice 'rankr smoke test: monthly reset ok';
 end $$;

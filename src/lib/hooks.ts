@@ -10,6 +10,7 @@ import type {
   FeedResponse,
   MarketSnapshot,
   MyCallsResponse,
+  MyRecapsResponse,
   StatsResponse,
   TokenView,
   TokensResponse,
@@ -112,6 +113,12 @@ export function useStats() {
   return { stats: data ?? null, error, isLoading };
 }
 
+/** The signed-in account's monthly recaps (none when `userId` is null). They change once a month. */
+export function useRecaps(userId: string | null) {
+  // No keepPreviousData: after switching accounts, never show the last one's recaps.
+  return useSWR<MyRecapsResponse>(userId ? `/api/me/recaps?u=${userId}` : null, authedFetcher, { revalidateOnFocus: false });
+}
+
 /** The signed-in account's calls (none when `userId` is null). */
 export function useAccountCalls(userId: string | null) {
   // No keepPreviousData: after switching accounts, never show the last one's calls.
@@ -126,6 +133,16 @@ export function refreshLive() {
       typeof key === "string" &&
       ["/api/tokens", "/api/stats", "/api/me/calls", "/api/callers", "/api/feed"].some((p) => key.includes(p)),
   );
+}
+
+const noSubscribe = () => () => {};
+
+/**
+ * False while the server renders and while the page hydrates, true after: for text that depends on the
+ * visitor's clock (a countdown), which a prerendered page would otherwise have from its build.
+ */
+export function useMounted(): boolean {
+  return useSyncExternalStore(noSubscribe, () => true, () => false);
 }
 
 /** Re-renders every `ms` so relative times stay current. */

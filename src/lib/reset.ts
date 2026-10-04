@@ -7,6 +7,15 @@ export function nextResetAt(now = Date.now()): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
 }
 
+/** How long before the reset Rankr reminds you (a banner in the app, and a notification with alerts on). */
+export const RESET_REMINDER_MS = 24 * 3_600_000;
+
+/** The coming reset when it's at most RESET_REMINDER_MS away, else null. */
+export function resetSoon(now = Date.now()): number | null {
+  const at = nextResetAt(now);
+  return at - now <= RESET_REMINDER_MS ? at : null;
+}
+
 /** "2026-09-01" -> "September 2026". */
 export function monthLabel(month: string): string {
   return new Date(`${month.slice(0, 10)}T00:00:00Z`).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });

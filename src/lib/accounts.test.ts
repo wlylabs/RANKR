@@ -393,3 +393,64 @@ describe("callerCall", () => {
     expect(await callerCall("no spaces!", "solana", "PEPEaddr")).toBeNull();
   });
 });
+
+describe("myRecaps", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("reads only the account's own recaps, newest first, in the app's shape", async () => {
+    vi.resetModules();
+    vi.stubEnv("SUPABASE_URL", "https://x.supabase.co");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
+    const urls: string[] = [];
+    const row = {
+      month: "2026-09-01",
+      calls: 3,
+      hits: 2,
+      wins: 2,
+      avg_multiple: 4.2,
+      best_multiple: 11,
+      best_token: { id: "base:0xbbb", chain_id: "base", address: "0xBBB", symbol: "BRAVO", name: "Bravo" },
+      top_tier: 10,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        if (url.includes("/rest/v1/recaps?")) return new Response(JSON.stringify([row, { ...row, month: "2026-08-01", best_token: null, top_tier: null }]));
+        return new Response("not found", { status: 404 });
+      }),
+    );
+    const { myRecaps, RECAPS_SHOWN } = await import("./accounts");
+    const account = { id: USER.id, username: "alpha_caller", hasKey: true, official: false, about: NO_ABOUT };
+    expect(await myRecaps(account)).toEqual([
+      {
+        month: "2026-09-01",
+        calls: 3,
+        hits: 2,
+        wins: 2,
+        avgMultiple: 4.2,
+        bestMultiple: 11,
+        bestToken: { id: "base:0xbbb", chainId: "base", address: "0xBBB", symbol: "BRAVO", name: "Bravo" },
+        topTier: 10,
+      },
+      expect.objectContaining({ month: "2026-08-01", bestToken: null, topTier: null }),
+    ]);
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain(`user_id=eq.${USER.id}`);
+    expect(urls[0]).toContain(`order=month.desc&limit=${RECAPS_SHOWN}`);
+  });
+
+  it("is empty without Supabase", async () => {
+    vi.resetModules();
+    vi.stubEnv("SUPABASE_URL", "");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { myRecaps } = await import("./accounts");
+    expect(await myRecaps({ id: USER.id, username: "a", hasKey: false, official: false, about: NO_ABOUT })).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

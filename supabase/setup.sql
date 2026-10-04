@@ -1510,3 +1510,101 @@ drop table if exists public.seasons;
 drop function if exists public.rankr_caller_rank(uuid, text, integer);
 drop function if exists public.rankr_callers(text, integer, integer, integer);
 drop function if exists public.rankr_caller_board(text, integer);
+
+-- ===== 20261004010000_rankr_recaps.sql =====
+
+-- Monthly recaps: before the reset clears the month, each caller's own numbers for it are kept as a
+-- private recap, for them alone. Not a board: nobody else can read them (no policies, so browsers get
+-- nothing; the server reads one account's own with the secret key). The calls themselves still go.
+
+do $$
+begin
+  if to_regprocedure('public.rankr_end_month(timestamptz)') is null then
+    raise exception 'rankr: run the earlier migrations first (or use supabase/setup.sql, which runs everything in order)';
+  end if;
+end $$;
+
+create table if not exists public.recaps (
+  user_id       uuid not null references public.profiles (user_id) on delete cascade,
+  month         date not null,                -- the month it covers, e.g. 2026-09-01
+  calls         integer not null,
+  hits          integer not null,             -- calls at 2x or more when the month ended
+  wins          integer not null,             -- calls above entry when the month ended
+  avg_multiple  double precision not null,
+  best_multiple double precision not null,
+  best_token    jsonb,                        -- {id, chain_id, address, symbol, name} of the best call
+  top_tier      integer,                      -- the highest milestone any call reached (null: none)
+  created_at    timestamptz not null default now(),
+  primary key (user_id, month)
+);
+
+-- No policies: only the server (secret key) reads and writes it.
+alter table public.recaps enable row level security;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on table public.recaps from anon, authenticated;
+  end if;
+end $$;
+
+-- Ends the month: keeps each caller's recap, then deletes every token (calls and milestones go with them).
+-- The month is the one that just ended when run in the first hours of the 1st, else the current one. Run
+-- again in the same month (by hand), the new calls are added to the recaps already kept. Nothing to clear
+-- (no tokens): nothing happens. Returns {ok, month, tokens, calls, callers} or {ok, skipped}.
+create or replace function public.rankr_end_month(p_at timestamptz default now()) returns jsonb
+language plpgsql as $$
+declare
+  v_month  date := date_trunc('month', p_at - interval '12 hours')::date;
+  v_counts jsonb;
+begin
+  select jsonb_build_object(
+    'tokens',  (select count(*) from public.tokens),
+    'calls',   (select count(*) from public.calls),
+    'callers', (select count(distinct user_id) from public.calls)
+  ) into v_counts;
+  if (v_counts->>'tokens')::int = 0 then
+    return jsonb_build_object('ok', true, 'skipped', true);
+  end if;
+
+  -- Each call measured from the caller's own entry, as on their profile.
+  insert into public.recaps as r (user_id, month, calls, hits, wins, avg_multiple, best_multiple, best_token, top_tier)
+  select a.user_id, v_month, a.calls, a.hits, a.wins, a.avg_multiple, a.best_multiple, a.best_token,
+         (select max(m.tier) from public.call_milestones m where m.user_id = a.user_id)
+  from (
+    select c.user_id,
+           count(*)::int                                       as calls,
+           count(*) filter (where t.last_price_usd / c.entry_price_usd >= 2)::int     as hits,
+           count(*) filter (where t.last_price_usd / c.entry_price_usd > 1.005)::int  as wins,
+           avg(t.last_price_usd / c.entry_price_usd)          as avg_multiple,
+           max(t.last_price_usd / c.entry_price_usd)          as best_multiple,
+           (array_agg(jsonb_build_object('id', t.id, 'chain_id', t.chain_id, 'address', t.address,
+                                         'symbol', t.symbol, 'name', t.name)
+                      order by t.last_price_usd / c.entry_price_usd desc, c.called_at))[1] as best_token
+    from public.calls c join public.tokens t on t.id = c.token_id
+    group by c.user_id
+  ) a
+  on conflict (user_id, month) do update set
+    calls         = r.calls + excluded.calls,
+    hits          = r.hits + excluded.hits,
+    wins          = r.wins + excluded.wins,
+    avg_multiple  = (r.avg_multiple * r.calls + excluded.avg_multiple * excluded.calls) / (r.calls + excluded.calls),
+    best_multiple = greatest(r.best_multiple, excluded.best_multiple),
+    best_token    = case when excluded.best_multiple > r.best_multiple then excluded.best_token else r.best_token end,
+    top_tier      = greatest(r.top_tier, excluded.top_tier);
+
+  -- "where true": Supabase's safeupdate refuses a delete without a where clause.
+  delete from public.tokens where true;
+
+  return jsonb_build_object('ok', true, 'month', v_month) || v_counts;
+end $$;
+
+revoke all on function public.rankr_end_month(timestamptz) from public;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on function public.rankr_end_month(timestamptz) from anon, authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.rankr_end_month(timestamptz) to service_role;
+  end if;
+end $$;

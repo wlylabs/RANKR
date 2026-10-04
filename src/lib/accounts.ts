@@ -7,7 +7,7 @@ import { parsePostId, xCode, type ProfileFields } from "./profile";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
-import type { CallResponse, CallView, CallerAbout, CallerView, FeedItem, TokenView } from "./types";
+import type { CallResponse, CallView, CallerAbout, CallerView, FeedItem, Recap, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 import { readPost, type Post } from "./x-post";
 
@@ -222,6 +222,47 @@ export async function recordCall(account: Account, token: TokenView) {
 
 export async function myCalls(account: Account): Promise<CallView[]> {
   return callsOf(account.id);
+}
+
+type RecapRow = {
+  month: string;
+  calls: number;
+  hits: number;
+  wins: number;
+  avg_multiple: number;
+  best_multiple: number;
+  best_token: { id: string; chain_id: string; address: string; symbol: string; name: string } | null;
+  top_tier: number | null;
+};
+
+/** How many recaps an account is shown: two years of months. */
+export const RECAPS_SHOWN = 24;
+
+/** The account's own monthly recaps (kept by the reset, rankr_end_month), newest first. Nobody else's. */
+export async function myRecaps(account: Account): Promise<Recap[]> {
+  const api = rest();
+  if (!api) return [];
+  const rows = await api.select<RecapRow[]>(
+    `recaps?select=month,calls,hits,wins,avg_multiple,best_multiple,best_token,top_tier&user_id=eq.${encodeURIComponent(account.id)}&order=month.desc&limit=${RECAPS_SHOWN}`,
+  );
+  return rows.map((r) => ({
+    month: r.month,
+    calls: r.calls,
+    hits: r.hits,
+    wins: r.wins,
+    avgMultiple: r.avg_multiple,
+    bestMultiple: r.best_multiple,
+    bestToken: r.best_token
+      ? {
+          id: r.best_token.id,
+          address: r.best_token.address,
+          symbol: r.best_token.symbol,
+          name: r.best_token.name,
+          chainId: r.best_token.chain_id,
+        }
+      : null,
+    topTier: r.top_tier,
+  }));
 }
 
 /**

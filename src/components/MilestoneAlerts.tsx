@@ -1,19 +1,55 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { milestoneAlerts, notify, readSeen, useAlertsOn, writeSeen, type AlertItem } from "@/lib/alerts";
+import {
+  milestoneAlerts,
+  notify,
+  notifyReset,
+  readResetNotified,
+  readSeen,
+  resetAlertDue,
+  useAlertsOn,
+  writeResetNotified,
+  writeSeen,
+  type AlertItem,
+} from "@/lib/alerts";
 import { tokenHref } from "@/lib/format";
-import { marketOf, useAccountCalls, useMyCalls, useTokens, useWatchlistMarkets } from "@/lib/hooks";
+import { marketOf, useAccountCalls, useMyCalls, useNow, useTokens, useWatchlistMarkets } from "@/lib/hooks";
 import { ratio } from "@/lib/metrics";
 import { MAX_LIMIT } from "@/lib/params";
+import { accountsAvailable } from "@/lib/supabase-browser";
 import { useWatchlist } from "@/lib/watchlist";
 import { useAuth } from "./AuthProvider";
 
 const NONE: ReturnType<typeof useMyCalls> = [];
 
-/** Watches your calls and watchlist while alerts are on (settings menu) and Rankr is open. */
+/**
+ * Watches your calls and watchlist while alerts are on (settings menu) and Rankr is open, and says the day
+ * before the monthly reset (only with accounts: the reset runs in Supabase).
+ */
 export function MilestoneAlerts() {
-  return useAlertsOn() ? <Watcher /> : null;
+  if (!useAlertsOn()) return null;
+  return (
+    <>
+      <Watcher />
+      {accountsAvailable && <ResetAlert />}
+    </>
+  );
+}
+
+/** One notification per reset, once it's a day away. */
+function ResetAlert() {
+  const { ready, userId } = useAuth();
+  const now = useNow(60_000);
+  useEffect(() => {
+    // After the session is read, so a signed-in caller hears about their recap.
+    if (!ready) return;
+    const at = resetAlertDue(now, readResetNotified());
+    if (at === null) return;
+    writeResetNotified(at);
+    void notifyReset(at, now, !!userId).catch(() => {});
+  }, [now, ready, userId]);
+  return null;
 }
 
 function Watcher() {
