@@ -1,8 +1,9 @@
 "use client";
 
-// Paper trades: simulated buys and sells of any amount, kept on this device (newest first), no account and
-// no real money. Each keeps what the buy filled at (src/lib/sim.ts) and every sale since, so its profit and
-// loss is known whatever happens to the token: tokens Rankr no longer tracks (after the monthly reset) are
+// Paper trades: simulated swaps of any amount, kept on this device (newest first), no account and no real
+// money. A paper wallet holds the cash (a balance you pick, topped up whenever): a buy takes from it, a sale
+// pays into it. Each trade keeps what the buy filled at (src/lib/sim.ts) and every sale since, so its profit
+// and loss is known whatever happens to the token: tokens Rankr no longer tracks (after the monthly reset) are
 // priced from live DEX data, like the watchlist.
 
 import { useSyncExternalStore } from "react";
@@ -46,6 +47,7 @@ export type PaperTrade = {
 };
 
 const KEY = "rankr:paper:v1";
+const WALLET_KEY = "rankr:paper:wallet:v1";
 /** Trades kept: the newest. */
 export const MAX_TRADES = 100;
 const EMPTY: PaperTrade[] = [];
@@ -105,7 +107,7 @@ function write(list: PaperTrade[]) {
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  const onStorage = (e: StorageEvent) => e.key === KEY && listener();
+  const onStorage = (e: StorageEvent) => (e.key === KEY || e.key === WALLET_KEY) && listener();
   window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(listener);
@@ -115,6 +117,67 @@ function subscribe(listener: () => void) {
 
 export function usePaperTrades(): PaperTrade[] {
   return useSyncExternalStore(subscribe, read, () => EMPTY);
+}
+
+/** The paper cash: what's left to buy with, and everything ever put in (the start and every top-up). */
+export type PaperWallet = { cashUsd: number; depositedUsd: number };
+
+let walletCache: { raw: string | null; value: PaperWallet | null } = { raw: null, value: null };
+// As last written, when the browser wouldn't store it; undefined when it did.
+let walletMemory: PaperWallet | null | undefined;
+
+function isWallet(x: unknown): x is PaperWallet {
+  const w = x as PaperWallet;
+  return !!w && Number.isFinite(w.cashUsd) && w.cashUsd >= 0 && Number.isFinite(w.depositedUsd) && w.depositedUsd >= 0;
+}
+
+function readWallet(): PaperWallet | null {
+  if (walletMemory !== undefined) return walletMemory;
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(WALLET_KEY);
+  } catch {
+    return null;
+  }
+  if (raw !== walletCache.raw) {
+    let value: PaperWallet | null = null;
+    try {
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      value = isWallet(parsed) ? parsed : null;
+    } catch {
+      /* corrupted entry, start over */
+    }
+    walletCache = { raw, value };
+  }
+  return walletCache.value;
+}
+
+function writeWallet(w: PaperWallet | null) {
+  try {
+    if (w) localStorage.setItem(WALLET_KEY, JSON.stringify(w));
+    else localStorage.removeItem(WALLET_KEY);
+    walletMemory = undefined;
+  } catch {
+    walletMemory = w;
+  }
+}
+
+/** Both at once, then one notice: a swap moves cash and tokens together. */
+function commit(trades: PaperTrade[], wallet: PaperWallet | null) {
+  writeWallet(wallet);
+  write(trades);
+}
+
+/** The paper wallet, or null before a balance has been picked. */
+export function usePaperWallet(): PaperWallet | null {
+  return useSyncExternalStore(subscribe, readWallet, () => null);
+}
+
+/** Starts the paper wallet with `usd` (any amount), or adds `usd` to it. */
+export function addPaperFunds(usd: number) {
+  if (!(usd > 0) || !Number.isFinite(usd)) return;
+  const w = readWallet();
+  commit(read(), w ? { cashUsd: w.cashUsd + usd, depositedUsd: w.depositedUsd + usd } : { cashUsd: usd, depositedUsd: usd });
 }
 
 function newId(): string {
@@ -152,11 +215,43 @@ export function paperBuy(m: MarketSnapshot, spendUsd: number, usdIdr: number | n
   };
 }
 
-/** Opens a paper trade (first in the list). Returns it, or null when the pair can't be priced. */
-export function openPaperTrade(m: MarketSnapshot, spendUsd: number, usdIdr: number | null): PaperTrade | null {
-  const trade = paperBuy(m, spendUsd, usdIdr);
-  if (trade) write([trade, ...read()].slice(0, MAX_TRADES));
-  return trade;
+/** The list with `trade` first, keeping MAX_TRADES: the oldest closed trades go first, open ones last. */
+function withTrade(trades: PaperTrade[], trade: PaperTrade): PaperTrade[] {
+  const list = [trade, ...trades];
+  while (list.length > MAX_TRADES) {
+    let drop = -1;
+    for (let i = list.length - 1; i > 0 && drop < 0; i--) if (remainingOf(list[i]) === 0) drop = i;
+    list.splice(drop < 0 ? list.length - 1 : drop, 1);
+  }
+  return list;
+}
+
+/** Why a paper swap didn't go through. */
+export type SwapError = "balance" | "holdings" | "price";
+
+/** A paper buy paid from the wallet. Pure: the wallet and trades after it, or why not. */
+export function buyWith(
+  wallet: PaperWallet,
+  trades: PaperTrade[],
+  m: MarketSnapshot,
+  spendUsd: number,
+  usdIdr: number | null,
+  now = Date.now(),
+): { wallet: PaperWallet; trades: PaperTrade[]; trade: PaperTrade } | { error: SwapError } {
+  if (spendUsd > wallet.cashUsd * (1 + 1e-9)) return { error: "balance" };
+  const trade = paperBuy(m, Math.min(spendUsd, wallet.cashUsd), usdIdr, now);
+  if (!trade) return { error: "price" };
+  return { wallet: { ...wallet, cashUsd: Math.max(0, wallet.cashUsd - trade.spentUsd) }, trades: withTrade(trades, trade), trade };
+}
+
+/** A paper buy from the wallet, saved. The trade, or why not. */
+export function swapBuy(m: MarketSnapshot, spendUsd: number, usdIdr: number | null): PaperTrade | SwapError {
+  const wallet = readWallet();
+  if (!wallet) return "balance";
+  const out = buyWith(wallet, read(), m, spendUsd, usdIdr);
+  if ("error" in out) return out.error;
+  commit(out.trades, out.wallet);
+  return out.trade;
 }
 
 /** Tokens not sold yet (none once what's left is a rounding error). */
@@ -175,14 +270,76 @@ export function paperSell(t: PaperTrade, fraction: number, m: MarketSnapshot, no
   return { ...t, sales: [...t.sales, { at: now, tokens, proceedsUsd: fill.proceedsUsd, priceUsd: m.priceUsd }] };
 }
 
-/** Sells part or all of a paper trade. Returns the updated trade, or null when it can't be priced. */
+/** A token's open paper trades, oldest first, with what they hold together and what it cost. */
+export function holdingsOf(trades: PaperTrade[], tokenId: string): { tokens: number; costUsd: number; open: PaperTrade[] } {
+  const open = trades.filter((t) => t.tokenId === tokenId && remainingOf(t) > 0).sort((a, b) => a.openedAt - b.openedAt);
+  let tokens = 0;
+  let costUsd = 0;
+  for (const t of open) {
+    const left = remainingOf(t);
+    tokens += left;
+    costUsd += (t.spentUsd * left) / t.tokens;
+  }
+  return { tokens, costUsd, open };
+}
+
+/**
+ * Sells `tokens` of a token in one go (priced as one sale, so its price impact is the whole amount's), taken
+ * from its open trades oldest first; each gets its share of what it brought in, and the wallet the whole of it.
+ * Pure: the wallet and trades after it, or why not.
+ */
+export function sellFrom(
+  wallet: PaperWallet | null,
+  trades: PaperTrade[],
+  tokenId: string,
+  tokens: number,
+  m: MarketSnapshot,
+  now = Date.now(),
+): { wallet: PaperWallet | null; trades: PaperTrade[]; proceedsUsd: number; tokens: number } | { error: SwapError } {
+  const held = holdingsOf(trades, tokenId);
+  if (!(tokens > 0) || !(held.tokens > 0) || tokens > held.tokens * (1 + 1e-9)) return { error: "holdings" };
+  const amount = Math.min(tokens, held.tokens);
+  const fill = quoteSell(m, amount);
+  if (!fill) return { error: "price" };
+  const sales = new Map<string, Sale>();
+  let left = amount;
+  for (const t of held.open) {
+    if (left <= amount * 1e-12) break;
+    const take = Math.min(remainingOf(t), left);
+    // The last one takes what's left of the trade outright, so no dust stays behind.
+    const all = take >= remainingOf(t) * (1 - 1e-9);
+    sales.set(t.id, { at: now, tokens: all ? remainingOf(t) : take, proceedsUsd: (fill.proceedsUsd * take) / amount, priceUsd: m.priceUsd });
+    left -= take;
+  }
+  return {
+    wallet: wallet && { ...wallet, cashUsd: wallet.cashUsd + fill.proceedsUsd },
+    trades: trades.map((t) => (sales.has(t.id) ? { ...t, sales: [...t.sales, sales.get(t.id)!] } : t)),
+    proceedsUsd: fill.proceedsUsd,
+    tokens: amount,
+  };
+}
+
+/** Sells `tokens` of a token from your paper trades, into the wallet. What it brought in, or why not. */
+export function swapSell(tokenId: string, tokens: number, m: MarketSnapshot): { proceedsUsd: number; tokens: number } | SwapError {
+  const out = sellFrom(readWallet(), read(), tokenId, tokens, m);
+  if ("error" in out) return out.error;
+  commit(out.trades, out.wallet);
+  return { proceedsUsd: out.proceedsUsd, tokens: out.tokens };
+}
+
+/** Sells part or all of one paper trade, into the wallet. Returns the updated trade, or null when it can't be priced. */
 export function sellPaperTrade(id: string, fraction: number, m: MarketSnapshot): PaperTrade | null {
   const list = read();
   const i = list.findIndex((t) => t.id === id);
   if (i < 0) return null;
   const next = paperSell(list[i], fraction, m);
   if (!next) return null;
-  write(list.map((t, j) => (j === i ? next : t)));
+  const wallet = readWallet();
+  const proceeds = next.sales[next.sales.length - 1].proceedsUsd;
+  commit(
+    list.map((t, j) => (j === i ? next : t)),
+    wallet && { ...wallet, cashUsd: wallet.cashUsd + proceeds },
+  );
   return next;
 }
 
@@ -190,8 +347,9 @@ export function removePaperTrade(id: string) {
   write(read().filter((t) => t.id !== id));
 }
 
+/** Every paper trade and the wallet: a fresh start. */
 export function clearPaperTrades() {
-  write(EMPTY);
+  commit(EMPTY, null);
 }
 
 export type Position = {

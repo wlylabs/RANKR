@@ -14,10 +14,12 @@ import {
   sellPaperTrade,
   summaryOf,
   usePaperTrades,
+  usePaperWallet,
   type PaperTrade,
 } from "@/lib/paper";
 import type { MarketSnapshot } from "@/lib/types";
 import { ChainTag } from "./Chain";
+import { PaperBalance } from "./PaperBalance";
 import { Cascade } from "./Cinema";
 import { RateNote } from "./RateNote";
 import { PAPER_NOTE } from "./Simulate";
@@ -34,9 +36,10 @@ function tone(n: number | null) {
   return n === null ? "text-muted" : n > 0.005 ? "text-up" : n < -0.005 ? "text-down" : "text-muted";
 }
 
-/** Paper trades on this device: what went in, what selling now would bring in, and selling them. */
+/** Paper trades on this device: the paper balance, what selling now would bring in, and selling them. */
 export function PaperTrades() {
   const trades = usePaperTrades();
+  const wallet = usePaperWallet();
   const ids = useMemo(() => [...new Set(trades.map((t) => t.tokenId))], [trades]);
   const { items, isLoading } = useWatchlistMarkets(ids);
   const market = (id: string) => marketOf(items.get(id));
@@ -45,12 +48,19 @@ export function PaperTrades() {
 
   if (!trades.length) {
     return (
-      <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
-        <FlaskConical className="mx-auto size-5 text-subtle" />
-        <p className="mt-3 font-medium">No paper trades yet</p>
-        <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
-          Open a token and use Simulate: a paper buy of any amount, no real money.
-        </p>
+      <div className="mt-6 space-y-4">
+        <PaperBalance />
+        <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
+          <FlaskConical className="mx-auto size-5 text-subtle" />
+          <p className="mt-3 font-medium">No paper trades yet</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Paste a token, pick how much, swap: any amount, no real money.</p>
+          <Link
+            href="/swap"
+            className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
+          >
+            Swap
+          </Link>
+        </div>
       </div>
     );
   }
@@ -62,10 +72,22 @@ export function PaperTrades() {
   return (
     <div className="mt-4">
       <p className="text-sm text-muted">
-        On this device only. Selling is priced on the pool as it is now, after the DEX fee and price impact.
+        On this device only. Selling is priced on the pool as it is now, after the DEX fee and price impact.{" "}
+        <Link href="/swap" className="text-fg underline-offset-4 hover:underline">
+          Swap
+        </Link>
       </p>
-      <div className="mt-6 grid grid-cols-2 card max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x lg:divide-border">
-        <Tile label="Put in" value={money.format(s.investedUsd)} hint={`${s.trades} ${s.trades === 1 ? "trade" : "trades"}, ${s.open} open`} />
+      <PaperBalance className="mt-4" />
+      <div className="mt-4 grid grid-cols-2 card max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(even)]:border-l lg:grid-cols-4 lg:divide-x lg:divide-border">
+        {wallet ? (
+          <Tile
+            label="Total, if sold now"
+            value={money.format(wallet.cashUsd + s.openValueUsd)}
+            hint={`cash ${money.format(wallet.cashUsd, { short: true })} · put in ${money.format(wallet.depositedUsd, { short: true })}`}
+          />
+        ) : (
+          <Tile label="Put in" value={money.format(s.investedUsd)} hint={`${s.trades} ${s.trades === 1 ? "trade" : "trades"}, ${s.open} open`} />
+        )}
         <Tile
           label="Open, if sold now"
           value={money.format(s.openValueUsd)}

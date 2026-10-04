@@ -1,14 +1,12 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, FlaskConical } from "lucide-react";
+import { ArrowLeftRight, FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
 import { formatAmount, formatMultiple, formatPrice, formatUsd } from "@/lib/format";
-import { openPaperTrade } from "@/lib/paper";
 import {
-  CONFIRM_IMPACT,
   WARN_IMPACT,
   atMultiple,
   poolOf,
@@ -54,16 +52,13 @@ function impactLabel(x: number) {
 
 /**
  * What a paper buy of any amount would fill at right now, what it would bring in at a few price moves, what it
- * would be worth had it gone in at an earlier price, and a button to open it as a paper trade (kept on this
- * device, under You → Paper).
+ * would be worth had it gone in at an earlier price, and a way into Swap to trade it on paper.
  */
 export function SimulatePanel({ market: m, entries = [], className }: { market: MarketSnapshot; entries?: WhatIfEntry[]; className?: string }) {
   const money = useMoney();
   const presets = spendPresets(money.shown, money.rate?.usdIdr ?? null);
   const [picked, setPicked] = useState<number | null>(null);
   const [typed, setTyped] = useState("");
-  const [bought, setBought] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const inputId = useId();
 
   const typedUsd = typed ? parseAmount(typed, money.shown, money.rate?.usdIdr ?? null) : null;
@@ -71,21 +66,7 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
   const spend = typed ? (typedOk ? typedUsd : null) : (picked ?? presets[0].usd);
   const fill = spend ? quoteBuy(m, spend) : null;
   const pool = poolOf(m);
-  const big = !!fill && fill.impact >= CONFIRM_IMPACT;
-
-  function changed() {
-    setBought(false);
-    setConfirming(false);
-  }
-
-  function buy() {
-    if (!spend) return;
-    if (big && !confirming) return setConfirming(true);
-    if (openPaperTrade(m, spend, money.rate?.usdIdr ?? null)) {
-      setBought(true);
-      setConfirming(false);
-    }
-  }
+  const swapHref = `/swap?chain=${encodeURIComponent(m.chainId)}&ca=${encodeURIComponent(m.address)}${spend ? `&usd=${spend}` : ""}`;
 
   return (
     <section className={clsx("card", className)}>
@@ -108,7 +89,6 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
                   onClick={() => {
                     setPicked(p.usd);
                     setTyped("");
-                    changed();
                   }}
                   className={clsx(
                     "h-8 truncate rounded-md border px-1 font-mono text-[11px] transition-colors",
@@ -129,7 +109,6 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
             value={typed}
             onChange={(e) => {
               setTyped(e.target.value);
-              changed();
             }}
             placeholder="Other amount, any size"
             className="mt-1.5 h-8 w-full rounded-md border border-border bg-transparent px-2.5 font-mono text-xs outline-none placeholder:text-subtle focus:border-border-strong"
@@ -229,28 +208,12 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
         )}
 
         <div>
-          {bought ? (
-            <p className="flex h-9 items-center gap-2 text-sm">
-              <Check className="size-4 text-up" /> Bought on paper.{" "}
-              <Link href="/me?tab=paper" className="text-muted underline-offset-4 hover:text-fg hover:underline">
-                Your paper trades
-              </Link>
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={buy}
-              disabled={!fill}
-              className={clsx(
-                "inline-flex h-9 w-full items-center justify-center rounded-md px-4 text-sm font-medium hover:opacity-85 disabled:opacity-40",
-                confirming ? "border border-down text-down" : "bg-fg text-bg",
-              )}
-            >
-              {confirming
-                ? `Paper buy anyway, at ${fill && fill.impact >= 1 ? impactLabel(fill.impact) : `${pct(fill?.impact ?? 0)} impact`}`
-                : `Paper buy${spend ? ` ${money.format(spend)}` : ""}`}
-            </button>
-          )}
+          <Link
+            href={swapHref}
+            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
+          >
+            <ArrowLeftRight className="size-3.5" /> Swap on paper{spend ? ` ${money.format(spend)}` : ""}
+          </Link>
           <RateNote className="mt-2" />
           <p className="mt-2 text-[11px] leading-relaxed text-subtle">{PAPER_NOTE}</p>
         </div>
