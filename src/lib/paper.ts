@@ -1,6 +1,6 @@
 "use client";
 
-// Paper trades: simulated buys and sells of $100-$1000, kept on this device (newest first), no account and
+// Paper trades: simulated buys and sells of any amount, kept on this device (newest first), no account and
 // no real money. Each keeps what the buy filled at (src/lib/sim.ts) and every sale since, so its profit and
 // loss is known whatever happens to the token: tokens Rankr no longer tracks (after the monthly reset) are
 // priced from live DEX data, like the watchlist.

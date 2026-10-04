@@ -37,16 +37,16 @@ describe("formatMoney", () => {
 });
 
 describe("spendPresets", () => {
-  it("offers $100-$1,000 in dollars", () => {
-    expect(spendPresets("usd", RATE).map((p) => p.usd)).toEqual([100, 250, 500, 1000]);
+  it("offers round dollar amounts", () => {
+    expect(spendPresets("usd", RATE).map((p) => p.label)).toEqual(["$50", "$100", "$500", "$1,000"]);
   });
 
-  it("offers round rupiah amounts that fit $100-$1,000 at the day's rate", () => {
+  it("offers round rupiah amounts, in dollars at the day's rate", () => {
     const idr = spendPresets("idr", RATE);
-    expect(idr.map((p) => p.label)).toEqual(["Rp2 jt", "Rp5 jt", "Rp10 jt", "Rp15 jt"]);
-    expect(idr[0].usd).toBeCloseTo(2_000_000 / RATE, 9);
-    // A rupiah far stronger than today: only Rp2 jt still fits, so dollars it is.
-    expect(spendPresets("idr", 1_000).map((p) => p.usd)).toEqual([100, 250, 500, 1000]);
+    expect(idr.map((p) => p.label)).toEqual(["Rp500 rb", "Rp1 jt", "Rp5 jt", "Rp10 jt"]);
+    expect(idr[1].usd).toBeCloseTo(1_000_000 / RATE, 9);
+    // No rate yet: dollars.
+    expect(spendPresets("idr", null).map((p) => p.usd)).toEqual([50, 100, 500, 1000]);
   });
 });
 

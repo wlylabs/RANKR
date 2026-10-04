@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atMultiple, clampSpend, poolOf, quoteBuy, quoteSell, whatIf } from "./sim";
+import { atMultiple, poolOf, quoteBuy, quoteSell, whatIf } from "./sim";
 import type { MarketSnapshot } from "./types";
 
 const SOL_USD = 150;
@@ -145,11 +145,17 @@ describe("whatIf", () => {
   });
 });
 
-describe("clampSpend", () => {
-  it("keeps a paper trade between $100 and $1,000", () => {
-    expect(clampSpend(50)).toBe(100);
-    expect(clampSpend(250)).toBe(250);
-    expect(clampSpend(5000)).toBe(1000);
+describe("any amount", () => {
+  it("fills small and huge amounts alike, the huge ones far above the market price", () => {
+    expect(quoteBuy(pair(), 5)!.tokens).toBeGreaterThan(0);
+    const whale = quoteBuy(pair(), 1_000_000)!;
+    expect(whale.impact).toBeGreaterThan(60); // $1M into a $15K-deep pool
+    expect(whale.fillPriceUsd).toBeGreaterThan(pair().priceUsd * 60);
+    expect(quoteSell(pair(), whale.tokens)!.proceedsUsd).toBeLessThan(15_000); // no more than the pool holds
+  });
+
+  it("has nothing to fill when the network costs take it all", () => {
+    expect(quoteBuy(pair(), 0.2)).toBeNull(); // network ≈ $0.30 on Solana
   });
 });
 

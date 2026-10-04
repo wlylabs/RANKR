@@ -49,7 +49,7 @@ export function PaperTrades() {
         <FlaskConical className="mx-auto size-5 text-subtle" />
         <p className="mt-3 font-medium">No paper trades yet</p>
         <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
-          Open a token and use Simulate: a paper buy of {money.format(100)} to {money.format(1000)}, no real money.
+          Open a token and use Simulate: a paper buy of any amount, no real money.
         </p>
       </div>
     );

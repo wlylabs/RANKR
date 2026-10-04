@@ -1,4 +1,4 @@
-// Paper trades: what a buy of $100-$1000, and selling it back later, would roughly fill at, from public data
+// Paper trades: what a buy of any amount, and selling it back later, would roughly fill at, from public data
 // only (DexScreener's pair). No real money and no quote from a DEX: an estimate, and labeled as one.
 //
 // The model ("fill-v1"), the same for every DEX with its own fee and depth:
@@ -16,9 +16,6 @@
 import type { MarketSnapshot } from "./types";
 
 export const SIM_MODEL = "fill-v1";
-/** What a paper trade puts in, in USD. */
-export const SIM_MIN_USD = 100;
-export const SIM_MAX_USD = 1000;
 /** Price impact worth a warning, and one big enough to ask again before a paper buy (Uniswap's thresholds). */
 export const WARN_IMPACT = 0.05;
 export const CONFIRM_IMPACT = 0.15;
@@ -226,7 +223,3 @@ export function atMultiple(m: MarketSnapshot, k: number): MarketSnapshot {
   };
 }
 
-/** Puts an amount in the paper range ($100-$1000). */
-export function clampSpend(usd: number): number {
-  return Math.min(SIM_MAX_USD, Math.max(SIM_MIN_USD, usd));
-}

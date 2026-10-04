@@ -5,12 +5,10 @@ import { Check, FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
-import { formatAmount, formatPrice, formatUsd } from "@/lib/format";
+import { formatAmount, formatMultiple, formatPrice, formatUsd } from "@/lib/format";
 import { openPaperTrade } from "@/lib/paper";
 import {
   CONFIRM_IMPACT,
-  SIM_MAX_USD,
-  SIM_MIN_USD,
   WARN_IMPACT,
   atMultiple,
   poolOf,
@@ -49,8 +47,13 @@ function pct(x: number) {
   return `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%`;
 }
 
+/** "+3.2% impact"; from double the market price on, as a multiple of it: "1,723x the market price". */
+function impactLabel(x: number) {
+  return x >= 1 ? `${formatMultiple(1 + x)} the market price` : `+${pct(x)} impact`;
+}
+
 /**
- * What a paper buy of $100-$1000 would fill at right now, what it would bring in at a few price moves, what it
+ * What a paper buy of any amount would fill at right now, what it would bring in at a few price moves, what it
  * would be worth had it gone in at an earlier price, and a button to open it as a paper trade (kept on this
  * device, under You → Paper).
  */
@@ -64,7 +67,7 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
   const inputId = useId();
 
   const typedUsd = typed ? parseAmount(typed, money.shown, money.rate?.usdIdr ?? null) : null;
-  const typedOk = typedUsd !== null && typedUsd >= SIM_MIN_USD - 1e-9 && typedUsd <= SIM_MAX_USD + 1e-9;
+  const typedOk = typedUsd !== null;
   const spend = typed ? (typedOk ? typedUsd : null) : (picked ?? presets[0].usd);
   const fill = spend ? quoteBuy(m, spend) : null;
   const pool = poolOf(m);
@@ -128,14 +131,10 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
               setTyped(e.target.value);
               changed();
             }}
-            placeholder={`Other amount, ${money.format(SIM_MIN_USD)} to ${money.format(SIM_MAX_USD)}`}
+            placeholder="Other amount, any size"
             className="mt-1.5 h-8 w-full rounded-md border border-border bg-transparent px-2.5 font-mono text-xs outline-none placeholder:text-subtle focus:border-border-strong"
           />
-          {typed && !typedOk && (
-            <p className="mt-1 text-xs text-down">
-              Between {money.format(SIM_MIN_USD)} and {money.format(SIM_MAX_USD)}.
-            </p>
-          )}
+          {typed && !typedOk && <p className="mt-1 text-xs text-down">That isn&apos;t an amount.</p>}
         </div>
 
         {fill ? (
@@ -149,7 +148,7 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
                 className={clsx(fill.impact >= WARN_IMPACT ? "text-down" : fill.impact >= 0.01 ? "text-fg" : "text-muted")}
                 title="Price impact: how far the buy moves the pool's price"
               >
-                ({fill.quality === "none" ? "impact unknown" : `+${pct(fill.impact)} impact`})
+                ({fill.quality === "none" ? "impact unknown" : impactLabel(fill.impact)})
               </span>
             </Row>
             <Row label="Costs">
@@ -166,12 +165,20 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
             </Row>
           </dl>
         ) : (
-          <p className="text-xs text-muted">{m.priceUsd > 0 ? "Pick an amount." : "No live price to simulate with."}</p>
+          <p className="text-xs text-muted">
+            {!(m.priceUsd > 0)
+              ? "No live price to simulate with."
+              : spend
+                ? `Too small: network costs alone are about ${money.format(pool.networkUsd)}.`
+                : "Pick an amount."}
+          </p>
         )}
 
         {fill && fill.impact >= WARN_IMPACT && (
           <p className="rounded-md border border-down/40 px-2.5 py-2 text-xs text-down">
-            Large price impact ({pct(fill.impact)}): a trade this size moves this pool a lot. A smaller amount fills closer to the market price.
+            {fill.impact >= 1
+              ? `Fills at ${impactLabel(fill.impact)}: a trade this size would all but drain this pool. A smaller amount fills closer to the market price.`
+              : `Large price impact (${pct(fill.impact)}): a trade this size moves this pool a lot. A smaller amount fills closer to the market price.`}
           </p>
         )}
 
@@ -239,7 +246,9 @@ export function SimulatePanel({ market: m, entries = [], className }: { market: 
                 confirming ? "border border-down text-down" : "bg-fg text-bg",
               )}
             >
-              {confirming ? `Paper buy anyway, at ${pct(fill?.impact ?? 0)} impact` : `Paper buy${spend ? ` ${money.format(spend)}` : ""}`}
+              {confirming
+                ? `Paper buy anyway, at ${fill && fill.impact >= 1 ? impactLabel(fill.impact) : `${pct(fill?.impact ?? 0)} impact`}`
+                : `Paper buy${spend ? ` ${money.format(spend)}` : ""}`}
             </button>
           )}
           <RateNote className="mt-2" />

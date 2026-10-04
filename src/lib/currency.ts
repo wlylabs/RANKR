@@ -8,7 +8,6 @@ import { useSyncExternalStore } from "react";
 import useSWR from "swr";
 import { formatUsd } from "./format";
 import { fetcher } from "./hooks";
-import { SIM_MAX_USD, SIM_MIN_USD } from "./sim";
 import type { FxResponse } from "./types";
 
 export type Currency = "usd" | "idr";
@@ -103,15 +102,14 @@ export function useMoney() {
   };
 }
 
-/** Round rupiah amounts for the paper presets, kept inside $100-$1000 at the day's rate. */
-const IDR_PRESETS = [2_000_000, 5_000_000, 10_000_000, 15_000_000];
-const USD_PRESETS = [100, 250, 500, 1000];
+/** Shortcuts for a paper buy, round in each currency; any other amount can be typed. */
+const IDR_PRESETS = [500_000, 1_000_000, 5_000_000, 10_000_000];
+const USD_PRESETS = [50, 100, 500, 1000];
 
 /** The amounts offered for a paper buy, in USD, with how each reads in the currency shown. */
 export function spendPresets(shown: Currency, usdIdr: number | null): { usd: number; label: string }[] {
   if (shown === "idr" && usdIdr) {
-    const fits = IDR_PRESETS.map((idr) => idr / usdIdr).filter((usd) => usd >= SIM_MIN_USD && usd <= SIM_MAX_USD);
-    if (fits.length >= 2) return fits.map((usd) => ({ usd, label: formatMoney(usd, "idr", usdIdr, { short: true }) }));
+    return IDR_PRESETS.map((idr) => ({ usd: idr / usdIdr, label: formatMoney(idr / usdIdr, "idr", usdIdr, { short: true }) }));
   }
   return USD_PRESETS.map((usd) => ({ usd, label: `$${usd.toLocaleString("en-US")}` }));
 }
