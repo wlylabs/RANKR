@@ -17,6 +17,13 @@ export type MarketSnapshot = {
   txns24h?: number | null;
   pairAddress: string;
   dexId: string;
+  /** The pool's kind as DexScreener labels it ("v2", "v3", "CLMM", "DLMM"...), when it does. */
+  labels?: string[];
+  /** The pair's quote coin (SOL, WETH, USDC...), its price in it, and the pool's quote-side reserve in it: what a
+   * sell can actually be paid out of. Absent in snapshots stored before these were kept. */
+  quoteSymbol?: string | null;
+  priceNative?: number | null;
+  liquidityQuote?: number | null;
   url: string;
   pairCreatedAt: number | null;
   websites: Link[];
@@ -102,6 +109,11 @@ export type Recap = {
 };
 
 export type MyRecapsResponse = { recaps: Recap[] };
+
+/** Rupiah per dollar (src/lib/fx.ts), null when no source answers. */
+export type FxResponse = {
+  rate: { usdIdr: number; date: string | null; source: string; credit?: { text: string; url: string }; fetchedAt: number } | null;
+};
 
 export type CallerView = {
   userId: string;

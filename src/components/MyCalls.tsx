@@ -21,6 +21,7 @@ import { CountUp } from "./CountUp";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { PageHeader } from "./PageHeader";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
+import { PaperTrades, useOpenPaperTrades } from "./PaperTrades";
 import { Recaps } from "./Recaps";
 import { SaveAvatar } from "./SaveAvatar";
 import { ShareCall } from "./ShareCall";
@@ -188,7 +189,7 @@ function DeviceCalls() {
   return <Page intro="Saved on this device." rows={rows} loading={isLoading && calls.length > 0} />;
 }
 
-const TABS = { calls: "Calls", stats: "Stats", recaps: "Recaps", watchlist: "Watchlist" } as const;
+const TABS = { calls: "Calls", stats: "Stats", recaps: "Recaps", paper: "Paper", watchlist: "Watchlist" } as const;
 type TabKey = keyof typeof TABS;
 
 /** The tab in the URL (?tab=stats), so it survives a reload and can be linked to. */
@@ -197,7 +198,8 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   const router = useRouter();
   const pathname = usePathname();
   const picked = params.get("tab");
-  const tab: TabKey = picked === "stats" || picked === "recaps" || picked === "watchlist" ? picked : "calls";
+  const tab: TabKey =
+    picked === "stats" || picked === "recaps" || picked === "paper" || picked === "watchlist" ? picked : "calls";
   // Old links: /me#watchlist.
   useEffect(() => {
     if (window.location.hash === "#watchlist") router.replace(`${pathname}?tab=watchlist`, { scroll: false });
@@ -205,7 +207,7 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   return [tab, (next) => router.replace(next === "calls" ? pathname : `${pathname}?tab=${next}`, { scroll: false })];
 }
 
-/** "You": your calls, how they're doing, your past months and your watchlist. */
+/** "You": your calls, how they're doing, your past months, your paper trades and your watchlist. */
 function Page({
   header,
   intro,
@@ -228,6 +230,7 @@ function Page({
   children?: React.ReactNode;
 }) {
   const watching = useWatchlist().length;
+  const paperOpen = useOpenPaperTrades();
   const [picked, setTab] = useTab();
   // The reset day is the visitor's (the page is prerendered): said once mounted.
   const mounted = useMounted();
@@ -247,6 +250,12 @@ function Page({
           calls: TABS.calls,
           stats: TABS.stats,
           ...(recapsOf && { recaps: TABS.recaps }),
+          paper: (
+            <>
+              {TABS.paper}
+              {paperOpen > 0 && <span className="ml-1.5 font-mono text-xs text-subtle">{paperOpen}</span>}
+            </>
+          ),
           watchlist: (
             <>
               {TABS.watchlist}
@@ -261,6 +270,8 @@ function Page({
 
       {tab === "watchlist" ? (
         <Watchlist />
+      ) : tab === "paper" ? (
+        <PaperTrades />
       ) : tab === "recaps" && recapsOf ? (
         <Recaps userId={recapsOf} />
       ) : children ? (

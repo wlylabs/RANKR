@@ -27,6 +27,7 @@ import { CopyButton } from "./CopyButton";
 import { DecryptText } from "./DecryptText";
 import { ChangeText, Flash, MultipleBadge } from "./MultipleBadge";
 import { ShareCall } from "./ShareCall";
+import { SimulatePanel } from "./Simulate";
 import { TimeAgo } from "./TimeAgo";
 import { WatchButton } from "./Watchlist";
 
@@ -254,6 +255,15 @@ function Tracked({ token: t }: { token: TokenView }) {
               </div>
             </Section>
           )}
+          {m && (
+            <SimulatePanel
+              market={m}
+              entries={[
+                { label: "The first paste", priceUsd: t.entryPriceUsd, marketCap: t.entryMarketCap },
+                ...(myCall ? [{ label: "Your call", priceUsd: myCall.entryPriceUsd, marketCap: myCall.entryMarketCap }] : []),
+              ]}
+            />
+          )}
           <Milestones token={t} />
           <Section title="Stats">
             <dl className="-my-2 divide-y divide-border">
@@ -476,8 +486,9 @@ function Untracked({ preview: p, onTracked }: { preview: MarketSnapshot; onTrack
           </button>
         </div>
       </section>
-      <div className="mt-6">
-        <Chart market={p} />
+      <div className="mt-6 grid gap-6 lg:grid-cols-3 lg:items-start">
+        <Chart market={p} className="lg:col-span-2" />
+        <SimulatePanel market={p} />
       </div>
     </>
   );
