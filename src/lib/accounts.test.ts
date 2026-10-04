@@ -20,7 +20,6 @@ describe("accounts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let profile: ProfileRow[];
   let feedArgs: Record<string, unknown> | null;
-  let rankArgs: Record<string, unknown> | null;
   let verifyOk: boolean;
 
   beforeEach(() => {
@@ -29,7 +28,6 @@ describe("accounts", () => {
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
     profile = [{ username: "alpha_caller" }];
     feedArgs = null;
-    rankArgs = null;
     verifyOk = true;
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const auth = new Headers(init?.headers).get("authorization");
@@ -47,32 +45,6 @@ describe("accounts", () => {
       if (url.includes("/auth/v1/admin/users/")) {
         if (init?.method !== "PUT") return new Response("method", { status: 405 });
         return new Response(JSON.stringify({ id: url.split("/").pop(), ...JSON.parse(String(init.body)) }));
-      }
-      if (url.endsWith("/rest/v1/rpc/rankr_callers")) {
-        const caller = { calls: 1, hits: 0, wins: 0, avg_multiple: 1, best_multiple: 1, best_token: null };
-        return new Response(
-          JSON.stringify({
-            total: 2,
-            callers: [
-              { ...caller, user_id: "u1", username: "rankr", official: true },
-              { ...caller, user_id: "u2", username: "degen" },
-            ],
-          }),
-        );
-      }
-      if (url.endsWith("/rest/v1/rpc/rankr_caller_rank")) {
-        rankArgs = JSON.parse(String(init?.body));
-        const caller = { calls: 6, hits: 2, wins: 3, avg_multiple: 1.8, best_multiple: 4.2, official: false };
-        return new Response(
-          JSON.stringify({
-            total: 12,
-            calls: 6,
-            rank: 4,
-            caller: { ...caller, user_id: USER.id, username: "alpha_caller",
-                      best_token: { id: "solana:ZZZ", address: "ZZZ", symbol: "ZED", name: "Zed", chain_id: "solana" } },
-            ahead: { ...caller, user_id: "u2", username: "degen", hits: 3, best_token: null },
-          }),
-        );
       }
       if (url.endsWith("/rest/v1/rpc/rankr_feed")) {
         feedArgs = JSON.parse(String(init?.body));
@@ -262,15 +234,6 @@ describe("accounts", () => {
     expect(await verifyX((await accountFromRequest(req("guest-token")))!, link, read)).toMatchObject({ ok: false, status: 409 });
   });
 
-  it("marks official callers on the board", async () => {
-    const { callers } = await import("./accounts");
-    const out = await callers("hits", 50, 0);
-    expect(out.callers.map((c) => [c.username, c.official])).toEqual([
-      ["rankr", true],
-      ["degen", false],
-    ]);
-  });
-
   it("is null without a token and rejects bad tokens", async () => {
     const { AuthError, accountFromRequest } = await import("./accounts");
     expect(await accountFromRequest(req())).toBeNull();
@@ -285,7 +248,7 @@ describe("accounts", () => {
     expect(await accountFromRequest(req("good-token"))).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it("reads the feed: milestones measured from the caller's own entry, with their board numbers", async () => {
+  it("reads the feed: milestones measured from the caller's own entry, with their numbers", async () => {
     const { feed } = await import("./accounts");
     const items = await feed({ limit: 20, offset: 0, users: ["u1"], chain: "solana", kind: "milestone" });
     expect(feedArgs).toEqual({ p_limit: 20, p_offset: 0, p_users: ["u1"], p_chain: "solana", p_kind: "milestone" });
@@ -303,19 +266,6 @@ describe("accounts", () => {
         multiple: 6, // price 12, this caller's entry 2
       },
     ]);
-  });
-
-  it("reads a caller's place on the board with the board's minimum calls", async () => {
-    const { callerRank } = await import("./accounts");
-    const out = await callerRank(USER.id, "rate");
-    expect(rankArgs).toEqual({ p_user: USER.id, p_sort: "rate", p_min_calls: 5 });
-    expect(out).toMatchObject({ total: 12, calls: 6, rank: 4 });
-    expect(out.caller).toMatchObject({ userId: USER.id, username: "alpha_caller", hits: 2, avgMultiple: 1.8 });
-    expect(out.caller?.bestToken).toEqual({ id: "solana:ZZZ", address: "ZZZ", symbol: "ZED", name: "Zed", chainId: "solana" });
-    expect(out.ahead).toMatchObject({ userId: "u2", username: "degen", hits: 3, bestToken: null });
-
-    await callerRank(USER.id, "hits");
-    expect(rankArgs).toMatchObject({ p_sort: "hits", p_min_calls: 1 });
   });
 
   it("asks nothing for an empty list of callers", async () => {
@@ -441,46 +391,5 @@ describe("callerCall", () => {
     expect(await callerCall("nonce_7f3a", "solana", "OTHER")).toBeNull();
     expect(await callerCall("someone_else", "solana", "PEPEaddr")).toBeNull();
     expect(await callerCall("no spaces!", "solana", "PEPEaddr")).toBeNull();
-  });
-});
-
-describe("lastSeason", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
-  });
-
-  it("reads the last month that ended, with callers by the names they have now", async () => {
-    vi.resetModules();
-    vi.stubEnv("SUPABASE_URL", "https://x.supabase.co");
-    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
-    const urls: string[] = [];
-    const caller = { user_id: "u1", username: "old_name", official: false, calls: 8, hits: 5, wins: 6, avg_multiple: 3, best_multiple: 12, best_token: null };
-    const token = { id: "solana:ZZZ", chain_id: "solana", address: "ZZZ", symbol: "ZED", name: "Zed", entry_market_cap: 1000, peak_multiple: 40, multiple: 2, first_caller: "u1" };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string) => {
-        urls.push(url);
-        if (url.includes("/rest/v1/seasons?")) {
-          return new Response(
-            JSON.stringify([
-              { month: "2026-09-01", ended_at: "2026-10-01T00:00:00+00:00", counts: { tokens: 120, calls: 300, callers: 40 }, callers: [caller], tokens: [token] },
-            ]),
-          );
-        }
-        if (url.includes("/rest/v1/profiles?")) return new Response(JSON.stringify([{ user_id: "u1", username: "new_name", official: true }]));
-        return new Response("not found", { status: 404 });
-      }),
-    );
-    const { lastSeason } = await import("./accounts");
-    expect(await lastSeason()).toEqual({
-      month: "2026-09-01",
-      endedAt: Date.parse("2026-10-01T00:00:00Z"),
-      counts: { tokens: 120, calls: 300, callers: 40 },
-      callers: [{ userId: "u1", username: "new_name", official: true, calls: 8, hits: 5, avgMultiple: 3, bestMultiple: 12 }],
-      tokens: [{ id: "solana:ZZZ", chainId: "solana", address: "ZZZ", symbol: "ZED", name: "Zed", entryMarketCap: 1000, peakMultiple: 40, firstCaller: "new_name" }],
-    });
-    expect(urls[0]).toContain("seasons?select=*&order=ended_at.desc&limit=1");
-    expect(urls[1]).toContain("user_id=in.(u1)");
   });
 });

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { HashField, Reveal } from "@/components/Cinema";
 import { DecryptText } from "@/components/DecryptText";
 import { LiveStatus } from "@/components/HomeFeed";
-import { BoardPreview, Faq } from "@/components/Landing";
+import { Faq } from "@/components/Landing";
 import { APP_HOME } from "@/lib/login";
 import { delay } from "@/lib/motion";
 
@@ -32,10 +32,6 @@ const FAQ = [
     a: "No wallet and no email. Continue as a guest in one click.",
   },
   {
-    q: "Does the board reset?",
-    a: "Yes. At 00:00 UTC on the 1st of every month every token and call is cleared and everyone starts from zero. The month's top 10 callers and tokens are kept.",
-  },
-  {
     q: "Is there an app?",
     a: "Yes. Open Settings, the gear at the top, and choose Install app.",
   },
@@ -61,7 +57,7 @@ export default function LandingPage() {
             </span>
           </h1>
           <p className="cine-in mt-6 max-w-sm text-[15px] text-pretty text-muted sm:max-w-md sm:text-base" style={delay(500)}>
-            Every call is sealed the second it&apos;s pasted, then ranked live.
+            Every call is sealed the second it&apos;s pasted, then tracked live.
           </p>
           {/* The one next step, styled like the app's own primary buttons (Track, Paste a CA). */}
           <Link
@@ -76,8 +72,6 @@ export default function LandingPage() {
           </p>
         </div>
       </section>
-
-      <BoardPreview />
 
       <section aria-label="How Rankr works" className="border-y border-border">
         <ol className="grid divide-border max-sm:divide-y sm:grid-cols-3 sm:divide-x">

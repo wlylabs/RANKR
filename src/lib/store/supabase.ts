@@ -1,5 +1,5 @@
 import { DEAD_MULTIPLE } from "../params";
-import { SupabaseError, SupabaseRest } from "../supabase-rest";
+import { SupabaseRest } from "../supabase-rest";
 import type { MarketSnapshot, TokenRecord } from "../types";
 import type { MarketUpdate, RecordPage, Store, StoreStats, TokenQuery } from "./types";
 
@@ -120,24 +120,13 @@ export class SupabaseStore implements Store {
   }
 
   async query(q: TokenQuery): Promise<RecordPage> {
-    const args: Record<string, unknown> = {
-      p_sort: q.sort,
+    const out = await this.rpc<{ total: number; records: TokenRow[] }>("rankr_query", {
+      p_sort: "new",
       p_chain: q.chain ?? null,
-      p_since: q.since != null ? iso(q.since) : null,
-      p_q: q.q || null,
       p_ids: q.ids ?? null,
       p_limit: q.limit,
       p_offset: q.offset,
-    };
-    let out: { total: number; records: TokenRow[] };
-    try {
-      out = await this.rpc("rankr_query", q.hideDead ? { ...args, p_hide_dead: true } : args);
-    } catch (err) {
-      // Until …_rankr_dead_tokens.sql has run, rankr_query has no p_hide_dead: show the board with dead tokens.
-      if (!(q.hideDead && err instanceof SupabaseError && err.status === 404)) throw err;
-      console.warn("[rankr] rankr_query without p_hide_dead: run supabase/setup.sql");
-      out = await this.rpc("rankr_query", args);
-    }
+    });
     return { total: out.total, records: out.records.map(fromRow) };
   }
 

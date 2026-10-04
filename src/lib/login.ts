@@ -1,6 +1,6 @@
 // Where to go after signing in. Only same-site paths, so /login?next=... can't bounce people elsewhere.
 
-/** The app's home: the paste box and the live board. The landing page is at /. */
+/** The app's home: the paste box, the stats and the live feed. The landing page is at /. */
 export const APP_HOME = "/app";
 
 /** The landing page. Signing out ends up here. */

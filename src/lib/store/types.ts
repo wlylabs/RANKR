@@ -1,16 +1,9 @@
-import type { SortKey } from "../params";
 import type { MarketSnapshot, TokenRecord } from "../types";
 
+/** Tracked tokens, newest first paste first: on one chain, or these ids. */
 export type TokenQuery = {
-  sort: SortKey;
   chain?: string | null;
-  /** Only tokens first pasted at or after this time (ms). */
-  since?: number | null;
-  /** Ticker / name substring, or an exact address. */
-  q?: string | null;
   ids?: string[] | null;
-  /** Leave out dead tokens (see DEAD_MULTIPLE): the boards. */
-  hideDead?: boolean;
   limit: number;
   offset: number;
 };

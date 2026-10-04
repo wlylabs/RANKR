@@ -3,16 +3,13 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
-import { MAX_LIMIT, type CallerSort, type FeedKind, type FeedScope, type RangeKey, type SortKey } from "./params";
+import { MAX_LIMIT, type FeedKind, type FeedScope } from "./params";
 import { authedFetcher } from "./supabase-browser";
 import type {
   CallerProfileResponse,
-  CallersResponse,
   FeedResponse,
   MarketSnapshot,
   MyCallsResponse,
-  MyRankResponse,
-  SeasonResponse,
   StatsResponse,
   TokenView,
   TokensResponse,
@@ -26,66 +23,13 @@ export async function fetcher<T>(url: string): Promise<T> {
   return body as T;
 }
 
-export type TokensParams = {
-  sort?: SortKey;
-  range?: RangeKey;
-  chain?: string | null;
-  q?: string | null;
-  ids?: string[];
-  limit?: number;
-  offset?: number;
-};
-
-/** SWR key for a token query, or null when there is nothing to ask for. */
-export function tokensKey(p: TokensParams): string | null {
-  if (p.ids && !p.ids.length) return null;
-  const qs = new URLSearchParams();
-  if (p.sort) qs.set("sort", p.sort);
-  if (p.range && p.range !== "all") qs.set("range", p.range);
-  if (p.chain) qs.set("chain", p.chain);
-  if (p.q) qs.set("q", p.q);
-  if (p.ids) qs.set("ids", p.ids.join(","));
-  if (p.limit) qs.set("limit", String(p.limit));
-  if (p.offset) qs.set("offset", String(p.offset));
-  return `/api/tokens?${qs}`;
-}
-
 const LIVE = { refreshInterval: 20_000, keepPreviousData: true } as const;
 
-export function useTokens(params: TokensParams) {
-  const { data, error, isLoading, isValidating, mutate } = useSWR<TokensResponse>(tokensKey(params), fetcher, LIVE);
-  return {
-    tokens: data?.tokens ?? [],
-    total: data?.total ?? 0,
-    updatedAt: data?.updatedAt ?? null,
-    error,
-    isLoading,
-    isValidating,
-    mutate,
-  };
-}
-
-/** A leaderboard read in pages of `pageSize`; `loadMore` fetches the next one. */
-export function useTokenPages(params: Omit<TokensParams, "limit" | "offset" | "ids">, pageSize = 50) {
-  const { data, error, isLoading, isValidating, size, setSize, mutate } = useSWRInfinite<TokensResponse>(
-    (i, prev: TokensResponse | null) =>
-      prev && prev.tokens.length < pageSize ? null : tokensKey({ ...params, limit: pageSize, offset: i * pageSize }),
-    fetcher,
-    // revalidateAll: every loaded page refreshes on the live interval. (revalidateFirstPage: false, used
-    // before, stopped the interval from fetching anything, so the board never moved on its own.)
-    { ...LIVE, revalidateAll: true },
-  );
-  const tokens = data?.flatMap((p) => p.tokens) ?? [];
-  return {
-    tokens,
-    total: data?.[0]?.total ?? 0,
-    updatedAt: data?.[0]?.updatedAt ?? null,
-    error,
-    isLoading,
-    isValidating,
-    loadMore: () => setSize(size + 1),
-    mutate,
-  };
+/** Live data for the tracked tokens among `ids` (from tokenId), at most MAX_LIMIT of them. */
+export function useTokens(ids: string[]) {
+  const key = ids.length ? `/api/tokens?ids=${ids.slice(0, MAX_LIMIT).map(encodeURIComponent).join(",")}` : null;
+  const { data, error, isLoading } = useSWR<TokensResponse>(key, fetcher, LIVE);
+  return { tokens: data?.tokens ?? [], error, isLoading };
 }
 
 /** Live data for watched tokens (ids from tokenId), by id: Rankr's record when it tracks one, else the DEX's. */
@@ -101,49 +45,13 @@ export function marketOf(item: WatchlistResponse["items"][number] | undefined): 
   return item?.token?.market ?? item?.market ?? null;
 }
 
-/** The last month that ended, with its top 10s. It changes once a month. */
-export function useLastSeason(enabled = true) {
-  const { data, isLoading } = useSWR<SeasonResponse>(enabled ? "/api/season" : null, fetcher, { revalidateOnFocus: false });
-  return { season: data?.last ?? null, isLoading };
-}
-
-/** A caller's public profile, refreshed like the boards. */
+/** A caller's public profile, refreshed live. */
 export function useCallerProfile(username: string, enabled = true) {
   return useSWR<CallerProfileResponse>(
     enabled ? `/api/callers/${encodeURIComponent(username)}` : null,
     fetcher,
     { ...LIVE, keepPreviousData: false },
   );
-}
-
-/** Caller leaderboard in pages of `pageSize`. */
-export function useCallerPages(sort: CallerSort, pageSize = 50) {
-  const { data, error, isLoading, isValidating, size, setSize } = useSWRInfinite<CallersResponse>(
-    (i, prev: CallersResponse | null) =>
-      prev && prev.callers.length < pageSize ? null : `/api/callers?sort=${sort}&limit=${pageSize}&offset=${i * pageSize}`,
-    fetcher,
-    // revalidateAll: every loaded page refreshes on the live interval. (revalidateFirstPage: false, used
-    // before, stopped the interval from fetching anything, so the board never moved on its own.)
-    { ...LIVE, revalidateAll: true },
-  );
-  return {
-    callers: data?.flatMap((p) => p.callers) ?? [],
-    total: data?.[0]?.total ?? 0,
-    enabled: data?.[0]?.enabled ?? true,
-    error,
-    isLoading,
-    isValidating,
-    loadMore: () => setSize(size + 1),
-  };
-}
-
-/** The signed-in caller's place on the caller board for `sort` (nothing when `userId` is null). */
-export function useMyRank(sort: CallerSort, userId: string | null) {
-  // No keepPreviousData: after switching accounts, never show the last one's place.
-  const { data } = useSWR<MyRankResponse>(userId ? `/api/me/rank?sort=${sort}&u=${userId}` : null, authedFetcher, {
-    refreshInterval: 20_000,
-  });
-  return data ?? null;
 }
 
 export type FeedParams = {
@@ -210,13 +118,13 @@ export function useAccountCalls(userId: string | null) {
   return useSWR<MyCallsResponse>(userId ? `/api/me/calls?u=${userId}` : null, authedFetcher, { refreshInterval: 20_000 });
 }
 
-/** Revalidates every board and stat on the page, e.g. after a paste. */
-export function refreshBoards() {
-  // `includes` also matches the "$inf$..." keys of paged boards.
+/** Revalidates every live list and stat on the page, e.g. after a paste. */
+export function refreshLive() {
+  // `includes` also matches the "$inf$..." keys of paged lists.
   return mutate(
     (key) =>
       typeof key === "string" &&
-      ["/api/tokens", "/api/stats", "/api/me/calls", "/api/me/rank", "/api/callers", "/api/feed"].some((p) => key.includes(p)),
+      ["/api/tokens", "/api/stats", "/api/me/calls", "/api/callers", "/api/feed"].some((p) => key.includes(p)),
   );
 }
 
@@ -273,7 +181,7 @@ function writeCalls(calls: MyCall[]) {
   try {
     localStorage.setItem(CALLS_KEY, JSON.stringify(calls));
   } catch {
-    /* storage full or blocked; the call still exists on the global board */
+    /* storage full or blocked; the call is still recorded on Rankr */
   }
   listeners.forEach((l) => l());
 }

@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "That doesn't look like a token address or token link." }, { status: 400 });
   }
 
-  // A daily quota per account, so one account can't spray the board: fewer for guests, none for official accounts.
+  // A daily quota per account, so one account can't spray the feed: fewer for guests, none for official accounts.
   if (account && !account.official) {
     const max = account.hasKey ? PASTE_LIMITS.keyedPerDay : PASTE_LIMITS.guestPerDay;
     const quota = await hit(`paste:user:${account.id}:day`, DAY, max);

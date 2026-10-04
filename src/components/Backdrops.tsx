@@ -33,28 +33,6 @@ export function SignalField() {
   );
 }
 
-/** Leaderboard: the stage. Two spotlights from above, swaying slowly over the board. */
-export function StageLights() {
-  return (
-    <div aria-hidden className={`${frame} [mask-image:linear-gradient(to_bottom,#000_40%,transparent)]`}>
-      <div
-        className={`${dots} [mask-image:radial-gradient(ellipse_70%_80%_at_50%_0%,#000_20%,transparent_80%)]`}
-        style={{ backgroundSize: "28px 28px", backgroundPosition: "50% 0" }}
-      />
-      {[
-        { left: "22%", r: 14, d: 0 },
-        { left: "78%", r: -14, d: 2600 },
-      ].map(({ left, r, d }) => (
-        <span
-          key={left}
-          className="spot absolute -top-24 h-[150%] w-56 origin-top blur-2xl sm:w-80 [background:linear-gradient(to_bottom,color-mix(in_srgb,var(--fg)_13%,transparent),transparent_85%)] [clip-path:polygon(42%_0,58%_0,100%_100%,0_100%)]"
-          style={{ left, "--r": `${r}deg`, "--d": `${d}ms` } as CSSProperties}
-        />
-      ))}
-    </div>
-  );
-}
-
 const CELL = 22;
 
 /**

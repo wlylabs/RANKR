@@ -97,21 +97,6 @@ export type CallerView = {
   bestToken: { id: string; address: string; symbol: string; name: string; chainId: string } | null;
 };
 
-export type CallersResponse = { enabled: boolean; total: number; callers: CallerView[]; updatedAt: number };
-
-/** The signed-in caller's place on the caller board for one sort (rankr_caller_rank). */
-export type MyRankResponse = {
-  /** Callers on the board. */
-  total: number;
-  /** All of the caller's calls, on the board or not. */
-  calls: number;
-  /** From 1; null off the board (fewer calls than the sort needs), and then `caller` is null too. */
-  rank: number | null;
-  caller: CallerView | null;
-  /** The caller one place up; null at #1. */
-  ahead: CallerView | null;
-};
-
 /**
  * What a caller says about themselves (see src/lib/profile.ts). On a public profile `x` is there only once
  * verified; the account's own view has it either way.
@@ -128,7 +113,7 @@ export type CallerAbout = {
 /** One caller's call on one token, from their own entry: its public page and share card. */
 export type CallResponse = { caller: Pick<CallerView, "userId" | "username" | "official">; call: CallView; updatedAt: number };
 
-/** A caller's public profile: board numbers, bio and links, and calls, newest first. */
+/** A caller's public profile: their numbers, bio and links, and calls, newest first. */
 export type CallerProfileResponse = { caller: CallerView; about: CallerAbout; calls: CallView[]; updatedAt: number };
 
 /**
@@ -146,7 +131,7 @@ export type FeedItem = {
   /** Null when accounts are off: the entry is a plain paste, not someone's call. */
   username: string | null;
   official: boolean;
-  /** The caller's board numbers: calls, and calls at 2x+ right now. */
+  /** The caller's numbers: calls, and calls at 2x+ right now. */
   caller: { calls: number; hits: number } | null;
   token: { id: string; chainId: string; address: string; symbol: string; name: string };
   /** Market cap at this call's entry. */
@@ -173,29 +158,6 @@ export type StatsResponse = {
   chains: string[];
   updatedAt: number;
 };
-
-/** A month that ended: its top 10 callers and tokens, kept when the boards reset (public.seasons). */
-export type Season = {
-  /** The month's first day, "2026-09-01". */
-  month: string;
-  endedAt: number;
-  counts: { tokens: number; calls: number; callers: number };
-  /** By hit rate, callers with 5+ calls, as on the caller board then. Names as they are now. */
-  callers: { userId: string; username: string; official: boolean; calls: number; hits: number; avgMultiple: number; bestMultiple: number }[];
-  /** By peak x since the first paste. `firstCaller`: who called it first, by today's name. */
-  tokens: {
-    id: string;
-    chainId: string;
-    address: string;
-    symbol: string;
-    name: string;
-    entryMarketCap: number | null;
-    peakMultiple: number;
-    firstCaller: string | null;
-  }[];
-};
-
-export type SeasonResponse = { last: Season | null };
 
 /** A paste looked up before it's called or watched: live data, and Rankr's record if it tracks the token. */
 export type LookupResponse = { preview: MarketSnapshot; token: TokenView | null };

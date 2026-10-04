@@ -4,7 +4,7 @@ import { Login } from "@/components/Login";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to Rankr as a guest or with your key to paste CAs and get ranked on the caller board.",
+  description: "Sign in to Rankr as a guest or with your key to paste CAs and track your calls.",
   robots: { index: false },
 };
 

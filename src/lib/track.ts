@@ -1,6 +1,6 @@
 "use client";
 
-import { addMyCall, refreshBoards } from "./hooks";
+import { addMyCall, refreshLive } from "./hooks";
 import { accountsAvailable, apiFetch } from "./supabase-browser";
 import type { LookupResponse, TrackResponse } from "./types";
 
@@ -14,7 +14,7 @@ export class PasteError extends Error {
   }
 }
 
-/** Sends a paste to Rankr, records it as your call and refreshes the boards. */
+/** Sends a paste to Rankr, records it as your call and refreshes what's live on the page. */
 export async function trackPaste(input: string, chain?: string): Promise<TrackResponse & { firstCallByYou: boolean }> {
   const res = await apiFetch("/api/track", {
     method: "POST",
@@ -29,7 +29,7 @@ export async function trackPaste(input: string, chain?: string): Promise<TrackRe
   const result = body as TrackResponse;
   // With accounts, your calls live on your account. Without (local dev), on this device.
   const firstCallByYou = accountsAvailable ? !!result.call?.created : addMyCall(result.token);
-  void refreshBoards();
+  void refreshLive();
   return { ...result, firstCallByYou };
 }
 

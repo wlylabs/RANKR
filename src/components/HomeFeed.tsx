@@ -5,25 +5,21 @@ import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatMultiple, tokenHref } from "@/lib/format";
-import { useCallerPages, useFeed, useNow, useStats, useTokens } from "@/lib/hooks";
-import { monthLabel, nextResetAt, resetDay, untilLabel } from "@/lib/season";
-import { accountsAvailable } from "@/lib/supabase-browser";
+import { useFeed, useStats } from "@/lib/hooks";
 import { useAuth } from "./AuthProvider";
-import { CallerRateRow } from "./CallersBoard";
 import { Cascade, HashField } from "./Cinema";
 import { CountUp } from "./CountUp";
 import { FeedRow } from "./Feed";
-import { RankCard } from "./MyCalls";
 import { LiveDot } from "./PageHeader";
 import { PasteBox } from "./PasteBox";
-import { ListSkeleton, TokenRow } from "./TokenList";
+import { ListSkeleton } from "./TokenList";
 
 const PANEL_ROWS = 5;
 
 /**
- * The top of the app's home. Signed out: the hero (`hero`). Signed in: the paste box, then your place this
- * month. Until the session is read it isn't known which, and a returning caller shouldn't see the hero flash,
- * so the paste box shows (it works either way).
+ * The top of the app's home. Signed out: the hero (`hero`). Signed in: the paste box. Until the session is
+ * read it isn't known which, and a returning caller shouldn't see the hero flash, so the paste box shows (it
+ * works either way).
  */
 export function HomeTop({ hero }: { hero: ReactNode }) {
   const { ready, userId } = useAuth();
@@ -34,7 +30,6 @@ export function HomeTop({ hero }: { hero: ReactNode }) {
       <div id="paste">
         <PasteBox resumeFromUrl />
       </div>
-      {userId && <RankCard userId={userId} href="/me" best className="mt-4" />}
     </section>
   );
 }
@@ -79,7 +74,7 @@ function Empty({ children = "Nothing here yet. Paste the first CA above." }: { c
   return <div className="px-4 py-12 text-center text-sm text-muted">{children}</div>;
 }
 
-/** Tracked / hit 2x+ / best run / in the red, for the whole board. */
+/** Tracked / hit 2x+ / best run / in the red, over every token tracked. */
 function StatsGrid() {
   const { stats } = useStats();
   const best = stats?.best ?? null;
@@ -123,62 +118,11 @@ function StatsGrid() {
   );
 }
 
-/** This month and when the boards reset (only with accounts: the reset runs in Supabase). */
-function MonthBar() {
-  const now = useNow(60_000);
-  const resetsAt = nextResetAt(now);
+/** The newest feed entries of one kind, calls or milestones. */
+function FeedPanel({ kind, title, empty }: { kind: "call" | "milestone"; title: string; empty?: ReactNode }) {
+  const { items, isLoading } = useFeed({ kind }, PANEL_ROWS);
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <h2 className="text-sm font-medium">{monthLabel(new Date(now).toISOString())}</h2>
-      <p className="font-mono text-[11px] text-subtle">
-        boards reset {resetDay(resetsAt)}, 00:00 UTC · in <span className="text-fg">{untilLabel(resetsAt, now)}</span>
-      </p>
-    </div>
-  );
-}
-
-function TopCallers() {
-  const { callers, isLoading } = useCallerPages("rate", PANEL_ROWS);
-  return (
-    <Panel title="Top callers" href="/leaderboard?view=callers">
-      {isLoading ? (
-        <ListSkeleton rows={PANEL_ROWS} />
-      ) : callers.length ? (
-        <Cascade className="divide-y divide-border">
-          {callers.slice(0, PANEL_ROWS).map((c, i) => (
-            <CallerRateRow key={c.userId} c={c} rank={i + 1} />
-          ))}
-        </Cascade>
-      ) : (
-        <Empty>Nobody has the 5 calls a hit rate needs yet.</Empty>
-      )}
-    </Panel>
-  );
-}
-
-function TopRunners() {
-  const { tokens, isLoading } = useTokens({ sort: "top", limit: PANEL_ROWS });
-  return (
-    <Panel title="Top runners" href="/leaderboard">
-      {isLoading ? (
-        <ListSkeleton rows={PANEL_ROWS} />
-      ) : tokens.length ? (
-        <Cascade className="divide-y divide-border">
-          {tokens.map((t, i) => (
-            <TokenRow key={t.id} token={t} rank={i + 1} meta="peak" />
-          ))}
-        </Cascade>
-      ) : (
-        <Empty />
-      )}
-    </Panel>
-  );
-}
-
-function Milestones() {
-  const { items, isLoading } = useFeed({ kind: "milestone" }, PANEL_ROWS);
-  return (
-    <Panel title="Milestones" href="/feed?kind=milestone">
+    <Panel title={title} href={`/feed?kind=${kind}`}>
       {isLoading ? (
         <ListSkeleton rows={PANEL_ROWS} />
       ) : items.length ? (
@@ -188,27 +132,7 @@ function Milestones() {
           ))}
         </Cascade>
       ) : (
-        <Empty>No call has hit 2x yet this month.</Empty>
-      )}
-    </Panel>
-  );
-}
-
-/** Without accounts there are no callers or calls: the newest pastes instead. */
-function JustPasted() {
-  const { tokens, isLoading } = useTokens({ sort: "new", limit: PANEL_ROWS });
-  return (
-    <Panel title="Just pasted" href="/leaderboard?sort=new">
-      {isLoading ? (
-        <ListSkeleton rows={PANEL_ROWS} />
-      ) : tokens.length ? (
-        <Cascade className="divide-y divide-border">
-          {tokens.map((t) => (
-            <TokenRow key={t.id} token={t} />
-          ))}
-        </Cascade>
-      ) : (
-        <Empty />
+        <Empty>{empty}</Empty>
       )}
     </Panel>
   );
@@ -221,27 +145,16 @@ export function HomeFeed() {
     <div className="space-y-6">
       {error && !stats && (
         <p className="flex items-center gap-2 text-sm text-down">
-          <TriangleAlert className="size-4" /> Couldn&apos;t load the board. Retrying…
+          <TriangleAlert className="size-4" /> Couldn&apos;t load the stats. Retrying…
         </p>
       )}
 
-      <div className="space-y-3">
-        {accountsAvailable && <MonthBar />}
-        <StatsGrid />
-      </div>
+      <StatsGrid />
 
-      {accountsAvailable ? (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <TopCallers />
-          <TopRunners />
-          <Milestones />
-        </div>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <TopRunners />
-          <JustPasted />
-        </div>
-      )}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <FeedPanel kind="call" title="Latest calls" />
+        <FeedPanel kind="milestone" title="Milestones" empty="No call has hit 2x yet." />
+      </div>
     </div>
   );
 }

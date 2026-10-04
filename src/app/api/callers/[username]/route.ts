@@ -4,7 +4,7 @@ import type { CallerProfileResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/callers/:username -> the caller's board numbers and calls */
+/** GET /api/callers/:username -> the caller's numbers and calls */
 export async function GET(_req: Request, { params }: { params: Promise<{ username: string }> }) {
   if (!accountsEnabled()) return NextResponse.json({ error: "Caller profiles need accounts." }, { status: 404 });
   const { username } = await params;

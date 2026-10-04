@@ -23,7 +23,7 @@ import { Segmented, TabBar } from "./Tabs";
 import { TimeAgo } from "./TimeAgo";
 import { ListSkeleton } from "./TokenList";
 
-const SCOPE_LABELS: Record<FeedScope, string> = { all: "Everyone", top: "Top callers", you: "You" };
+const SCOPE_LABELS: Record<FeedScope, string> = { all: "Everyone", you: "You" };
 const KIND_LABELS: Record<FeedKind, string> = { all: "All", call: "Calls", milestone: "Milestones" };
 
 /** One feed entry: the sentence, the multiple now, and how long ago. */
@@ -74,8 +74,8 @@ function Empty({ title, body }: { title: string; body: React.ReactNode }) {
 }
 
 /**
- * Every call and every milestone, newest first, by day, filtered by callers (everyone, top callers or your
- * own), kind and chain. Entries that land while you read wait behind an "N new" button instead of pushing
+ * Every call and every milestone, newest first, by day, filtered by callers (everyone or your own), kind and
+ * chain. Entries that land while you read wait behind an "N new" button instead of pushing
  * the list down.
  */
 export function Feed() {

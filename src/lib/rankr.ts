@@ -4,7 +4,7 @@ import { UpstreamError, fetchSnapshots, findToken } from "./dexscreener";
 import { applySnapshot, newRecord, toView as statsOf } from "./metrics";
 import { DEAD_REFRESH_MS } from "./params";
 import { store, type MarketUpdate, type TokenQuery } from "./store";
-import { compareRecords } from "./store/memory";
+import { byNewest } from "./store/memory";
 import type { LookupResponse, MarketSnapshot, TokenRecord, TokenResponse, TokenView, TrackResponse, WatchlistResponse } from "./types";
 
 /** Records younger than this are served as-is. */
@@ -85,12 +85,12 @@ export async function lookupToken(input: string): Promise<LookupResponse> {
 const liveCache = new Map<string, { snapshot: MarketSnapshot; until: number }>();
 
 /**
- * Live data for watched tokens (ids from tokenId): Rankr's record, refreshed like the boards, for the ones it
+ * Live data for watched tokens (ids from tokenId): Rankr's record, refreshed like any token page, for the ones it
  * tracks; DexScreener for the rest.
  */
 export async function watchlistOf(ids: string[]): Promise<WatchlistResponse["items"]> {
   if (!ids.length) return [];
-  const { tokens } = await queryTokens({ sort: "new", ids, limit: ids.length, offset: 0 });
+  const { tokens } = await queryTokens({ ids, limit: ids.length, offset: 0 });
   const tracked = new Map(tokens.map((t) => [t.id, t]));
   const now = Date.now();
   const missing = ids.filter((id) => !tracked.has(id) && !((liveCache.get(id)?.until ?? 0) > now));
@@ -132,12 +132,12 @@ async function refresh(records: TokenRecord[]): Promise<TokenRecord[]> {
   }
 }
 
-/** One leaderboard page, with the tokens on it refreshed if their data is old. */
+/** One page of tracked tokens (newest first), refreshed if their data is old. */
 export async function queryTokens(q: TokenQuery): Promise<{ total: number; tokens: TokenView[] }> {
   const page = await store.query(q);
   const fresh = await refresh(page.records);
   const now = Date.now();
-  return { total: page.total, tokens: fresh.sort(compareRecords(q.sort)).map((r) => toView(r, now)) };
+  return { total: page.total, tokens: fresh.sort(byNewest).map((r) => toView(r, now)) };
 }
 
 /** Views for arbitrary records, refreshed first if their data is old. */

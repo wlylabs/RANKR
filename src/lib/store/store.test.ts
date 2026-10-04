@@ -48,35 +48,18 @@ const DATA = [
 ];
 
 describe("in-memory query", () => {
-  const ids = (sort: Parameters<typeof queryRecords>[1]["sort"], extra = {}) =>
-    queryRecords(DATA, { sort, limit: 50, offset: 0, ...extra }).records.map((r) => r.id);
+  const ids = (extra = {}) => queryRecords(DATA, { limit: 50, offset: 0, ...extra }).records.map((r) => r.id);
 
-  it("sorts like the SQL function", () => {
-    expect(ids("top")).toEqual(["base:0xbbb", "solana:AAA", "solana:CCC"]);
-    expect(ids("losers")[0]).toBe("solana:CCC");
-    expect(ids("peak")[0]).toBe("base:0xbbb");
-    expect(ids("new")).toEqual(["solana:CCC", "solana:AAA", "base:0xbbb"]);
-    expect(ids("hot")[0]).toBe("solana:AAA");
+  it("lists the newest first paste first, like the SQL function", () => {
+    expect(ids()).toEqual(["solana:CCC", "solana:AAA", "base:0xbbb"]);
   });
 
   it("filters and pages", () => {
-    expect(ids("top", { chain: "solana" })).toHaveLength(2);
-    expect(ids("top", { since: T0 - 24 * H })).toHaveLength(2);
-    expect(ids("top", { q: "brav" })).toEqual(["base:0xbbb"]);
-    expect(ids("top", { q: "0xbbb" })).toEqual(["base:0xbbb"]);
-    expect(ids("top", { q: "%" })).toEqual(["solana:AAA"]);
-    expect(ids("top", { ids: ["solana:CCC", "nope"] })).toEqual(["solana:CCC"]);
-    const page = queryRecords(DATA, { sort: "top", limit: 1, offset: 1 });
+    expect(ids({ chain: "solana" })).toEqual(["solana:CCC", "solana:AAA"]);
+    expect(ids({ ids: ["solana:CCC", "nope"] })).toEqual(["solana:CCC"]);
+    const page = queryRecords(DATA, { limit: 1, offset: 1 });
     expect(page.total).toBe(3);
     expect(page.records.map((r) => r.id)).toEqual(["solana:AAA"]);
-  });
-
-  it("leaves dead tokens (0.3x or below) off the boards, and back once they recover", () => {
-    expect(ids("losers", { hideDead: true })).toEqual(["solana:AAA", "base:0xbbb"]);
-    const revived = rec("solana:CCC", 2, 0.61, T0 + 3 * H);
-    expect(queryRecords([revived], { sort: "top", limit: 50, offset: 0, hideDead: true }).total).toBe(1);
-    const edge = rec("solana:CCC", 2, 0.6, T0 + 3 * H);
-    expect(queryRecords([edge], { sort: "top", limit: 50, offset: 0, hideDead: true }).total).toBe(0);
   });
 
   it("refreshes dead tokens less often", () => {
@@ -152,44 +135,15 @@ describe("SupabaseStore", () => {
   it("maps query arguments and results", async () => {
     const r = rec("solana:AAA", 1, 2, T0);
     const f = mockFetch({ total: 7, records: [{ ...toRow(r), multiple: 2, peak_multiple: 2 }] });
-    const page = await new SupabaseStore("https://x.supabase.co", "k", f).query({
-      sort: "hot",
-      chain: "solana",
-      since: T0,
-      q: "",
-      limit: 10,
-      offset: 20,
-    });
+    const page = await new SupabaseStore("https://x.supabase.co", "k", f).query({ chain: "solana", limit: 10, offset: 20 });
     expect(page).toEqual({ total: 7, records: [r] });
     expect(JSON.parse(String(f.mock.calls[0][1]?.body))).toEqual({
-      p_sort: "hot",
+      p_sort: "new",
       p_chain: "solana",
-      p_since: "2026-09-27T05:42:00.123Z",
-      p_q: null,
       p_ids: null,
       p_limit: 10,
       p_offset: 20,
     });
-  });
-
-  it("asks for boards without dead tokens, and falls back before the migration has run", async () => {
-    const f = mockFetch({ total: 0, records: [] });
-    await new SupabaseStore("https://x.supabase.co", "k", f).query({ sort: "top", hideDead: true, limit: 10, offset: 0 });
-    expect(JSON.parse(String(f.mock.calls[0][1]?.body))).toMatchObject({ p_hide_dead: true });
-
-    let calls = 0;
-    const g = vi.fn(async (_url: string | URL | Request, init?: RequestInit) =>
-      ++calls === 1 && JSON.parse(String(init?.body)).p_hide_dead
-        ? new Response(JSON.stringify({ code: "PGRST202", message: "Could not find the function" }), { status: 404 })
-        : new Response(JSON.stringify({ total: 0, records: [] })),
-    );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await new SupabaseStore("https://x.supabase.co", "k", g).query({ sort: "top", hideDead: true, limit: 10, offset: 0 })).toEqual({
-      total: 0,
-      records: [],
-    });
-    expect(JSON.parse(String(g.mock.calls[1][1]?.body))).not.toHaveProperty("p_hide_dead");
-    warn.mockRestore();
   });
 
   it("asks for stale tokens, dead ones by their own cutoff", async () => {

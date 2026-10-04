@@ -1,25 +1,21 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronRight, ClipboardPaste, Globe, Pencil, UserRound } from "lucide-react";
+import { ClipboardPaste, Globe, Pencil, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { callerStats } from "@/lib/caller-stats";
 import { callerHref, formatMultiple, formatUsd, tokenHref } from "@/lib/format";
-import { useAccountCalls, useMyCalls, useMyRank, useTokens, type MyCall } from "@/lib/hooks";
+import { useAccountCalls, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
 import { loginHref } from "@/lib/login";
-import { MAX_LIMIT } from "@/lib/params";
 import { ratio, tierOf } from "@/lib/metrics";
-import { nextResetAt, resetDay } from "@/lib/season";
-import { accountsAvailable } from "@/lib/supabase-browser";
 import type { CallView, CallerAbout, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { IdentityField } from "./Backdrops";
 import { CallSpread, RecentForm } from "./CallerCharts";
 import { Cascade } from "./Cinema";
 import { CountUp } from "./CountUp";
-import { rankLine } from "./CallersBoard";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { PageHeader } from "./PageHeader";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
@@ -97,8 +93,8 @@ export function MyCalls() {
           <p className="mt-3 font-medium">{userId ? "Pick a name" : "Sign in to see your calls"}</p>
           <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
             {userId
-              ? "Your calls show up on the caller board under it."
-              : "Every CA you paste is your call, tracked from your own entry and ranked on the caller board. Continue as a guest in one click, or sign in with your key."}
+              ? "Your calls show up on your public page under it."
+              : "Every CA you paste is your call, tracked from your own entry. Continue as a guest in one click, or sign in with your key."}
           </p>
           <Link
             href={loginHref("/me")}
@@ -134,7 +130,7 @@ function AccountCalls({
     <Page
       header={
         <>
-          {/* Who you are, as on your public page, and your place on the caller board. */}
+          {/* Who you are, as on your public page. */}
           <ProfileHeader
             userId={userId}
             username={username}
@@ -156,7 +152,6 @@ function AccountCalls({
               </>
             }
           />
-          <RankCard userId={userId} className="mt-6" />
         </>
       }
       intro={
@@ -177,58 +172,11 @@ function AccountCalls({
   );
 }
 
-/**
- * Your place on the caller board (by hit rate, its default) as a link, to the board unless `href` says
- * otherwise. `best` adds your best call.
- */
-export function RankCard({
-  userId,
-  href = "/leaderboard?view=callers",
-  best = false,
-  className,
-}: {
-  userId: string;
-  href?: string;
-  best?: boolean;
-  className?: string;
-}) {
-  const mine = useMyRank("rate", userId);
-  if (!mine) return null;
-  const bestCall =
-    best && mine.caller?.bestToken ? `best $${mine.caller.bestToken.symbol} ${formatMultiple(mine.caller.bestMultiple)}` : null;
-  const line = [rankLine("rate", mine), bestCall].filter(Boolean).join(" · ");
-  return (
-    <Link
-      href={href}
-      className={clsx("flex items-center gap-4 card px-4 py-3 transition-colors hover:bg-surface-2", className)}
-    >
-      {/* Your place, climbing to it from the foot of the board. */}
-      <span className="tabular font-mono text-2xl font-medium tracking-tight">
-        {mine.rank ? (
-          <>
-            #<CountUp value={mine.rank} from={mine.total} />
-          </>
-        ) : (
-          "—"
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm">
-          {mine.rank ? `of ${mine.total} on the caller board` : "Not on the caller board yet"}
-          <span className="text-subtle"> · hit rate</span>
-        </span>
-        {line && <span className="mt-0.5 block truncate font-mono text-[11px] text-subtle">{line}</span>}
-      </span>
-      <ChevronRight className="size-4 shrink-0 text-subtle" />
-    </Link>
-  );
-}
-
 /** Without accounts (local dev): the calls pasted from this browser. */
 function DeviceCalls() {
   const calls = useMyCalls();
   // Live data for the calls on this device (the newest MAX_LIMIT of them).
-  const { tokens, isLoading } = useTokens({ ids: calls.slice(0, MAX_LIMIT).map((c) => c.id), limit: MAX_LIMIT });
+  const { tokens, isLoading } = useTokens(calls.map((c) => c.id));
   const rows = useMemo(() => {
     const byId = new Map(tokens.map((t) => [t.id, t]));
     return calls.map((c) => deviceRow(c, byId.get(c.id)));
@@ -308,9 +256,6 @@ function Page({
         <>
           <p className="mt-4 text-sm text-muted">
             Measured from the moment <em>you</em> pasted. {intro && <span className="text-subtle">{intro}</span>}
-            {accountsAvailable && (
-              <span className="text-subtle"> Calls reset with the boards on {resetDay(nextResetAt())}, 00:00 UTC.</span>
-            )}
           </p>
           {!rows.length && !loading ? <NoCalls /> : <CallsView rows={rows} loading={loading} shareAs={shareAs} />}
         </>
@@ -356,7 +301,7 @@ function Stats({ rows, loading }: { rows: Row[]; loading: boolean }) {
 
 /**
  * Summary tiles, a sort switch and the list of calls, each measured from the caller's own entry.
- * Used by My calls and by public caller profiles. Calls can't be removed: they all go with the monthly reset.
+ * Used by My calls and by public caller profiles.
  */
 export function CallsView({
   rows: unsorted,

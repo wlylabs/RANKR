@@ -56,7 +56,7 @@ begin
   end;
   assert failed, 'entry update must be rejected';
 
-  -- More tokens for the leaderboard.
+  -- More tokens.
   perform public.rankr_record_paste(jsonb_build_object(
     'id', 'base:0xbbb', 'chain_id', 'base', 'address', '0xBBB', 'name', 'Bravo', 'symbol', 'BRAVO',
     'entry_price_usd', 1, 'entry_market_cap', 1000000, 'first_pasted_at', t0 - interval '10 days', 'last_pasted_at', t0,
@@ -99,9 +99,9 @@ begin
   assert (q->>'total')::int = 3 and jsonb_array_length(q->'records') = 1 and q->'records'->0->>'id' = 'solana:AAA';
   q := public.rankr_query('top', p_chain => 'nochain');
   assert (q->>'total')::int = 0 and q->'records' = '[]'::jsonb;
-  -- Dead tokens (0.3x or below) leave the boards; a search or an id lookup still finds them.
+  -- Dead tokens (0.3x or below) are left out with p_hide_dead; a search or an id lookup still finds them.
   q := public.rankr_query('losers', p_hide_dead => true);
-  assert (q->>'total')::int = 2 and q->'records'->0->>'id' = 'solana:AAA', 'CHAR at 0.1x is off the board: ' || (q->'records')::text;
+  assert (q->>'total')::int = 2 and q->'records'->0->>'id' = 'solana:AAA', 'CHAR at 0.1x is left out: ' || (q->'records')::text;
   assert (public.rankr_query('top', p_q => 'char', p_hide_dead => false)->>'total')::int = 1;
   assert (public.rankr_query('top', p_ids => array['solana:CCC'])->>'total')::int = 1;
   assert to_regprocedure('public.rankr_query(text,text,timestamptz,text,text[],integer,integer)') is null, 'no 7-argument leftover';
@@ -125,7 +125,7 @@ begin
   raise notice 'rankr smoke test: tokens ok';
 end $$;
 
--- Accounts and callers (needs all migrations).
+-- Accounts and calls (needs all migrations).
 do $$
 declare
   a uuid := '00000000-0000-4000-8000-00000000000a';
@@ -170,17 +170,6 @@ begin
   r := public.rankr_my_calls(a);
   assert jsonb_array_length(r) = 2 and r->0->'token'->>'id' is not null;
 
-  r := public.rankr_callers('avg');
-  assert (r->>'total')::int = 2;
-  assert r->'callers'->0->>'username' = 'alpha_caller', 'A leads on avg: ' || r::text;
-  assert (r->'callers'->0->>'calls')::int = 2 and (r->'callers'->0->>'hits')::int = 2;
-  assert r->'callers'->0->'best_token'->>'symbol' = 'BRAVO';
-  assert (r->'callers'->0->>'best_multiple')::float8 = 11;
-  assert (r->'callers'->1->>'wins')::int = 0;
-  r := public.rankr_callers('calls', p_min_calls => 3);
-  assert (r->>'total')::int = 0, 'min calls filter';
-  r := public.rankr_callers('avg', p_limit => 1, p_offset => 1);
-  assert r->'callers'->0->>'username' = 'bravo';
 
   -- Feed: calls and milestones. CHAR goes 0.2 -> 0.55: A's call (entry 0.1) crosses 2x, 3x and 5x at once,
   -- B's (entry 2) nothing. Only the highest milestone of that jump shows.
@@ -201,8 +190,7 @@ begin
   assert jsonb_array_length(public.rankr_feed(p_chain => 'base')) = 1, 'chain filter';
   assert jsonb_array_length(public.rankr_feed(2)) = 2 and jsonb_array_length(public.rankr_feed(2, 4)) = 1, 'paging';
 
-  -- Calls can't be removed one by one (only the monthly reset clears them); the rest of the test goes on
-  -- without this one.
+  -- Calls can't be removed one by one; the rest of the test goes on without this one.
   assert to_regprocedure('public.rankr_delete_call(uuid,text)') is null, 'no removing calls';
   delete from public.calls where user_id = b and token_id = 'solana:AAA';
 
@@ -228,9 +216,7 @@ begin
   assert public.rankr_set_official('alpha_caller', p_rename => 'Rankr')->>'error' = 'taken';
   assert public.rankr_set_username(b, 'bravo_again')->>'error' = 'locked', 'official names only change via rankr_set_official';
   assert public.rankr_ensure_profile(b) = 'rankr';
-  r := public.rankr_callers('calls');
-  assert (select bool_and((x->>'official')::boolean = (x->>'username' = 'rankr')) from jsonb_array_elements(r->'callers') x),
-         'official flag on the board: ' || r::text;
+  assert (select bool_and(official = (username = 'rankr')) from public.profiles), 'only rankr is official';
   assert not (public.rankr_set_official('rankr', p_official => false)->>'official')::boolean;
   assert (public.rankr_set_username(b, 'bravo')->>'ok')::boolean, 'unlocked again';
 
@@ -271,17 +257,14 @@ begin
     assert not has_function_privilege('anon', 'public.rankr_set_official(text,text,boolean)', 'execute');
     assert not has_function_privilege('authenticated', 'public.rankr_set_official(text,text,boolean)', 'execute');
     assert has_function_privilege('service_role', 'public.rankr_set_official(text,text,boolean)', 'execute');
-    assert has_function_privilege('anon', 'public.rankr_callers(text,integer,integer,integer)', 'execute');
   end if;
 
   raise notice 'rankr smoke test: accounts ok';
 end $$;
 
--- Paste limits and the hit-rate caller board (needs all migrations).
+-- Paste limits (needs all migrations).
 do $$
 declare
-  a uuid := '00000000-0000-4000-8000-00000000000a';
-  s uuid := '00000000-0000-4000-8000-00000000000e';
   r jsonb;
 begin
   -- Fixed window: up to p_max hits pass, the next one doesn't, a new window starts over.
@@ -297,88 +280,27 @@ begin
   r := public.rankr_rate_hit('test:bucket', 60, 2);
   assert (r->>'ok')::boolean and (r->>'hits')::int = 1, 'new window: ' || r::text;
 
-  -- A sprayer: 10 calls, 3 at 2x+. alpha_caller: 2 calls, both at 2x+ (from the blocks above).
-  insert into auth.users (id) values (s);
-  assert (public.rankr_set_username(s, 'sprayer')->>'ok')::boolean;
-  for i in 1..10 loop
-    perform public.rankr_record_paste(jsonb_build_object(
-      'id', 'solana:S' || i, 'chain_id', 'solana', 'address', 'S' || i, 'name', 'Spray ' || i, 'symbol', 'S' || i,
-      'entry_price_usd', 1, 'entry_market_cap', 1000, 'first_pasted_at', now(), 'last_pasted_at', now(),
-      'peak_price_usd', 1, 'peak_at', now(), 'low_price_usd', 1, 'low_at', now(),
-      'last_price_usd', case when i <= 3 then 3 else 0.5 end, 'market', '{}', 'last_checked_at', now()));
-    perform public.rankr_record_call(s, 'solana:S' || i, 1, 1000, now());
-  end loop;
-
-  r := public.rankr_callers('hits');
-  assert r->'callers'->0->>'username' = 'sprayer', 'by count, volume wins: ' || r::text;
-  r := public.rankr_callers('rate');
-  assert r->'callers'->0->>'username' = 'alpha_caller', 'by rate, judgment wins: ' || r::text;
-  r := public.rankr_callers('rate', p_min_calls => 5);
-  assert (r->>'total')::int = 1 and r->'callers'->0->>'username' = 'sprayer', 'min calls keeps flukes off';
-  assert (public.rankr_callers()->'callers'->0->>'username') = 'alpha_caller', 'rate is the default';
-
-  -- Your position: the board's order, with the caller one place up. By rate: alpha_caller, sprayer, bravo.
-  r := public.rankr_caller_rank(s, 'rate');
-  assert (r->>'rank')::int = 2 and (r->>'total')::int = 3 and r->'ahead'->>'username' = 'alpha_caller', 'sprayer is #2: ' || r::text;
-  assert (r->'caller'->>'calls')::int = 10 and (r->'caller'->>'hits')::int = 3 and (r->>'calls')::int = 10, r::text;
-  assert not (r->'caller' ? 'rn') and not (r->'ahead' ? 'rn'), 'same fields as the board';
-  r := public.rankr_caller_rank(s, 'hits');
-  assert (r->>'rank')::int = 1 and r->'ahead' = 'null'::jsonb, '#1 has nobody ahead: ' || r::text;
-  assert (select (x->>'user_id')::uuid from jsonb_array_elements(public.rankr_callers('avg')->'callers') with ordinality e(x, i)
-          where i = (public.rankr_caller_rank(s, 'avg')->>'rank')::int) = s, 'the board and the rank agree';
-  r := public.rankr_caller_rank(a, 'rate', 5);
-  assert r->'rank' = 'null'::jsonb and r->'caller' = 'null'::jsonb and (r->>'calls')::int = 2 and (r->>'total')::int = 1,
-         'under the minimum: off the board, calls still counted: ' || r::text;
-  r := public.rankr_caller_rank('00000000-0000-4000-8000-0000000000ff');
-  assert (r->>'calls')::int = 0 and r->'rank' = 'null'::jsonb and r->'ahead' = 'null'::jsonb, 'no calls: ' || r::text;
-
   if exists (select 1 from pg_roles where rolname = 'anon') then
     assert not has_function_privilege('anon', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
     assert not has_function_privilege('authenticated', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
     assert has_function_privilege('service_role', 'public.rankr_rate_hit(text,integer,integer)', 'execute');
-    assert has_function_privilege('anon', 'public.rankr_caller_board(text,integer)', 'execute'), 'the public board reads it';
   end if;
 
   raise notice 'rankr smoke test: limits ok';
 end $$;
 
--- Monthly reset (needs all migrations): the top 10s are kept, every token, call and milestone goes,
--- accounts stay.
+-- No leaderboard (needs all migrations): the caller board, a caller's place on it, the monthly reset and the
+-- months it kept are gone.
 do $$
-declare
-  r jsonb;
-  s record;
-  v_profiles int := (select count(*) from public.profiles);
 begin
-  assert (select count(*) from public.calls) > 0 and (select count(*) from public.call_milestones) > 0, 'something to reset';
-  r := public.rankr_end_month('2026-10-01 00:05+00');
-  assert (r->>'ok')::boolean and r->>'month' = '2026-09-01', 'the month that just ended: ' || r::text;
-  assert (r->>'tokens')::int > 0 and (r->>'calls')::int > 0 and (r->>'callers')::int > 0, r::text;
+  assert to_regprocedure('public.rankr_callers(text,integer,integer,integer)') is null, 'no caller board';
+  assert to_regprocedure('public.rankr_caller_board(text,integer)') is null;
+  assert to_regprocedure('public.rankr_caller_rank(uuid,text,integer)') is null, 'no place on a board';
+  assert to_regprocedure('public.rankr_end_month(timestamptz)') is null, 'no monthly reset';
+  assert to_regclass('public.seasons') is null, 'no kept months';
+  assert (select count(*) from public.calls) > 0, 'calls stay';
 
-  select * into s from public.seasons order by ended_at desc limit 1;
-  assert s.month = '2026-09-01' and s.ended_at = '2026-10-01 00:05+00';
-  assert s.callers->0->>'username' = 'sprayer', 'hit rate board, 5+ calls: ' || s.callers::text;
-  assert jsonb_array_length(s.tokens) = least(10, (r->>'tokens')::int), 'top 10 tokens';
-  assert (s.tokens->0->>'peak_multiple')::float8 >= (s.tokens->1->>'peak_multiple')::float8, 'by peak x';
-  assert (select bool_and(t ? 'first_caller') from jsonb_array_elements(s.tokens) t);
-
-  assert (select count(*) from public.tokens) = 0 and (select count(*) from public.calls) = 0, 'everything goes';
-  assert (select count(*) from public.call_milestones) = 0;
-  assert (select count(*) from public.profiles) = v_profiles, 'accounts stay';
-  assert (public.rankr_callers()->>'total')::int = 0, 'the caller board starts from zero';
-  assert (public.rankr_caller_rank('00000000-0000-4000-8000-00000000000e')->>'calls')::int = 0, 'your calls go too';
-
-  r := public.rankr_end_month('2026-10-01 00:06+00');
-  assert (r->>'skipped')::boolean and (select count(*) from public.seasons) = 1, 'nothing to keep, nothing written';
-  assert date_trunc('month', timestamptz '2026-09-15 12:00+00' - interval '12 hours')::date = '2026-09-01', 'by hand mid-month: this month';
-
-  if exists (select 1 from pg_roles where rolname = 'anon') then
-    assert not has_function_privilege('anon', 'public.rankr_end_month(timestamptz)', 'execute');
-    assert not has_function_privilege('authenticated', 'public.rankr_end_month(timestamptz)', 'execute');
-    assert has_function_privilege('service_role', 'public.rankr_end_month(timestamptz)', 'execute');
-  end if;
-
-  raise notice 'rankr smoke test: monthly reset ok';
+  raise notice 'rankr smoke test: no leaderboard ok';
 end $$;
 
 rollback;

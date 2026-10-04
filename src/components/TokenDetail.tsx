@@ -19,7 +19,7 @@ import {
 } from "@/lib/format";
 import { fetcher, useAccountCalls, useMyCalls } from "@/lib/hooks";
 import { MILESTONES, ratio } from "@/lib/metrics";
-import { loginHref } from "@/lib/login";
+import { APP_HOME, loginHref } from "@/lib/login";
 import { PasteError, trackPaste } from "@/lib/track";
 import type { Link as TokenLink, MarketSnapshot, TokenResponse, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
@@ -41,8 +41,8 @@ export function TokenDetail({ chain, address, initial }: { chain: string; addres
 
   return (
     <div className="pt-6 sm:pt-10">
-      <Link href="/leaderboard" className="text-sm text-muted hover:text-fg">
-        Back to leaderboard
+      <Link href={APP_HOME} className="text-sm text-muted hover:text-fg">
+        Back to home
       </Link>
       {token ? (
         <Tracked token={token} />

@@ -1,6 +1,6 @@
 "use client";
 
-// The feed filter picked on the feed page (everyone, top callers or yours), kept in the browser; the ticker
+// The feed filter picked on the feed page (everyone or yours), kept in the browser; the ticker
 // under the header shows the same one, and the feed opens on it when its link doesn't say.
 
 import { useSyncExternalStore } from "react";

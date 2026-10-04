@@ -26,7 +26,7 @@ function Watcher() {
   const deviceCalls = useMemo(() => (available ? NONE : device), [available, device]);
 
   const ids = useMemo(() => deviceCalls.map((c) => c.id).slice(0, MAX_LIMIT), [deviceCalls]);
-  const { tokens } = useTokens({ ids, limit: MAX_LIMIT });
+  const { tokens } = useTokens(ids);
 
   useEffect(() => {
     const byId = new Map(tokens.map((t) => [t.id, t]));
