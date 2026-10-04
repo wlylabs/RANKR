@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { Flag, TriangleAlert } from "lucide-react";
 import { formatAmount, formatDay, formatUsd } from "@/lib/format";
-import { caseFile } from "@/lib/trace/case";
+import { caseFile, holdingsText } from "@/lib/trace/case";
 import type { TraceResponse } from "@/lib/trace/types";
 import { TimeAgo } from "../TimeAgo";
 import { FullAddress } from "./TraceCard";
@@ -32,6 +32,7 @@ export function CaseFile({
 }) {
   const c = caseFile(root, data);
   const f = root.funder;
+  const holds = holdingsText(root);
   return (
     <section className="card p-4 sm:p-5" aria-labelledby="case-title">
       <div className="flex items-baseline justify-between gap-3">
@@ -67,10 +68,9 @@ export function CaseFile({
               first seen <TimeAgo at={root.firstSeen} />
             </>
           )}
-          {root.balance && (
+          {holds && (
             <>
-              {root.firstSeen && " · "}holds {formatAmount(root.balance.amount)} {root.balance.symbol}
-              {root.balance.usd !== null && <> ({formatUsd(root.balance.usd)})</>}
+              {root.firstSeen && " · "}holds {holds}
             </>
           )}
         </Row>

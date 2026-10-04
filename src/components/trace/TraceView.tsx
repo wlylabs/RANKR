@@ -23,8 +23,11 @@ import { useTrail } from "./useTrail";
 
 type ReadError = { message: string; code?: TraceErrorCode };
 
-/** Reads wallets for the trail, each once (until it fails and is asked for again). */
-function useWallets(chain: string) {
+/**
+ * Reads wallets for the trail, each once (until it fails and is asked for again). The target's tokens are read
+ * too; the wallets down the trail go without, to keep Blockscout's credits for trails.
+ */
+function useWallets(chain: string, target: string) {
   const [data, setData] = useState<Map<string, TraceResponse>>(() => new Map());
   const [errors, setErrors] = useState<Map<string, ReadError>>(() => new Map());
   const inflight = useRef(new Set<string>());
@@ -41,7 +44,8 @@ function useWallets(chain: string) {
       });
       try {
         // With the session: Trace is for official accounts only.
-        const res = await apiFetch(`/api/trace/${chain}/${encodeURIComponent(address)}`);
+        const extra = address === target ? "?holdings=1" : "";
+        const res = await apiFetch(`/api/trace/${chain}/${encodeURIComponent(address)}${extra}`);
         const body = await res.json().catch(() => null);
         if (!res.ok) {
           const error: ReadError = { message: body?.error ?? `Request failed (${res.status})`, code: body?.code };
@@ -55,7 +59,7 @@ function useWallets(chain: string) {
         inflight.current.delete(address);
       }
     },
-    [chain],
+    [chain, target],
   );
 
   return { data, errors, load };
@@ -90,7 +94,7 @@ function RootError({ error, onRetry }: { error: ReadError; onRetry: () => void }
  */
 export function TraceView({ chain: chainId, address }: { chain: string; address: string }) {
   const chain = traceChain(chainId)!;
-  const { data, errors, load } = useWallets(chainId);
+  const { data, errors, load } = useWallets(chainId, address);
   const [link, setLink] = useState("");
   const details = useRef<HTMLDivElement>(null);
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { formatAmount, formatDay, formatUsd } from "@/lib/format";
 import { delay } from "@/lib/motion";
+import { holdingsText } from "@/lib/trace/case";
 import { traceHref, type TraceChain } from "@/lib/trace/chains";
 import { DANGER } from "@/lib/trace/kinds";
 import { branches, type PathStep, type PathStop } from "@/lib/trace/path";
@@ -254,9 +255,8 @@ function StopCard({
       <FullAddress address={stop.address} decrypt max={15} className="mt-1.5" />
       {label && <LabelTag label={label} className={clsx("mt-1 text-[12px]", target && "text-bg/80")} />}
       {target && root.balance && (
-        <span className="tabular mt-1 block truncate font-mono text-[11.5px] text-bg/70">
-          Holds {formatAmount(root.balance.amount)} {root.balance.symbol}
-          {root.balance.usd !== null && <> · {formatUsd(root.balance.usd)}</>}
+        <span className="tabular mt-1 block font-mono text-[11.5px] text-pretty text-bg/70">
+          Holds {holdingsText(root)}
         </span>
       )}
     </Tag>

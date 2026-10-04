@@ -1,14 +1,15 @@
 // EVM chains through Blockscout's API (api.blockscout.com/<chain id>/api/v2). Since July 2026 it needs a key,
 // free at dev.blockscout.com (100K credits a day, 5 requests a second); without one the public explorers
 // allow about 10 requests per 16 minutes, too few for a trail. One wallet costs four requests: the address,
-// its transactions, its ERC-20 transfers and its internal transactions (the newest 50 of each).
+// its transactions, its ERC-20 transfers and its internal transactions (the newest 50 of each). The wallet a
+// trail starts at costs one more, for the tokens it holds (on a budget of its own: evmHoldings).
 import { BLOCKSCOUT_CREDITS, resetOf, take } from "../budget";
 import { untilReset } from "../rate-limit";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
 import { labelOf } from "./labels";
 import { TraceError } from "./errors";
 import type { TraceChain } from "./chains";
-import type { TraceLabel, TraceResponse } from "./types";
+import type { TraceHoldings, TraceLabel, TraceResponse } from "./types";
 
 const api = () => (process.env.BLOCKSCOUT_API_URL ?? "https://api.blockscout.com").replace(/\/+$/, "");
 
@@ -60,6 +61,20 @@ type TokenTransfer = {
     symbol?: string | null;
     exchange_rate?: string | null;
     decimals?: string | null;
+  } | null;
+};
+
+/** One token a wallet holds (/addresses/:hash/tokens). */
+type TokenBalance = {
+  value?: string | null;
+  token?: {
+    address_hash?: string;
+    address?: string;
+    symbol?: string | null;
+    decimals?: string | null;
+    exchange_rate?: string | null;
+    reputation?: string | null;
+    is_scam?: boolean;
   } | null;
 };
 
@@ -158,6 +173,9 @@ export function units(value: string | null | undefined, decimals: number): numbe
 /** Exchanges' names, to tell an exchange's tag from any other in Blockscout's metadata. */
 const EXCHANGES =
   /binance|coinbase|okx|kraken|bybit|kucoin|bitfinex|gate\.io|htx|huobi|mexc|bitget|crypto\.com|gemini|bitstamp|upbit|bithumb/i;
+/** Bridges, and the cross-chain aggregators in front of them (LI.FI, Jumper, Socket...), by the names Blockscout tags. */
+const BRIDGES =
+  /bridge|portal|gateway|spokepool|li\.?fi\b|jumper|stargate|across protocol|socket|bungee|\brelay(\.link)?\b|wormhole|debridge|synapse|orbiter|rango|squid router|\bhop protocol|cbridge|celer|connext|everclear|layerzero|axelar|allbridge|symbiosis|meson|owlto|rhino\.fi/i;
 /** Contracts that are someone's wallet (a Safe, a smart account): followed like any wallet. */
 const SMART_WALLET = /safe|wallet|account|multisig/i;
 
@@ -173,7 +191,7 @@ export function blockscoutLabel(p: AddressParam): TraceLabel | null {
   if (exchange) return { kind: "cex", name: exchange, source };
   const name = tags[0] ?? p.name ?? p.implementation_name ?? p.ens_domain_name ?? null;
   if (p.is_contract) {
-    if (/bridge|portal|gateway|spokepool/i.test(name ?? "")) return { kind: "bridge", name: name!, source };
+    if (BRIDGES.test(name ?? "")) return { kind: "bridge", name: name!, source };
     if (SMART_WALLET.test(`${p.name ?? ""} ${p.implementation_name ?? ""}`))
       return { kind: "named", name: name ?? "Smart wallet", source };
     return { kind: "contract", name: name ?? "Contract", source };
@@ -269,6 +287,47 @@ export async function evmFunder(chain: TraceChain, address: string): Promise<str
   if (!complete) return null;
   const legs = evmLegs(address, chain, { txs: txs?.items ?? [], internal: internal?.items ?? [], tokens: [] }, null);
   return firstFunding(legs)?.address ?? null;
+}
+
+/** At most this many tokens named; the rest counted. */
+const TOP_TOKENS = 3;
+
+/** The tokens in Blockscout's list that have a price, summed (flagged scams and unpriced airdrops left out). */
+export function summarizeHoldings(items: TokenBalance[], partial: boolean): TraceHoldings {
+  const priced = items.flatMap((b) => {
+    const t = b.token;
+    const rate = num(t?.exchange_rate);
+    if (!t || rate === null || t.is_scam || t.reputation === "scam") return [];
+    const amount = units(b.value, Number(t.decimals ?? 18));
+    const address = t.address_hash ?? t.address ?? "";
+    const usd = amount * rate;
+    return usd > 0 ? [{ symbol: t.symbol || `${address.slice(0, 6)}…`, amount, usd }] : [];
+  });
+  priced.sort((a, b) => b.usd - a.usd);
+  return {
+    usd: priced.reduce((s, t) => s + t.usd, 0),
+    top: priced.slice(0, TOP_TOKENS),
+    count: priced.length,
+    partial,
+  };
+}
+
+/**
+ * The tokens a wallet holds now: one request (the first 50 tokens), on its own daily budget
+ * (BLOCKSCOUT_HOLDINGS_DAILY_CREDITS) on top of Blockscout's, so it never leaves trails short. "budget" when
+ * either is spent; null when Blockscout couldn't say.
+ */
+export async function evmHoldings(chain: TraceChain, address: string): Promise<TraceHoldings | "budget" | null> {
+  if (!process.env.BLOCKSCOUT_API_KEY) return null;
+  if (!(await take("blockscout-holdings", BLOCKSCOUT_CREDITS))) return "budget";
+  try {
+    const page = await blockscout<Page<TokenBalance>>(chain, `/addresses/${address}/tokens?type=ERC-20`);
+    if (!page) return summarizeHoldings([], false);
+    const more = page.next_page_params !== null && page.next_page_params !== undefined;
+    return summarizeHoldings(page.items ?? [], more);
+  } catch (err) {
+    return err instanceof TraceError && err.code === "quota" ? "budget" : null;
+  }
 }
 
 export async function traceEvm(chain: TraceChain, address: string): Promise<TraceResponse> {

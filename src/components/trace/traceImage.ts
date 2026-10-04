@@ -4,7 +4,7 @@
 // images as JPEG, which breaks soft shading into bands (see the call card).
 import { avatarCells } from "@/lib/avatar";
 import { formatAmount, formatUsd } from "@/lib/format";
-import type { CaseExit, CaseFlag } from "@/lib/trace/case";
+import { holdingsText, type CaseExit, type CaseFlag } from "@/lib/trace/case";
 import { DANGER } from "@/lib/trace/kinds";
 import type { PathStep, PathStop } from "@/lib/trace/path";
 import type { TraceFlow, TraceLabel, TraceResponse } from "@/lib/trace/types";
@@ -278,12 +278,7 @@ export async function drawPathImage(input: PathImageInput): Promise<Blob | null>
         ctx.fillText(s.address, lx, ly);
       } else if (target && root.balance) {
         ctx.font = `20px ${f.mono}`;
-        const holds = `holds ${formatAmount(root.balance.amount)} ${root.balance.symbol}`;
-        ctx.fillText(
-          fit(ctx, root.balance.usd !== null ? `${holds} · ${formatUsd(root.balance.usd)}` : holds, x + w - 32 - lx),
-          lx,
-          ly,
-        );
+        ctx.fillText(fit(ctx, `holds ${holdingsText(root)}`, x + w - 32 - lx), lx, ly);
       }
     }
     y += h;

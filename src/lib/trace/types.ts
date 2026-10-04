@@ -29,6 +29,18 @@ export type TraceLabel = {
 /** An amount of one asset; usd at today's price (null when it has none we trust). */
 export type TraceAsset = { symbol: string; amount: number; usd: number | null };
 
+/** The tokens a wallet holds now (EVM: the ERC-20s Blockscout puts a price on), beside its native balance. */
+export type TraceHoldings = {
+  /** Their total at today's prices. */
+  usd: number;
+  /** Biggest first, at most 3. */
+  top: TraceAsset[];
+  /** Priced tokens it holds, all told. */
+  count: number;
+  /** It holds more than one page of tokens (50): only those were counted. */
+  partial: boolean;
+};
+
 /** Everything that moved between the wallet and one counterparty, in one direction. */
 export type TraceFlow = {
   address: string;
@@ -54,6 +66,12 @@ export type TraceResponse = {
   label: TraceLabel | null;
   /** Native balance now. */
   balance: TraceAsset | null;
+  /**
+   * Its tokens now: read for the wallet a trail starts at, on EVM chains, on a budget of its own
+   * (BLOCKSCOUT_HOLDINGS_DAILY_CREDITS). Absent when not asked for (Solana, a wallet further down the trail);
+   * null when it couldn't be read; "budget" when today's budget for it is spent.
+   */
+  holdings?: TraceHoldings | "budget" | null;
   /** Its first transaction, when the whole history was in reach. */
   firstSeen: number | null;
   /** Where its first money came from (the first incoming native transfer). */
