@@ -23,3 +23,11 @@ select cron.schedule(
 
 -- Check it:   select * from cron.job_run_details order by start_time desc limit 5;
 -- Stop it:    select cron.unschedule('rankr-refresh');
+
+-- Monthly reset: every token, call and milestone goes at 00:00 UTC on the 1st, so Rankr starts clean every
+-- month (accounts stay, nothing is kept from the month). supabase/setup.sql schedules it when pg_cron is
+-- enabled; after enabling pg_cron later, run this (or setup.sql again):
+select cron.schedule('rankr-monthly-reset', '0 0 1 * *', 'select public.rankr_end_month()');
+
+-- Check it:   select * from cron.job where jobname = 'rankr-monthly-reset';
+-- Stop it:    select cron.unschedule('rankr-monthly-reset');

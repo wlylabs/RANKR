@@ -10,6 +10,8 @@ import { callerHref, formatMultiple, formatUsd, tokenHref } from "@/lib/format";
 import { useAccountCalls, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
 import { loginHref } from "@/lib/login";
 import { ratio, tierOf } from "@/lib/metrics";
+import { nextResetAt, resetDay } from "@/lib/reset";
+import { accountsAvailable } from "@/lib/supabase-browser";
 import type { CallView, CallerAbout, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
 import { IdentityField } from "./Backdrops";
@@ -256,6 +258,9 @@ function Page({
         <>
           <p className="mt-4 text-sm text-muted">
             Measured from the moment <em>you</em> pasted. {intro && <span className="text-subtle">{intro}</span>}
+            {accountsAvailable && (
+              <span className="text-subtle"> Calls are cleared on {resetDay(nextResetAt())}, 00:00 UTC.</span>
+            )}
           </p>
           {!rows.length && !loading ? <NoCalls /> : <CallsView rows={rows} loading={loading} shareAs={shareAs} />}
         </>
@@ -301,7 +306,7 @@ function Stats({ rows, loading }: { rows: Row[]; loading: boolean }) {
 
 /**
  * Summary tiles, a sort switch and the list of calls, each measured from the caller's own entry.
- * Used by My calls and by public caller profiles.
+ * Used by My calls and by public caller profiles. Calls can't be removed: they all go with the monthly reset.
  */
 export function CallsView({
   rows: unsorted,

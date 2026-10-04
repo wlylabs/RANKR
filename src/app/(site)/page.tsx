@@ -32,6 +32,10 @@ const FAQ = [
     a: "No wallet and no email. Continue as a guest in one click.",
   },
   {
+    q: "Does Rankr reset?",
+    a: "Yes. At 00:00 UTC on the 1st of every month every token and call is cleared and everyone starts from zero. Accounts stay.",
+  },
+  {
     q: "Is there an app?",
     a: "Yes. Open Settings, the gear at the top, and choose Install app.",
   },

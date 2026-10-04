@@ -190,7 +190,8 @@ begin
   assert jsonb_array_length(public.rankr_feed(p_chain => 'base')) = 1, 'chain filter';
   assert jsonb_array_length(public.rankr_feed(2)) = 2 and jsonb_array_length(public.rankr_feed(2, 4)) = 1, 'paging';
 
-  -- Calls can't be removed one by one; the rest of the test goes on without this one.
+  -- Calls can't be removed one by one (only the monthly reset clears them); the rest of the test goes on
+  -- without this one.
   assert to_regprocedure('public.rankr_delete_call(uuid,text)') is null, 'no removing calls';
   delete from public.calls where user_id = b and token_id = 'solana:AAA';
 
@@ -289,18 +290,45 @@ begin
   raise notice 'rankr smoke test: limits ok';
 end $$;
 
--- No leaderboard (needs all migrations): the caller board, a caller's place on it, the monthly reset and the
--- months it kept are gone.
+-- No leaderboard (needs all migrations): the caller board, a caller's place on it and the months the reset
+-- kept are gone.
 do $$
 begin
   assert to_regprocedure('public.rankr_callers(text,integer,integer,integer)') is null, 'no caller board';
   assert to_regprocedure('public.rankr_caller_board(text,integer)') is null;
   assert to_regprocedure('public.rankr_caller_rank(uuid,text,integer)') is null, 'no place on a board';
-  assert to_regprocedure('public.rankr_end_month(timestamptz)') is null, 'no monthly reset';
   assert to_regclass('public.seasons') is null, 'no kept months';
-  assert (select count(*) from public.calls) > 0, 'calls stay';
 
   raise notice 'rankr smoke test: no leaderboard ok';
+end $$;
+
+-- Monthly reset (needs all migrations): every token, call and milestone goes, accounts stay, nothing is kept.
+do $$
+declare
+  r jsonb;
+  v_profiles int := (select count(*) from public.profiles);
+begin
+  assert (select count(*) from public.calls) > 0 and (select count(*) from public.call_milestones) > 0, 'something to reset';
+  r := public.rankr_end_month('2026-10-01 00:05+00');
+  assert (r->>'ok')::boolean and r->>'month' = '2026-09-01', 'the month that just ended: ' || r::text;
+  assert (r->>'tokens')::int > 0 and (r->>'calls')::int > 0 and (r->>'callers')::int > 0, r::text;
+
+  assert (select count(*) from public.tokens) = 0 and (select count(*) from public.calls) = 0, 'everything goes';
+  assert (select count(*) from public.call_milestones) = 0;
+  assert (select count(*) from public.profiles) = v_profiles, 'accounts stay';
+  assert jsonb_array_length(public.rankr_feed()) = 0, 'the feed starts from zero';
+
+  r := public.rankr_end_month('2026-10-01 00:06+00');
+  assert (r->>'skipped')::boolean, 'nothing to clear: ' || r::text;
+  assert date_trunc('month', timestamptz '2026-09-15 12:00+00' - interval '12 hours')::date = '2026-09-01', 'by hand mid-month: this month';
+
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    assert not has_function_privilege('anon', 'public.rankr_end_month(timestamptz)', 'execute');
+    assert not has_function_privilege('authenticated', 'public.rankr_end_month(timestamptz)', 'execute');
+    assert has_function_privilege('service_role', 'public.rankr_end_month(timestamptz)', 'execute');
+  end if;
+
+  raise notice 'rankr smoke test: monthly reset ok';
 end $$;
 
 rollback;

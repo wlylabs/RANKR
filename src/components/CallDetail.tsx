@@ -125,7 +125,7 @@ function NotFound({ username }: { username: string }) {
         <CircleAlert className="mx-auto size-5 text-subtle" />
         <p className="mt-3 font-medium">No call here</p>
         <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-          @{username} hasn&apos;t called this token.
+          @{username} hasn&apos;t called this token this month. Every call is cleared on the 1st of the month.
         </p>
         <Link href={callerHref(username)} className={`mt-5 ${GHOST}`}>
           @{username}&apos;s calls

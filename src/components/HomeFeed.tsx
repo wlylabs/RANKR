@@ -5,7 +5,9 @@ import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatMultiple, tokenHref } from "@/lib/format";
-import { useFeed, useStats } from "@/lib/hooks";
+import { useFeed, useNow, useStats } from "@/lib/hooks";
+import { monthLabel, nextResetAt, resetDay, untilLabel } from "@/lib/reset";
+import { accountsAvailable } from "@/lib/supabase-browser";
 import { useAuth } from "./AuthProvider";
 import { Cascade, HashField } from "./Cinema";
 import { CountUp } from "./CountUp";
@@ -118,6 +120,20 @@ function StatsGrid() {
   );
 }
 
+/** This month and when Rankr resets (only with accounts: the reset runs in Supabase). */
+function MonthBar() {
+  const now = useNow(60_000);
+  const resetsAt = nextResetAt(now);
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <h2 className="text-sm font-medium">{monthLabel(new Date(now).toISOString())}</h2>
+      <p className="font-mono text-[11px] text-subtle">
+        everything resets {resetDay(resetsAt)}, 00:00 UTC · in <span className="text-fg">{untilLabel(resetsAt, now)}</span>
+      </p>
+    </div>
+  );
+}
+
 /** The newest feed entries of one kind, calls or milestones. */
 function FeedPanel({ kind, title, empty }: { kind: "call" | "milestone"; title: string; empty?: ReactNode }) {
   const { items, isLoading } = useFeed({ kind }, PANEL_ROWS);
@@ -149,11 +165,14 @@ export function HomeFeed() {
         </p>
       )}
 
-      <StatsGrid />
+      <div className="space-y-3">
+        {accountsAvailable && <MonthBar />}
+        <StatsGrid />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <FeedPanel kind="call" title="Latest calls" />
-        <FeedPanel kind="milestone" title="Milestones" empty="No call has hit 2x yet." />
+        <FeedPanel kind="milestone" title="Milestones" empty="No call has hit 2x yet this month." />
       </div>
     </div>
   );
