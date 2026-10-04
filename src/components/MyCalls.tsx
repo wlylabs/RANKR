@@ -275,7 +275,7 @@ function Page({
               <span className="text-subtle">
                 {" "}
                 Calls are cleared on {resetDay(nextResetAt())}, 00:00 UTC
-                {recapsOf ? "; your month is kept as a private recap." : "."}
+                {recapsOf && rows.length ? "; your month is kept as a private recap." : "."}
               </span>
             )}
           </p>

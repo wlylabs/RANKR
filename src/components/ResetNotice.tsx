@@ -21,7 +21,7 @@ function readDismissed(): number | null {
 
 /**
  * The day before the monthly reset, a strip under the header: when it comes, that every token and call goes,
- * and (signed in) that the month is kept as a private recap. Closing it hides it until the next reset. Only
+ * and (signed in) that a caller's month is kept as a private recap. Closing it hides it until the next reset. Only
  * with accounts (the reset runs in Supabase), and only once mounted: the time is the visitor's, not the build's.
  */
 export function ResetNotice() {
@@ -52,7 +52,7 @@ export function ResetNotice() {
           <span className="font-mono text-subtle"> · {resetDay(at)}, 00:00 UTC</span>. Every token and call is cleared
           {userId ? (
             <>
-              ; your month is kept as a{" "}
+              ; if you made calls, your month is kept as a{" "}
               <Link href="/me?tab=recaps" className="text-fg underline-offset-4 hover:underline">
                 private recap
               </Link>

@@ -23,8 +23,8 @@ export function Recaps({ userId }: { userId: string }) {
       <p className="flex items-start gap-1.5 text-sm text-muted">
         <Lock className="mt-0.5 size-3.5 shrink-0 text-subtle" />
         <span>
-          Only you see these. When Rankr resets on the 1st, your calls are cleared and the month is kept here: your
-          numbers when it ended, each call measured from your own entry.
+          Only you see these. When Rankr resets on the 1st, your calls are cleared and the month is kept here: where
+          your calls stood when it ended, each from your own entry, and the highest milestone one reached during it.
         </span>
       </p>
       {isLoading && !data ? (
@@ -56,14 +56,14 @@ function RecapCard({ recap: r }: { recap: Recap }) {
   return (
     <article className="overflow-hidden card">
       <header className="flex items-baseline justify-between gap-3 border-b border-border px-4 py-2.5">
-        <h3 className="text-sm font-medium">{monthLabel(r.month)}</h3>
+        <h2 className="text-sm font-medium">{monthLabel(r.month)}</h2>
         <span className="tabular font-mono text-[11px] text-subtle">
           {r.calls} {r.calls === 1 ? "call" : "calls"}
         </span>
       </header>
       <dl className="grid grid-cols-2 sm:grid-cols-4 max-sm:[&>*:nth-child(-n+2)]:border-b max-sm:[&>*:nth-child(even)]:border-l sm:divide-x sm:divide-border">
-        <Stat label="Hit rate" value={pct(r.hits, r.calls)} hint={`${r.hits} of ${r.calls} at 2x+`} />
-        <Stat label="In profit" value={pct(r.wins, r.calls)} hint={`${r.wins} of ${r.calls} above entry`} />
+        <Stat label="Hit rate" value={pct(r.hits, r.calls)} hint={`${r.hits} of ${r.calls} at 2x+ at month end`} />
+        <Stat label="In profit" value={pct(r.wins, r.calls)} hint={`${r.wins} of ${r.calls} above entry at month end`} />
         <Stat
           label="Average"
           value={<span className={toneOf(r.avgMultiple, "text-fg")}>{formatMultiple(r.avgMultiple)}</span>}
@@ -72,7 +72,7 @@ function RecapCard({ recap: r }: { recap: Recap }) {
         <Stat
           label="Top milestone"
           value={r.topTier ? <span className="text-up">{r.topTier}x</span> : "—"}
-          hint={r.topTier ? "reached by a call" : "no call reached 2x"}
+          hint={r.topTier ? "peak during the month" : "no call reached 2x"}
         />
       </dl>
       {r.bestToken && (
@@ -80,7 +80,9 @@ function RecapCard({ recap: r }: { recap: Recap }) {
           href={tokenHref(r.bestToken)}
           className="flex items-center gap-3 border-t border-border px-4 py-3 transition-colors hover:bg-surface-2"
         >
-          <span className="label shrink-0 text-subtle">Best call</span>
+          <span className="label shrink-0 text-subtle" title="The call furthest up from your entry when the month ended">
+            Best call
+          </span>
           <TokenName symbol={r.bestToken.symbol} name={r.bestToken.name} className="min-w-0 flex-1" />
           <ChainTag chainId={r.bestToken.chainId} className="max-sm:hidden" />
           <span className={`tabular shrink-0 font-mono text-sm ${toneOf(r.bestMultiple, "text-fg")}`}>
@@ -97,7 +99,7 @@ function Stat({ label, value, hint }: { label: string; value: React.ReactNode; h
     <div className="border-border px-4 py-4">
       <dt className="label text-subtle">{label}</dt>
       <dd className="tabular mt-1.5 font-mono text-xl font-medium tracking-tight">{value}</dd>
-      <dd className="mt-0.5 truncate text-xs text-muted">{hint}</dd>
+      <dd className="mt-0.5 text-xs text-pretty text-muted">{hint}</dd>
     </div>
   );
 }

@@ -110,17 +110,21 @@ export function resetAlertDue(now: number, notified: number | null): number | nu
   return at !== null && at !== notified ? at : null;
 }
 
+// This page's own note of it too, so a browser that won't store it still notifies only once per page.
+let resetNotified: number | null = null;
+
 /** The reset last notified of (its time), so each one notifies once per browser. */
 export function readResetNotified(): number | null {
   try {
     const at = Number(localStorage.getItem(RESET_KEY));
-    return Number.isFinite(at) && at > 0 ? at : null;
+    return Number.isFinite(at) && at > 0 ? Math.max(at, resetNotified ?? 0) : resetNotified;
   } catch {
-    return null;
+    return resetNotified;
   }
 }
 
 export function writeResetNotified(at: number) {
+  resetNotified = at;
   try {
     localStorage.setItem(RESET_KEY, String(at));
   } catch {
@@ -128,11 +132,11 @@ export function writeResetNotified(at: number) {
   }
 }
 
-/** "Rankr resets in 5h": every token and call is cleared; signed in, your month is kept as a private recap. */
+/** "Rankr resets in 5h": every token and call is cleared; signed in, a caller's month is kept as a recap. */
 export async function notifyReset(at: number, now: number, signedIn: boolean) {
   const title = `Rankr resets in ${untilLabel(at, now)}`;
   const options: NotificationOptions = {
-    body: `Every token and call is cleared on ${resetDay(at)}, 00:00 UTC.${signedIn ? " Your month is kept as a private recap." : ""}`,
+    body: `Every token and call is cleared on ${resetDay(at)}, 00:00 UTC.${signedIn ? " If you made calls, your month is kept as a private recap." : ""}`,
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     tag: `reset:${at}`,

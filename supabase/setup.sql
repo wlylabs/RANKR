@@ -1452,8 +1452,9 @@ end $$;
 
 -- No leaderboard: the caller board, a caller's place on it and the months the reset kept (public.seasons)
 -- are gone. The monthly reset stays, so Rankr starts clean every month: at 00:00 UTC on the 1st every token
--- goes, and with it every call and milestone (on delete cascade). Accounts stay. Nothing is kept from the
--- month that ended. rankr_query stays (the app reads tokens by id and the newest pastes through it).
+-- goes, and with it every call and milestone (on delete cascade). Accounts stay. No top 10s are kept (each
+-- caller's own private recap comes with …_rankr_recaps.sql). rankr_query stays (the app reads tokens by id
+-- and the newest pastes through it).
 --
 -- Run after deploying the app that no longer reads the board.
 --
@@ -1462,27 +1463,37 @@ end $$;
 
 -- Ends the month: deletes every token (calls and milestones go with them). The month is the one that just
 -- ended when run in the first hours of the 1st, else the current one. Nothing to clear (no tokens): nothing
--- happens. Returns {ok, month, tokens, calls, callers} or {ok, skipped}.
-create or replace function public.rankr_end_month(p_at timestamptz default now()) returns jsonb
-language plpgsql as $$
-declare
-  v_month  date := date_trunc('month', p_at - interval '12 hours')::date;
-  v_counts jsonb;
+-- happens. Returns {ok, month, tokens, calls, callers} or {ok, skipped}. Left alone once the recaps migration
+-- (…_rankr_recaps.sql) has run, whichever order they run in: its version keeps each caller's month first.
+do $do$
 begin
-  select jsonb_build_object(
-    'tokens',  (select count(*) from public.tokens),
-    'calls',   (select count(*) from public.calls),
-    'callers', (select count(distinct user_id) from public.calls)
-  ) into v_counts;
-  if (v_counts->>'tokens')::int = 0 then
-    return jsonb_build_object('ok', true, 'skipped', true);
+  if to_regclass('public.recaps') is not null then
+    raise notice 'rankr: public.recaps exists, so rankr_end_month (which keeps them) stays as it is';
+    return;
   end if;
+  execute $fn$
+    create or replace function public.rankr_end_month(p_at timestamptz default now()) returns jsonb
+    language plpgsql as $body$
+    declare
+      v_month  date := date_trunc('month', (p_at at time zone 'UTC') - interval '12 hours')::date;
+      v_counts jsonb;
+    begin
+      select jsonb_build_object(
+        'tokens',  (select count(*) from public.tokens),
+        'calls',   (select count(*) from public.calls),
+        'callers', (select count(distinct user_id) from public.calls)
+      ) into v_counts;
+      if (v_counts->>'tokens')::int = 0 then
+        return jsonb_build_object('ok', true, 'skipped', true);
+      end if;
 
-  -- "where true": Supabase's safeupdate refuses a delete without a where clause.
-  delete from public.tokens where true;
+      -- "where true": Supabase's safeupdate refuses a delete without a where clause.
+      delete from public.tokens where true;
 
-  return jsonb_build_object('ok', true, 'month', v_month) || v_counts;
-end $$;
+      return jsonb_build_object('ok', true, 'month', v_month) || v_counts;
+    end $body$;
+  $fn$;
+end $do$;
 
 revoke all on function public.rankr_end_month(timestamptz) from public;
 do $$
@@ -1548,15 +1559,20 @@ begin
 end $$;
 
 -- Ends the month: keeps each caller's recap, then deletes every token (calls and milestones go with them).
--- The month is the one that just ended when run in the first hours of the 1st, else the current one. Run
--- again in the same month (by hand), the new calls are added to the recaps already kept. Nothing to clear
--- (no tokens): nothing happens. Returns {ok, month, tokens, calls, callers} or {ok, skipped}.
+-- Each call goes into the recap of the month it was made in (UTC), so a reset that runs late, or by hand,
+-- never mixes two months; calls of a month already kept are added to its recap. Nothing to clear (no
+-- tokens): nothing happens. Returns {ok, month, tokens, calls, callers} or {ok, skipped}, `month` being the
+-- one that just ended when run in the first hours of the 1st, else the current one.
 create or replace function public.rankr_end_month(p_at timestamptz default now()) returns jsonb
 language plpgsql as $$
 declare
-  v_month  date := date_trunc('month', p_at - interval '12 hours')::date;
+  v_month  date := date_trunc('month', (p_at at time zone 'UTC') - interval '12 hours')::date;
   v_counts jsonb;
 begin
+  -- Pastes, calls, price refreshes and another reset wait until this one is done: every call it clears is
+  -- in a recap, and only once.
+  lock table public.tokens, public.calls in share row exclusive mode;
+
   select jsonb_build_object(
     'tokens',  (select count(*) from public.tokens),
     'calls',   (select count(*) from public.calls),
@@ -1566,23 +1582,27 @@ begin
     return jsonb_build_object('ok', true, 'skipped', true);
   end if;
 
-  -- Each call measured from the caller's own entry, as on their profile.
+  -- Each call measured from the caller's own entry, as on their profile; its highest milestone is its own.
   insert into public.recaps as r (user_id, month, calls, hits, wins, avg_multiple, best_multiple, best_token, top_tier)
-  select a.user_id, v_month, a.calls, a.hits, a.wins, a.avg_multiple, a.best_multiple, a.best_token,
-         (select max(m.tier) from public.call_milestones m where m.user_id = a.user_id)
+  select p.user_id, p.month,
+         count(*)::int,
+         count(*) filter (where p.m >= 2)::int,
+         count(*) filter (where p.m > 1.005)::int,
+         avg(p.m),
+         max(p.m),
+         (array_agg(p.token order by p.m desc, p.called_at))[1],
+         max(p.tier)
   from (
-    select c.user_id,
-           count(*)::int                                       as calls,
-           count(*) filter (where t.last_price_usd / c.entry_price_usd >= 2)::int     as hits,
-           count(*) filter (where t.last_price_usd / c.entry_price_usd > 1.005)::int  as wins,
-           avg(t.last_price_usd / c.entry_price_usd)          as avg_multiple,
-           max(t.last_price_usd / c.entry_price_usd)          as best_multiple,
-           (array_agg(jsonb_build_object('id', t.id, 'chain_id', t.chain_id, 'address', t.address,
-                                         'symbol', t.symbol, 'name', t.name)
-                      order by t.last_price_usd / c.entry_price_usd desc, c.called_at))[1] as best_token
+    select c.user_id, c.called_at,
+           date_trunc('month', c.called_at at time zone 'UTC')::date as month,
+           t.last_price_usd / c.entry_price_usd as m,
+           jsonb_build_object('id', t.id, 'chain_id', t.chain_id, 'address', t.address,
+                              'symbol', t.symbol, 'name', t.name) as token,
+           (select max(ms.tier) from public.call_milestones ms
+             where ms.user_id = c.user_id and ms.token_id = c.token_id) as tier
     from public.calls c join public.tokens t on t.id = c.token_id
-    group by c.user_id
-  ) a
+  ) p
+  group by p.user_id, p.month
   on conflict (user_id, month) do update set
     calls         = r.calls + excluded.calls,
     hits          = r.hits + excluded.hits,

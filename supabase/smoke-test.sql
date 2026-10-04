@@ -310,6 +310,8 @@ declare
   b uuid := '00000000-0000-4000-8000-00000000000b';
   r jsonb;
   k public.recaps;
+  -- The blocks above made their calls now(): their recaps are this month's (UTC).
+  v_month date := date_trunc('month', now() at time zone 'UTC')::date;
   v_profiles int := (select count(*) from public.profiles);
 begin
   assert (select count(*) from public.calls) > 0 and (select count(*) from public.call_milestones) > 0, 'something to reset';
@@ -323,23 +325,27 @@ begin
   assert (select count(*) from public.profiles) = v_profiles, 'accounts stay';
   assert jsonb_array_length(public.rankr_feed()) = 0, 'the feed starts from zero';
 
-  -- Recaps: one per caller for the month that ended, measured from each caller's own entry.
+  -- Recaps: one per caller for the month the calls were made in, each measured from the caller's own entry.
   assert (select count(*) from public.recaps) = 2, 'one recap per caller';
-  select * into k from public.recaps where user_id = a and month = '2026-09-01';
+  select * into k from public.recaps where user_id = a and month = v_month;
   assert k.calls = 2 and k.hits = 2 and k.wins = 2, 'A: ' || to_jsonb(k)::text;
   assert abs(k.avg_multiple - 8.3) < 1e-9 and k.best_multiple = 11, 'A: ' || to_jsonb(k)::text;
   assert k.best_token->>'symbol' = 'BRAVO' and k.best_token->>'chain_id' = 'base' and k.best_token->>'address' = '0xBBB';
   assert k.top_tier = 5, 'the highest milestone reached: ' || to_jsonb(k)::text;
-  select * into k from public.recaps where user_id = b and month = '2026-09-01';
+  select * into k from public.recaps where user_id = b and month = v_month;
   assert k.calls = 1 and k.hits = 0 and k.wins = 0 and abs(k.best_multiple - 0.28) < 1e-9 and k.top_tier is null,
          'B: ' || to_jsonb(k)::text;
 
   r := public.rankr_end_month('2026-10-01 00:06+00');
   assert (r->>'skipped')::boolean, 'nothing to clear: ' || r::text;
   assert (select count(*) from public.recaps) = 2, 'nothing to clear, nothing kept';
-  assert date_trunc('month', timestamptz '2026-09-15 12:00+00' - interval '12 hours')::date = '2026-09-01', 'by hand mid-month: this month';
+  set local timezone = 'Pacific/Auckland';
+  assert public.rankr_end_month('2026-10-01 00:06+00') = '{"ok": true, "skipped": true}'::jsonb;
+  assert date_trunc('month', (timestamptz '2026-10-01 00:05+00' at time zone 'UTC') - interval '12 hours')::date = '2026-09-01',
+         'months are UTC whatever the session time zone';
+  reset timezone;
 
-  -- Run again in the same month (by hand): the new calls join the recap already kept.
+  -- Run again (by hand): this month's new calls join the recap already kept, a better call becomes the best...
   perform public.rankr_record_paste(jsonb_build_object(
     'id', 'solana:DDD', 'chain_id', 'solana', 'address', 'DDD', 'name', 'Delta', 'symbol', 'DELTA',
     'entry_price_usd', 1, 'entry_market_cap', 1000, 'first_pasted_at', now(), 'last_pasted_at', now(),
@@ -347,11 +353,49 @@ begin
     'last_price_usd', 30, 'market', '{}', 'last_checked_at', now()));
   perform public.rankr_record_call(a, 'solana:DDD', 1, 1000, now());
   r := public.rankr_end_month('2026-10-01 00:07+00');
-  assert r->>'month' = '2026-09-01' and (select count(*) from public.recaps) = 2, r::text;
-  select * into k from public.recaps where user_id = a and month = '2026-09-01';
+  assert (select count(*) from public.recaps) = 2, r::text;
+  select * into k from public.recaps where user_id = a and month = v_month;
   assert k.calls = 3 and k.hits = 3 and k.wins = 3, 'merged: ' || to_jsonb(k)::text;
   assert abs(k.avg_multiple - (8.3 * 2 + 30) / 3) < 1e-9, 'weighted average: ' || to_jsonb(k)::text;
   assert k.best_multiple = 30 and k.best_token->>'symbol' = 'DELTA' and k.top_tier = 5, 'merged best: ' || to_jsonb(k)::text;
+
+  -- ...and a worse one leaves the best and the milestone as they were.
+  perform public.rankr_record_paste(jsonb_build_object(
+    'id', 'solana:EEE', 'chain_id', 'solana', 'address', 'EEE', 'name', 'Echo', 'symbol', 'ECHO',
+    'entry_price_usd', 1, 'entry_market_cap', 1000, 'first_pasted_at', now(), 'last_pasted_at', now(),
+    'peak_price_usd', 1, 'peak_at', now(), 'low_price_usd', 0.5, 'low_at', now(),
+    'last_price_usd', 0.5, 'market', '{}', 'last_checked_at', now()));
+  perform public.rankr_record_call(a, 'solana:EEE', 1, 1000, now());
+  perform public.rankr_end_month('2026-10-01 00:08+00');
+  select * into k from public.recaps where user_id = a and month = v_month;
+  assert k.calls = 4 and k.hits = 3 and k.wins = 3, 'worse call counted: ' || to_jsonb(k)::text;
+  assert abs(k.avg_multiple - (8.3 * 2 + 30 + 0.5) / 4) < 1e-9, 'weighted average: ' || to_jsonb(k)::text;
+  assert k.best_multiple = 30 and k.best_token->>'symbol' = 'DELTA' and k.top_tier = 5, 'best kept: ' || to_jsonb(k)::text;
+
+  -- A reset that runs late: calls of earlier months go to their own months' recaps, never into this one,
+  -- each with its own highest milestone. FOXTROT pumps to 3x and closes at 0.9x; GOLF sits at 4x.
+  perform public.rankr_record_paste(jsonb_build_object(
+    'id', 'solana:FFF', 'chain_id', 'solana', 'address', 'FFF', 'name', 'Foxtrot', 'symbol', 'FOXTROT',
+    'entry_price_usd', 1, 'entry_market_cap', 1000, 'first_pasted_at', now(), 'last_pasted_at', now(),
+    'peak_price_usd', 1, 'peak_at', now(), 'low_price_usd', 1, 'low_at', now(),
+    'last_price_usd', 1, 'market', '{}', 'last_checked_at', now()));
+  perform public.rankr_record_paste(jsonb_build_object(
+    'id', 'solana:GGG', 'chain_id', 'solana', 'address', 'GGG', 'name', 'Golf', 'symbol', 'GOLF',
+    'entry_price_usd', 1, 'entry_market_cap', 1000, 'first_pasted_at', now(), 'last_pasted_at', now(),
+    'peak_price_usd', 4, 'peak_at', now(), 'low_price_usd', 1, 'low_at', now(),
+    'last_price_usd', 4, 'market', '{}', 'last_checked_at', now()));
+  perform public.rankr_record_call(a, 'solana:FFF', 1, 1000, '2026-07-31 23:30+00');  -- July in UTC
+  perform public.rankr_record_call(a, 'solana:GGG', 1, 1000, '2026-06-30 22:00-03');  -- July 1st in UTC
+  update public.tokens set last_price_usd = 3.1, last_checked_at = now() + interval '1 second' where id = 'solana:FFF';
+  update public.tokens set last_price_usd = 0.9, last_checked_at = now() + interval '2 seconds' where id = 'solana:FFF';
+  r := public.rankr_end_month('2026-10-01 13:00+00');
+  assert (select count(*) from public.recaps where user_id = a) = 2, 'one recap per month: ' ||
+         (select jsonb_agg(to_jsonb(x)) from public.recaps x where x.user_id = a)::text;
+  select * into k from public.recaps where user_id = a and month = '2026-07-01';
+  assert k.calls = 2 and k.hits = 1 and k.wins = 1, 'July: ' || to_jsonb(k)::text;
+  assert abs(k.avg_multiple - (0.9 + 4) / 2) < 1e-9 and k.best_token->>'symbol' = 'GOLF' and k.top_tier = 3, 'July: ' || to_jsonb(k)::text;
+  select * into k from public.recaps where user_id = a and month = v_month;
+  assert k.calls = 4, 'this month untouched: ' || to_jsonb(k)::text;
 
   -- Private: no policies, so browsers (anon, authenticated) read nothing; deleting an account deletes its recaps.
   assert (select relrowsecurity from pg_class where oid = 'public.recaps'::regclass), 'row level security on';

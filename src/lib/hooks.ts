@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import { MAX_LIMIT, type FeedKind, type FeedScope } from "./params";
+import { nextResetAt } from "./reset";
 import { authedFetcher } from "./supabase-browser";
 import type {
   CallerProfileResponse,
@@ -113,10 +114,14 @@ export function useStats() {
   return { stats: data ?? null, error, isLoading };
 }
 
-/** The signed-in account's monthly recaps (none when `userId` is null). They change once a month. */
+/**
+ * The signed-in account's monthly recaps (none when `userId` is null). They change at the reset, so the key
+ * carries the reset to come: a page left open across it asks again (and on focus, should that be too soon).
+ */
 export function useRecaps(userId: string | null) {
+  const period = nextResetAt(useNow(60_000));
   // No keepPreviousData: after switching accounts, never show the last one's recaps.
-  return useSWR<MyRecapsResponse>(userId ? `/api/me/recaps?u=${userId}` : null, authedFetcher, { revalidateOnFocus: false });
+  return useSWR<MyRecapsResponse>(userId ? `/api/me/recaps?u=${userId}&r=${period}` : null, authedFetcher);
 }
 
 /** The signed-in account's calls (none when `userId` is null). */
