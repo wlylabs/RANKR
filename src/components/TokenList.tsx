@@ -1,20 +1,4 @@
 import clsx from "clsx";
-import Link from "next/link";
-import { formatMultiple, formatUsd, tokenHref } from "@/lib/format";
-import type { TokenView } from "@/lib/types";
-import { ChainTag } from "./Chain";
-import { Cascade } from "./Cinema";
-import { MultipleBadge } from "./MultipleBadge";
-import { TimeAgo } from "./TimeAgo";
-
-/** A row's place on the board; the top three catch the light once as the board comes in. */
-export function Rank({ rank, className = "w-6" }: { rank: number; className?: string }) {
-  return (
-    <span className={clsx("tabular shrink-0 font-mono text-xs", className, rank <= 3 ? "rank-shine text-fg" : "text-subtle")}>
-      {String(rank).padStart(2, "0")}
-    </span>
-  );
-}
 
 /** Ticker + name, the only identity a token gets (no logos). */
 export function TokenName({ symbol, name, className }: { symbol: string; name: string; className?: string }) {
@@ -23,77 +7,6 @@ export function TokenName({ symbol, name, className }: { symbol: string; name: s
       <span className="shrink-0 font-medium">${symbol}</span>
       <span className="truncate text-sm text-muted">{name}</span>
     </span>
-  );
-}
-
-/**
- * Compact row used on the home page and on mobile leaderboards. The meta line stays short enough for a
- * phone: chain, market cap now, and age (or peak); the entry is on the token page.
- */
-export function TokenRow({ token: t, rank, meta = "pasted" }: { token: TokenView; rank?: number; meta?: "pasted" | "peak" }) {
-  return (
-    // The board's #1: a band of light passes over it as the board comes in.
-    <Link href={tokenHref(t)} className={clsx("flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2", rank === 1 && "sweep")}>
-      {rank !== undefined && <Rank rank={rank} />}
-      <div className="min-w-0 flex-1">
-        <TokenName symbol={t.symbol} name={t.name} />
-        <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
-          <ChainTag chainId={t.chainId} /> · mc {formatUsd(t.marketCap)} ·{" "}
-          {meta === "peak" ? `peak ${formatMultiple(t.peakMultiple)}` : <TimeAgo at={t.firstPastedAt} compact />}
-        </div>
-      </div>
-      <MultipleBadge multiple={t.multiple} />
-    </Link>
-  );
-}
-
-/** Full table for md+ screens. */
-export function TokenTable({ tokens, startRank = 1 }: { tokens: TokenView[]; startRank?: number }) {
-  return (
-    <div className="overflow-hidden card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="label border-b border-border text-left text-subtle">
-            <th className="w-14 py-2.5 pl-4 font-normal">#</th>
-            <th className="py-2.5 font-normal">Token</th>
-            <th className="py-2.5 font-normal">Chain</th>
-            <th className="py-2.5 text-right font-normal">Entry MC</th>
-            <th className="py-2.5 text-right font-normal">MC now</th>
-            <th className="hidden py-2.5 text-right font-normal lg:table-cell">Peak</th>
-            <th className="hidden py-2.5 text-right font-normal lg:table-cell">Liquidity</th>
-            <th className="py-2.5 text-right font-normal">Pasted</th>
-            <th className="py-2.5 pr-4 text-right font-normal">Since paste</th>
-          </tr>
-        </thead>
-        <Cascade as="tbody" className="font-mono text-[13px]">
-          {tokens.map((t, i) => (
-            <tr key={t.id} className="relative border-b border-border transition-colors last:border-0 hover:bg-surface-2">
-              <td className="py-3 pl-4">
-                <Rank rank={startRank + i} />
-              </td>
-              <td className="max-w-[18rem] py-3 font-sans">
-                <Link href={tokenHref(t)} className="block after:absolute after:inset-0">
-                  <TokenName symbol={t.symbol} name={t.name} />
-                </Link>
-              </td>
-              <td className="py-3">
-                <ChainTag chainId={t.chainId} />
-              </td>
-              <td className="tabular py-3 text-right text-muted">{formatUsd(t.entryMarketCap)}</td>
-              <td className="tabular py-3 text-right">{formatUsd(t.marketCap)}</td>
-              <td className="tabular hidden py-3 text-right text-muted lg:table-cell">{formatMultiple(t.peakMultiple)}</td>
-              <td className="tabular hidden py-3 text-right text-muted lg:table-cell">{formatUsd(t.market?.liquidityUsd)}</td>
-              <td className="py-3 text-right text-muted">
-                <TimeAgo at={t.firstPastedAt} />
-              </td>
-              <td className="py-3 pr-4 text-right">
-                <MultipleBadge multiple={t.multiple} />
-              </td>
-            </tr>
-          ))}
-        </Cascade>
-      </table>
-    </div>
   );
 }
 

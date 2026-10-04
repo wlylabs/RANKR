@@ -16,6 +16,11 @@ describe("parseWallet", () => {
       chain: "optimism",
       address: EVM,
     });
+    expect(parseWallet(`https://robinhoodchain.blockscout.com/address/${EVM}`)).toEqual({
+      chain: "robinhood",
+      address: EVM,
+    });
+    expect(parseWallet(`https://dexscreener.com/robinhood/${EVM}`)).toEqual({ chain: "robinhood", address: EVM });
     // BSC: its tokens have reports (its wallets say they can't be traced yet).
     expect(parseWallet(`https://bscscan.com/address/${EVM}`)).toEqual({ chain: "bsc", address: EVM });
     expect(parseWallet("EQD4FPq-PRDieyQKkizFTRtSDyucUIqrj0v_zXJmqaDp6_0t")).toBeNull();

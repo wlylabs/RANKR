@@ -3,13 +3,13 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { callerHref, formatUsd, tokenHref } from "@/lib/format";
-import { MIN_CALLS_RANKED } from "@/lib/params";
+import { MIN_CALLS_RATED } from "@/lib/params";
 import type { FeedItem } from "@/lib/types";
 import { OfficialBadge } from "./OfficialBadge";
 
 /** The caller's hit rate (calls at 2x+ right now), once they have enough calls for it to mean something. */
 function HitRate({ caller }: { caller: FeedItem["caller"] }) {
-  if (!caller || caller.calls < MIN_CALLS_RANKED) return null;
+  if (!caller || caller.calls < MIN_CALLS_RATED) return null;
   return (
     <span
       className="rounded border border-border px-1 text-[10px] leading-4 text-subtle"

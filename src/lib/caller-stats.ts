@@ -1,12 +1,10 @@
-import type { CallerSort } from "./params";
 import type { CallView, CallerView } from "./types";
 
 type Stats = Pick<CallerView, "calls" | "hits" | "wins" | "avgMultiple" | "bestMultiple" | "bestToken">;
 
 /**
- * A caller's numbers from their calls, the same way the caller board counts them (rankr_callers):
- * hits are calls at 2x or more right now, wins are calls above entry right now, each measured from
- * the caller's own entry.
+ * A caller's numbers from their calls: hits are calls at 2x or more right now, wins are calls above entry
+ * right now, each measured from the caller's own entry.
  */
 export function callerStats(calls: CallView[]): Stats {
   let hits = 0;
@@ -37,39 +35,6 @@ export function callerStats(calls: CallView[]): Stats {
   };
 }
 
-type Ranked = Pick<CallerView, "calls" | "hits" | "avgMultiple" | "bestMultiple">;
-
-const rate = (c: Ranked) => c.hits / Math.max(c.calls, 1);
-
-function gapX(d: number): string | null {
-  return d >= 0.005 ? `${d.toFixed(d >= 100 ? 0 : d >= 10 ? 1 : 2)}x` : null;
-}
-
-/**
- * How far `me` is behind `ahead` in the number the caller board sorts by: "6 pts" (of hit rate), "2 hits",
- * "0.35x", "3 calls". Null when they are level as shown (the board's tie-breaks put `ahead` first).
- */
-export function behind(sort: CallerSort, me: Ranked, ahead: Ranked): string | null {
-  switch (sort) {
-    case "rate": {
-      const pts = Math.round(rate(ahead) * 100) - Math.round(rate(me) * 100);
-      return pts > 0 ? `${pts} ${pts === 1 ? "pt" : "pts"}` : null;
-    }
-    case "hits": {
-      const n = ahead.hits - me.hits;
-      return n > 0 ? `${n} ${n === 1 ? "hit" : "hits"}` : null;
-    }
-    case "calls": {
-      const n = ahead.calls - me.calls;
-      return n > 0 ? `${n} ${n === 1 ? "call" : "calls"}` : null;
-    }
-    case "avg":
-      return gapX(ahead.avgMultiple - me.avgMultiple);
-    case "best":
-      return gapX(ahead.bestMultiple - me.bestMultiple);
-  }
-}
-
 /** Where a caller's calls are now: a loss (below entry), under 2x, or a hit, bucketed by size. */
 export const SPREAD = [
   { key: "loss", label: "loss", min: 0, tone: "down" },
@@ -97,7 +62,7 @@ export function callSpread(multiples: number[]): SpreadBucket[] {
 
 /**
  * Recent form: the newest `n` calls (newest first), how many of them are above entry and at 2x+ right now,
- * and the streak of calls above entry counting back from the newest. Same lines as the caller board.
+ * and the streak of calls above entry counting back from the newest.
  */
 export function recentForm<T extends { calledAt: number; multiple: number }>(calls: T[], n = 10) {
   const recent = [...calls].sort((a, b) => b.calledAt - a.calledAt).slice(0, n);

@@ -10,7 +10,7 @@ import { MultipleBadge } from "./MultipleBadge";
 import { LiveDot } from "./PageHeader";
 import { TimeAgo } from "./TimeAgo";
 
-const SCOPE_LABEL = { all: null, top: "Top", you: "You" } as const;
+const SCOPE_LABEL = { all: null, you: "You" } as const;
 
 /** One entry: the sentence, then the multiple now (for a call) and how long ago. */
 function Entry({ item, copy }: { item: FeedItem; copy?: boolean }) {
@@ -26,7 +26,7 @@ function Entry({ item, copy }: { item: FeedItem; copy?: boolean }) {
 const MIN_ENTRIES = 10;
 
 /**
- * The live feed as a ticker under the app header, filtered like the feed page (everyone, top callers or yours).
+ * The live feed as a ticker under the app header, filtered like the feed page (everyone or yours).
  * It scrolls on its own and stops on hover or focus; with reduced motion it stays put
  * and scrolls by hand.
  */

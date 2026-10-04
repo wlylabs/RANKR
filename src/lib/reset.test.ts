@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { monthLabel, nextResetAt, resetDay, untilLabel } from "./season";
+import { RESET_REMINDER_MS, monthLabel, nextResetAt, resetDay, resetSoon, untilLabel } from "./reset";
 
-describe("season", () => {
+describe("monthly reset", () => {
   it("resets at 00:00 UTC on the 1st of the coming month", () => {
     expect(nextResetAt(Date.parse("2026-09-27T15:49:00Z"))).toBe(Date.parse("2026-10-01T00:00:00Z"));
     expect(nextResetAt(Date.parse("2026-12-31T23:59:59Z"))).toBe(Date.parse("2027-01-01T00:00:00Z"));
@@ -22,5 +22,17 @@ describe("season", () => {
   it("names the month", () => {
     expect(monthLabel("2026-09-01")).toBe("September 2026");
     expect(monthLabel("2026-12-01T00:00:00+00:00")).toBe("December 2026");
+  });
+
+  it("is soon in the last day before the reset", () => {
+    const at = Date.parse("2026-11-01T00:00:00Z");
+    expect(RESET_REMINDER_MS).toBe(86_400_000);
+    expect(resetSoon(at - RESET_REMINDER_MS - 60_000)).toBeNull();
+    expect(resetSoon(at - RESET_REMINDER_MS)).toBe(at);
+    expect(resetSoon(at - 5 * 3_600_000)).toBe(at);
+    expect(resetSoon(at - 1)).toBe(at);
+    // Right after it, the next one is a month away.
+    expect(resetSoon(at)).toBeNull();
+    expect(resetSoon(at + 60_000)).toBeNull();
   });
 });

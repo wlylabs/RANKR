@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 const asked: { users: string[] | null }[] = [];
 vi.mock("@/lib/accounts", () => ({
   accountsEnabled: () => true,
-  topCallerIds: async () => ["top1", "top2"],
   feed: async (q: { users: string[] | null }) => {
     asked.push(q);
     return [];
@@ -32,10 +31,10 @@ describe("GET /api/feed", () => {
     expect(asked[0].users).toEqual(["me"]);
   });
 
-  it("scope=top is the top callers, everyone otherwise", async () => {
+  it("is everyone otherwise, an old scope=top link too", async () => {
     asked.length = 0;
     await get("scope=top");
     await get("");
-    expect(asked.map((q) => q.users)).toEqual([["top1", "top2"], null]);
+    expect(asked.map((q) => q.users)).toEqual([null, null]);
   });
 });

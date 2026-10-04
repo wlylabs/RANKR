@@ -1,10 +1,19 @@
-// The boards reset at 00:00 UTC on the 1st of every month (rankr_end_month, scheduled with pg_cron), after
-// the month's top 10 callers and tokens are kept. Browser and server.
+// Rankr starts clean every month: at 00:00 UTC on the 1st every token, call and milestone is cleared
+// (rankr_end_month, scheduled with pg_cron). Accounts stay. Browser and server.
 
-/** When the boards reset next: 00:00 UTC on the 1st of the coming month. */
+/** When the next reset is: 00:00 UTC on the 1st of the coming month. */
 export function nextResetAt(now = Date.now()): number {
   const d = new Date(now);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+}
+
+/** How long before the reset Rankr reminds you (a banner in the app, and a notification with alerts on). */
+export const RESET_REMINDER_MS = 24 * 3_600_000;
+
+/** The coming reset when it's at most RESET_REMINDER_MS away, else null. */
+export function resetSoon(now = Date.now()): number | null {
+  const at = nextResetAt(now);
+  return at - now <= RESET_REMINDER_MS ? at : null;
 }
 
 /** "2026-09-01" -> "September 2026". */

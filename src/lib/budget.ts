@@ -42,6 +42,8 @@ const RULES = {
   dexscreener: (): Rule[] => [{ window: "minute", max: env("DEXSCREENER_PER_MINUTE", 270) }],
   "dexscreener-slow": (): Rule[] => [{ window: "minute", max: env("DEXSCREENER_SLOW_PER_MINUTE", 55) }],
   publicnode: (): Rule[] => [{ window: "minute", max: env("EVM_RPC_PER_MINUTE", 120) }],
+  // The USD to IDR rate is read a few times a day (it's cached for hours): this only stops a loop.
+  fx: (): Rule[] => [{ window: "minute", max: env("FX_PER_MINUTE", 10) }],
 } satisfies Record<string, () => Rule[]>;
 
 export type Upstream = keyof typeof RULES;
@@ -56,6 +58,7 @@ export const UPSTREAM_NAMES: Record<Upstream, string> = {
   dexscreener: "DexScreener",
   "dexscreener-slow": "DexScreener",
   publicnode: "EVM RPC",
+  fx: "Exchange rates",
 };
 
 /** Blockscout's cost of one request, in credits (its default; heavier endpoints aren't used). */
@@ -164,6 +167,7 @@ const USES: Record<Upstream, string> = {
   dexscreener: "Prices, pools, search: the whole app",
   "dexscreener-slow": "A pasted address without its chain",
   publicnode: "A token's owner(), BSC tokens",
+  fx: "USD to IDR, for paper trades in rupiah",
 };
 
 export type UsageRow = {

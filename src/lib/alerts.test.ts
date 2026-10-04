@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { milestoneAlerts, type AlertItem } from "./alerts";
+import { milestoneAlerts, readResetNotified, resetAlertDue, writeResetNotified, type AlertItem } from "./alerts";
 
 const item = (multiple: number, key = "call:solana:A"): AlertItem => ({ key, symbol: "A", multiple, href: "/t/solana/A", kind: "call" });
 
@@ -23,5 +23,24 @@ describe("milestoneAlerts", () => {
     const seen = { "call:solana:A": 2 };
     expect(milestoneAlerts([item(1.4)], seen).alerts).toEqual([]);
     expect(milestoneAlerts([item(2.1)], seen).alerts).toEqual([]);
+  });
+});
+
+describe("resetAlertDue", () => {
+  const at = Date.parse("2026-11-01T00:00:00Z");
+
+  it("is the coming reset once it is a day away, once per reset", () => {
+    expect(resetAlertDue(at - 2 * 86_400_000, null)).toBeNull();
+    expect(resetAlertDue(at - 5 * 3_600_000, null)).toBe(at);
+    expect(resetAlertDue(at - 5 * 3_600_000, at)).toBeNull(); // already said
+    // Last month's reset was said: this one still is.
+    expect(resetAlertDue(at - 5 * 3_600_000, Date.parse("2026-10-01T00:00:00Z"))).toBe(at);
+  });
+
+  it("still notifies once when the browser won't store it (no localStorage here)", () => {
+    expect(readResetNotified()).toBeNull();
+    writeResetNotified(at);
+    expect(readResetNotified()).toBe(at);
+    expect(resetAlertDue(at - 4 * 3_600_000, readResetNotified())).toBeNull(); // a minute later: not again
   });
 });

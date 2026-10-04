@@ -1,7 +1,7 @@
 "use client";
 
 // The watchlist: tokens saved on this device (newest first), without a call. Private: nothing is sent to
-// Rankr, the token doesn't join the boards, and it needs no account. Each entry keeps the price when it was
+// Rankr, the token isn't a call, and it needs no account. Each entry keeps the price when it was
 // saved, so the list shows the x since then. Tokens Rankr doesn't track can be watched too.
 
 import { useSyncExternalStore } from "react";

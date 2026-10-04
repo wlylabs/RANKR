@@ -3,12 +3,11 @@
 import { tokenId } from "./address";
 import { callerStats } from "./caller-stats";
 import { generateKey, isKeyEmail, keyEmail } from "./key";
-import { minCallsFor, type CallerSort } from "./params";
 import { parsePostId, xCode, type ProfileFields } from "./profile";
 import { viewsOf } from "./rankr";
 import { fromRow, type TokenRow } from "./store/supabase";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
-import type { CallResponse, CallView, CallerAbout, CallerView, FeedItem, MyRankResponse, Season, TokenView } from "./types";
+import type { CallResponse, CallView, CallerAbout, CallerView, FeedItem, Recap, TokenView } from "./types";
 import { checkUsername, type UsernameProblem } from "./username";
 import { readPost, type Post } from "./x-post";
 
@@ -225,6 +224,47 @@ export async function myCalls(account: Account): Promise<CallView[]> {
   return callsOf(account.id);
 }
 
+type RecapRow = {
+  month: string;
+  calls: number;
+  hits: number;
+  wins: number;
+  avg_multiple: number;
+  best_multiple: number;
+  best_token: { id: string; chain_id: string; address: string; symbol: string; name: string } | null;
+  top_tier: number | null;
+};
+
+/** How many recaps an account is shown: two years of months. */
+export const RECAPS_SHOWN = 24;
+
+/** The account's own monthly recaps (kept by the reset, rankr_end_month), newest first. Nobody else's. */
+export async function myRecaps(account: Account): Promise<Recap[]> {
+  const api = rest();
+  if (!api) return [];
+  const rows = await api.select<RecapRow[]>(
+    `recaps?select=month,calls,hits,wins,avg_multiple,best_multiple,best_token,top_tier&user_id=eq.${encodeURIComponent(account.id)}&order=month.desc&limit=${RECAPS_SHOWN}`,
+  );
+  return rows.map((r) => ({
+    month: r.month,
+    calls: r.calls,
+    hits: r.hits,
+    wins: r.wins,
+    avgMultiple: r.avg_multiple,
+    bestMultiple: r.best_multiple,
+    bestToken: r.best_token
+      ? {
+          id: r.best_token.id,
+          address: r.best_token.address,
+          symbol: r.best_token.symbol,
+          name: r.best_token.name,
+          chainId: r.best_token.chain_id,
+        }
+      : null,
+    topTier: r.top_tier,
+  }));
+}
+
 /**
  * Every call of one user, newest first, each measured from that user's own entry. `only`: just the call on
  * that token, so only its market data is fetched.
@@ -307,81 +347,8 @@ export async function feed(q: FeedQuery): Promise<FeedItem[]> {
   });
 }
 
-let topCache: { ids: string[]; until: number } | null = null;
-
-/** User ids of the top callers by hit rate (the default caller board), cached for a minute. */
-export async function topCallerIds(n: number): Promise<string[]> {
-  if (topCache && topCache.until > Date.now()) return topCache.ids;
-  const { callers: top } = await callers("rate", n, 0);
-  topCache = { ids: top.map((c) => c.userId), until: Date.now() + 60_000 };
-  return topCache.ids;
-}
-
-type CallerRow = {
-  user_id: string;
-  username: string;
-  official?: boolean;
-  calls: number;
-  hits: number;
-  wins: number;
-  avg_multiple: number;
-  best_multiple: number;
-  best_token: { id: string; address: string; symbol: string; name: string; chain_id: string } | null;
-};
-
-function callerView(c: CallerRow): CallerView {
-  return {
-    userId: c.user_id,
-    username: c.username,
-    official: !!c.official,
-    calls: c.calls,
-    hits: c.hits,
-    wins: c.wins,
-    avgMultiple: c.avg_multiple,
-    bestMultiple: c.best_multiple,
-    bestToken: c.best_token
-      ? {
-          id: c.best_token.id,
-          address: c.best_token.address,
-          symbol: c.best_token.symbol,
-          name: c.best_token.name,
-          chainId: c.best_token.chain_id,
-        }
-      : null,
-  };
-}
-
-export async function callers(sort: CallerSort, limit: number, offset: number): Promise<{ total: number; callers: CallerView[] }> {
-  const api = rest();
-  if (!api) return { total: 0, callers: [] };
-  const out = await api.rpc<{ total: number; callers: CallerRow[] }>("rankr_callers", {
-    p_sort: sort,
-    p_min_calls: minCallsFor(sort),
-    p_limit: limit,
-    p_offset: offset,
-  });
-  return { total: out.total, callers: out.callers.map(callerView) };
-}
-
-/** A caller's place on the caller board for `sort`: their rank and the caller one place up (rankr_caller_rank). */
-export async function callerRank(userId: string, sort: CallerSort): Promise<MyRankResponse> {
-  const api = rest();
-  if (!api) return { total: 0, calls: 0, rank: null, caller: null, ahead: null };
-  const out = await api.rpc<{ total: number; calls: number; rank: number | null; caller: CallerRow | null; ahead: CallerRow | null }>(
-    "rankr_caller_rank",
-    { p_user: userId, p_sort: sort, p_min_calls: minCallsFor(sort) },
-  );
-  return {
-    total: out.total,
-    calls: out.calls,
-    rank: out.rank,
-    caller: out.caller && callerView(out.caller),
-    ahead: out.ahead && callerView(out.ahead),
-  };
-}
-
 /**
- * A caller's public profile by username (any case): their board numbers, bio and links, and their calls.
+ * A caller's public profile by username (any case): their numbers, bio and links, and their calls.
  * Null when no account has that name. Usernames are letters, numbers and "_" (a LIKE wildcard, so it is
  * escaped). The X account is left out until it is verified.
  */
@@ -424,59 +391,3 @@ export async function callerCall(
   return call ? { caller: { userId: row.user_id, username: row.username, official: !!row.official }, call } : null;
 }
 
-type SeasonRow = {
-  month: string;
-  ended_at: string;
-  counts: { tokens?: number; calls?: number; callers?: number };
-  callers: CallerRow[];
-  tokens: {
-    id: string;
-    chain_id: string;
-    address: string;
-    symbol: string;
-    name: string;
-    entry_market_cap: number | null;
-    peak_multiple: number;
-    first_caller: string | null;
-  }[];
-};
-
-/** The last month that ended (see rankr_end_month), with callers by the names they have now; null before the first. */
-export async function lastSeason(): Promise<Season | null> {
-  const api = rest();
-  if (!api) return null;
-  const [row] = await api.select<SeasonRow[]>("seasons?select=*&order=ended_at.desc&limit=1");
-  if (!row) return null;
-  // A caller may have renamed since the month ended.
-  const ids = [...new Set([...row.callers.map((c) => c.user_id), ...row.tokens.flatMap((t) => (t.first_caller ? [t.first_caller] : []))])];
-  const now = ids.length
-    ? await api.select<{ user_id: string; username: string; official?: boolean }[]>(
-        `profiles?select=user_id,username,official&user_id=in.(${ids.map(encodeURIComponent).join(",")})`,
-      )
-    : [];
-  const byId = new Map(now.map((p) => [p.user_id, p]));
-  return {
-    month: row.month,
-    endedAt: Date.parse(row.ended_at),
-    counts: { tokens: row.counts.tokens ?? 0, calls: row.counts.calls ?? 0, callers: row.counts.callers ?? 0 },
-    callers: row.callers.map((c) => ({
-      userId: c.user_id,
-      username: byId.get(c.user_id)?.username ?? c.username,
-      official: byId.get(c.user_id)?.official ?? !!c.official,
-      calls: c.calls,
-      hits: c.hits,
-      avgMultiple: c.avg_multiple,
-      bestMultiple: c.best_multiple,
-    })),
-    tokens: row.tokens.map((t) => ({
-      id: t.id,
-      chainId: t.chain_id,
-      address: t.address,
-      symbol: t.symbol,
-      name: t.name,
-      entryMarketCap: t.entry_market_cap,
-      peakMultiple: t.peak_multiple,
-      firstCaller: t.first_caller ? (byId.get(t.first_caller)?.username ?? null) : null,
-    })),
-  };
-}

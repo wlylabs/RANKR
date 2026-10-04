@@ -4,7 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
-import { refreshBoards } from "@/lib/hooks";
+import { refreshLive } from "@/lib/hooks";
 import { keyEmail, parseKey } from "@/lib/key";
 import { captchaToken } from "@/lib/captcha";
 import { authErrorMessage, LANDING } from "@/lib/login";
@@ -18,7 +18,7 @@ type AuthState = {
   /** The stored session (and, when signed in, the profile) has been read. */
   ready: boolean;
   userId: string | null;
-  /** Public name on the caller board. New accounts get a default one (e.g. nonce_7f3a). */
+  /** Public name on calls and profiles. New accounts get a default one (e.g. nonce_7f3a). */
   username: string | null;
   /** The account has a sign-in key. Without one it is a guest that lives in this browser only. */
   hasKey: boolean;
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = sb.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       if (next) setJustSignedOut(false);
-      void refreshBoards();
+      void refreshLive();
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -138,12 +138,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? "Could not save your username.");
       await mutate(body as MeResponse, { revalidate: false });
-      void refreshBoards();
+      void refreshLive();
     },
     [mutate],
   );
 
-  // Profile changes: the account's own copy, then the boards and profiles that show it.
+  // Profile changes: the account's own copy, then the feed and profiles that show it.
   const postMe = useCallback(
     async (url: string, payload: unknown, fallback: string) => {
       const res = await apiFetch(url, {
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error ?? fallback);
       await mutate(body as MeResponse, { revalidate: false });
-      void refreshBoards();
+      void refreshLive();
     },
     [mutate],
   );

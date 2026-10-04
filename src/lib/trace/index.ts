@@ -18,7 +18,10 @@ const cache = new Map<string, { at: number; value: Promise<TraceResponse> }>();
 export async function traceWallet(chainId: string, address: string, now = Date.now()): Promise<TraceResponse> {
   const chain = traceChain(chainId);
   if (!chain)
-    throw new TraceError("unsupported", "Tracing works on Solana, Ethereum, Base, Arbitrum, Optimism and Polygon.");
+    throw new TraceError(
+      "unsupported",
+      "Tracing works on Solana, Ethereum, Base, Arbitrum, Optimism, Polygon and Robinhood Chain.",
+    );
   if (!validWallet(chain, address))
     throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);
   // BSC: its tokens have reports, its wallets no trail yet (no free explorer API to read them from).

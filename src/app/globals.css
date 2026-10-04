@@ -27,7 +27,7 @@
   --chart-mid: #8f8f8f;
   --chart-up: #116329;
   /* Depth, still monochrome. A card sits on the page with a hairline and the softest drop; what floats
-     over the page (menus, the Track dialog, the pinned rank) casts a real shadow. */
+     over the page (menus, the Track dialog) casts a real shadow. */
   --card-lift: transparent;
   --card-edge: 0 1px 2px rgb(0 0 0 / 0.04);
   --float: 0 0 0 1px rgb(0 0 0 / 0.03), 0 12px 32px -8px rgb(0 0 0 / 0.16), 0 3px 8px -3px rgb(0 0 0 / 0.08);
@@ -253,8 +253,8 @@ body {
 }
 
 /* A list arriving: its rows rise in one after another (the first dozen staggered, the rest together).
-   Opacity and transform only, so a long board stays cheap. Cascade (Cinema.tsx) drops the class once
-   the list has settled, so live re-ranks and new rows don't replay it. */
+   Opacity and transform only, so a long list stays cheap. Cascade (Cinema.tsx) drops the class once
+   the list has settled, so live updates and new rows don't replay it. */
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -577,22 +577,6 @@ body {
   animation-delay: var(--d, 0ms);
 }
 
-/* Leaderboard: spotlights swaying over the stage. */
-@keyframes spot {
-  0%,
-  100% {
-    transform: rotate(var(--r, 0deg));
-  }
-  50% {
-    transform: rotate(calc(var(--r, 0deg) * -0.35));
-  }
-}
-.spot {
-  transform: rotate(var(--r, 0deg));
-  animation: spot 9s ease-in-out infinite;
-  animation-delay: var(--d, 0ms);
-}
-
 /* You: your glyph's cells come in as a scan passes down them, and the scan comes back now and then. */
 @keyframes glyph-cell {
   from {
@@ -625,7 +609,7 @@ body {
   animation: id-scan 7s linear 0.25s infinite;
 }
 
-/* A row that just hit (a milestone, the board's #1): a band of light passes over it once. */
+/* A row that just hit (a milestone): a band of light passes over it once. */
 .sweep {
   position: relative;
   isolation: isolate;
@@ -655,22 +639,6 @@ body {
     transparent 80%
   );
   animation: sweep 1.3s var(--ease-enter) 0.5s;
-}
-
-/* The board's top three: their rank catches the light once. */
-@keyframes rank-shine {
-  from {
-    background-position: 120% 0;
-  }
-  to {
-    background-position: -20% 0;
-  }
-}
-.rank-shine {
-  color: transparent;
-  background: linear-gradient(100deg, var(--fg) 35%, var(--subtle) 50%, var(--fg) 65%) 0 0 / 300% 100%;
-  background-clip: text;
-  animation: rank-shine 1.6s var(--ease-enter) 0.4s backwards;
 }
 
 /* Home: a call sealed. Its hash decrypts and a SEALED stamp comes down (.stamp, as at the end of a trail). */
@@ -728,7 +696,6 @@ body {
   .trail-drip,
   .caret,
   .signal-ring,
-  .spot,
   .id-scan,
   .sweep::after,
   .skeleton {

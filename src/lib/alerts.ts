@@ -1,10 +1,12 @@
 "use client";
 
 // Milestone alerts: a notification when one of your calls or a watched token reaches a new milestone
-// (2x, 3x, 5x, 10x...). Checked on every live refresh while Rankr is open; opt-in from the settings menu.
+// (2x, 3x, 5x, 10x...), and one the day before the monthly reset. Checked while Rankr is open; opt-in from
+// the settings menu.
 
 import { useSyncExternalStore } from "react";
 import { milestoneOf } from "./metrics";
+import { resetDay, resetSoon, untilLabel } from "./reset";
 
 export type AlertItem = { key: string; symbol: string; multiple: number; href: string; kind: "call" | "watch" };
 export type Alert = { item: AlertItem; milestone: number };
@@ -30,6 +32,7 @@ export function milestoneAlerts(items: AlertItem[], seen: Record<string, number>
 
 const ON_KEY = "rankr:alerts:on";
 const SEEN_KEY = "rankr:alerts:seen:v1";
+const RESET_KEY = "rankr:alerts:reset";
 const listeners = new Set<() => void>();
 
 export function alertsSupported(): boolean {
@@ -95,6 +98,49 @@ export async function notify({ item, milestone }: Alert) {
     badge: "/icon-192.png",
     tag: `${item.key}:${milestone}`,
     data: { url: item.href },
+  };
+  const reg = await navigator.serviceWorker?.getRegistration();
+  if (reg) await reg.showNotification(title, options);
+  else new Notification(title, options); // no service worker (dev)
+}
+
+/** The reset to remind of now: the coming one once it's a day away, unless `notified` (its time) already was. */
+export function resetAlertDue(now: number, notified: number | null): number | null {
+  const at = resetSoon(now);
+  return at !== null && at !== notified ? at : null;
+}
+
+// This page's own note of it too, so a browser that won't store it still notifies only once per page.
+let resetNotified: number | null = null;
+
+/** The reset last notified of (its time), so each one notifies once per browser. */
+export function readResetNotified(): number | null {
+  try {
+    const at = Number(localStorage.getItem(RESET_KEY));
+    return Number.isFinite(at) && at > 0 ? Math.max(at, resetNotified ?? 0) : resetNotified;
+  } catch {
+    return resetNotified;
+  }
+}
+
+export function writeResetNotified(at: number) {
+  resetNotified = at;
+  try {
+    localStorage.setItem(RESET_KEY, String(at));
+  } catch {
+    /* storage full or blocked */
+  }
+}
+
+/** "Rankr resets in 5h": every token and call is cleared; signed in, a caller's month is kept as a recap. */
+export async function notifyReset(at: number, now: number, signedIn: boolean) {
+  const title = `Rankr resets in ${untilLabel(at, now)}`;
+  const options: NotificationOptions = {
+    body: `Every token and call is cleared on ${resetDay(at)}, 00:00 UTC.${signedIn ? " If you made calls, your month is kept as a private recap." : ""}`,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: `reset:${at}`,
+    data: { url: signedIn ? "/me?tab=recaps" : "/app" },
   };
   const reg = await navigator.serviceWorker?.getRegistration();
   if (reg) await reg.showNotification(title, options);

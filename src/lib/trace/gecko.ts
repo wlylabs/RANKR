@@ -17,6 +17,7 @@ export const GECKO_NETWORKS: Record<string, string> = {
   optimism: "optimism",
   polygon: "polygon_pos",
   bsc: "bsc",
+  robinhood: "robinhood",
 };
 
 /** One request; null for something it doesn't know, or when its per-minute budget is used up (not asked). */

@@ -8,8 +8,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { APP_HOME } from "@/lib/login";
 import { alertsSupported, setAlerts, useAlertsOn } from "@/lib/alerts";
+import { setCurrency, useCurrency, type Currency } from "@/lib/currency";
 import { promptInstall, useInstallState } from "@/lib/pwa";
+import { accountsAvailable } from "@/lib/supabase-browser";
 import { CopyButton } from "./CopyButton";
+import { RateNote } from "./RateNote";
 
 const ITEM = "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
 
@@ -138,6 +141,8 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
             </div>
           </div>
 
+          <CurrencySwitch />
+
           <AlertsSwitch />
 
           <div className="border-t border-border py-1">
@@ -187,6 +192,42 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
   );
 }
 
+/** USD or IDR for simulations and paper trades (kept in the browser), with the rupiah rate in use. */
+function CurrencySwitch() {
+  const currency = useCurrency();
+  const options: [Currency, string][] = [
+    ["usd", "USD"],
+    ["idr", "IDR"],
+  ];
+  return (
+    <div className="border-t border-border px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-muted">
+          Currency
+          <span className="block text-xs text-subtle">for simulations</span>
+        </span>
+        <div role="group" aria-label="Currency" className="grid grid-cols-2 rounded-md border border-border p-0.5">
+          {options.map(([c, label]) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCurrency(c)}
+              aria-pressed={currency === c}
+              className={clsx(
+                "inline-flex h-6 items-center justify-center rounded px-2.5 font-mono text-[11px] transition-colors",
+                currency === c ? "bg-surface-2 text-fg" : "text-subtle hover:text-fg",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <RateNote className="mt-1.5" />
+    </div>
+  );
+}
+
 /** Milestone alerts on / off. Hidden where the browser has no notifications (e.g. Safari tabs on iPhone). */
 function AlertsSwitch() {
   const on = useAlertsOn();
@@ -206,7 +247,9 @@ function AlertsSwitch() {
         <div className="mt-0.5 text-xs text-subtle">
           {blocked
             ? "Notifications are blocked for this site in your browser settings."
-            : "2x, 5x, 10x and up on your calls and watchlist, while Rankr is open."}
+            : accountsAvailable
+              ? "2x, 5x, 10x and up on your calls and watchlist, and a heads-up the day before the monthly reset, while Rankr is open."
+              : "2x, 5x, 10x and up on your calls and watchlist, while Rankr is open."}
         </div>
       </div>
       <button

@@ -1,17 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronRight, ClipboardPaste, Globe, Pencil, UserRound } from "lucide-react";
+import { ClipboardPaste, Globe, Pencil, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { callerStats } from "@/lib/caller-stats";
 import { callerHref, formatMultiple, formatUsd, tokenHref } from "@/lib/format";
-import { useAccountCalls, useMyCalls, useMyRank, useTokens, type MyCall } from "@/lib/hooks";
+import { useAccountCalls, useMounted, useMyCalls, useTokens, type MyCall } from "@/lib/hooks";
 import { loginHref } from "@/lib/login";
-import { MAX_LIMIT } from "@/lib/params";
 import { ratio, tierOf } from "@/lib/metrics";
-import { nextResetAt, resetDay } from "@/lib/season";
+import { nextResetAt, resetDay } from "@/lib/reset";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import type { CallView, CallerAbout, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
@@ -19,10 +18,11 @@ import { IdentityField } from "./Backdrops";
 import { CallSpread, RecentForm } from "./CallerCharts";
 import { Cascade } from "./Cinema";
 import { CountUp } from "./CountUp";
-import { rankLine } from "./CallersBoard";
 import { MultipleBadge, toneOf } from "./MultipleBadge";
 import { PageHeader } from "./PageHeader";
 import { PROFILE_ACTION, ProfileHeader } from "./ProfileHeader";
+import { PaperTrades, useOpenPaperTrades } from "./PaperTrades";
+import { Recaps } from "./Recaps";
 import { SaveAvatar } from "./SaveAvatar";
 import { ShareCall } from "./ShareCall";
 import { Segmented, TabBar } from "./Tabs";
@@ -97,8 +97,8 @@ export function MyCalls() {
           <p className="mt-3 font-medium">{userId ? "Pick a name" : "Sign in to see your calls"}</p>
           <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
             {userId
-              ? "Your calls show up on the caller board under it."
-              : "Every CA you paste is your call, tracked from your own entry and ranked on the caller board. Continue as a guest in one click, or sign in with your key."}
+              ? "Your calls show up on your public page under it."
+              : "Every CA you paste is your call, tracked from your own entry. Continue as a guest in one click, or sign in with your key."}
           </p>
           <Link
             href={loginHref("/me")}
@@ -134,7 +134,7 @@ function AccountCalls({
     <Page
       header={
         <>
-          {/* Who you are, as on your public page, and your place on the caller board. */}
+          {/* Who you are, as on your public page. */}
           <ProfileHeader
             userId={userId}
             username={username}
@@ -156,7 +156,6 @@ function AccountCalls({
               </>
             }
           />
-          <RankCard userId={userId} className="mt-6" />
         </>
       }
       intro={
@@ -173,54 +172,8 @@ function AccountCalls({
       rows={rows}
       loading={isLoading}
       shareAs={username}
+      recapsOf={userId}
     />
-  );
-}
-
-/**
- * Your place on the caller board (by hit rate, its default) as a link, to the board unless `href` says
- * otherwise. `best` adds your best call.
- */
-export function RankCard({
-  userId,
-  href = "/leaderboard?view=callers",
-  best = false,
-  className,
-}: {
-  userId: string;
-  href?: string;
-  best?: boolean;
-  className?: string;
-}) {
-  const mine = useMyRank("rate", userId);
-  if (!mine) return null;
-  const bestCall =
-    best && mine.caller?.bestToken ? `best $${mine.caller.bestToken.symbol} ${formatMultiple(mine.caller.bestMultiple)}` : null;
-  const line = [rankLine("rate", mine), bestCall].filter(Boolean).join(" · ");
-  return (
-    <Link
-      href={href}
-      className={clsx("flex items-center gap-4 card px-4 py-3 transition-colors hover:bg-surface-2", className)}
-    >
-      {/* Your place, climbing to it from the foot of the board. */}
-      <span className="tabular font-mono text-2xl font-medium tracking-tight">
-        {mine.rank ? (
-          <>
-            #<CountUp value={mine.rank} from={mine.total} />
-          </>
-        ) : (
-          "—"
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm">
-          {mine.rank ? `of ${mine.total} on the caller board` : "Not on the caller board yet"}
-          <span className="text-subtle"> · hit rate</span>
-        </span>
-        {line && <span className="mt-0.5 block truncate font-mono text-[11px] text-subtle">{line}</span>}
-      </span>
-      <ChevronRight className="size-4 shrink-0 text-subtle" />
-    </Link>
   );
 }
 
@@ -228,7 +181,7 @@ export function RankCard({
 function DeviceCalls() {
   const calls = useMyCalls();
   // Live data for the calls on this device (the newest MAX_LIMIT of them).
-  const { tokens, isLoading } = useTokens({ ids: calls.slice(0, MAX_LIMIT).map((c) => c.id), limit: MAX_LIMIT });
+  const { tokens, isLoading } = useTokens(calls.map((c) => c.id));
   const rows = useMemo(() => {
     const byId = new Map(tokens.map((t) => [t.id, t]));
     return calls.map((c) => deviceRow(c, byId.get(c.id)));
@@ -236,7 +189,7 @@ function DeviceCalls() {
   return <Page intro="Saved on this device." rows={rows} loading={isLoading && calls.length > 0} />;
 }
 
-const TABS = { calls: "Calls", stats: "Stats", watchlist: "Watchlist" } as const;
+const TABS = { calls: "Calls", stats: "Stats", recaps: "Recaps", paper: "Paper", watchlist: "Watchlist" } as const;
 type TabKey = keyof typeof TABS;
 
 /** The tab in the URL (?tab=stats), so it survives a reload and can be linked to. */
@@ -245,7 +198,8 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   const router = useRouter();
   const pathname = usePathname();
   const picked = params.get("tab");
-  const tab: TabKey = picked === "stats" || picked === "watchlist" ? picked : "calls";
+  const tab: TabKey =
+    picked === "stats" || picked === "recaps" || picked === "paper" || picked === "watchlist" ? picked : "calls";
   // Old links: /me#watchlist.
   useEffect(() => {
     if (window.location.hash === "#watchlist") router.replace(`${pathname}?tab=watchlist`, { scroll: false });
@@ -253,13 +207,14 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   return [tab, (next) => router.replace(next === "calls" ? pathname : `${pathname}?tab=${next}`, { scroll: false })];
 }
 
-/** "You": your calls, how they're doing, and your watchlist. */
+/** "You": your calls, how they're doing, your past months, your paper trades and your watchlist. */
 function Page({
   header,
   intro,
   rows,
   loading = false,
   shareAs,
+  recapsOf,
   children,
 }: {
   /** Above the tabs; a plain "You" heading when there's no account to show. */
@@ -269,11 +224,18 @@ function Page({
   loading?: boolean;
   /** The account the calls are under, so each can be shared (calls on this device only can't). */
   shareAs?: string;
+  /** The signed-in account whose monthly recaps get a tab (only with accounts: the reset keeps them). */
+  recapsOf?: string;
   /** Shown instead of the calls and the stats (e.g. "Sign in"). */
   children?: React.ReactNode;
 }) {
   const watching = useWatchlist().length;
-  const [tab, setTab] = useTab();
+  const paperOpen = useOpenPaperTrades();
+  const [picked, setTab] = useTab();
+  // The reset day is the visitor's (the page is prerendered): said once mounted.
+  const mounted = useMounted();
+  // No account, no recaps: a ?tab=recaps link opens the calls.
+  const tab = picked === "recaps" && !recapsOf ? "calls" : picked;
   const { userId } = useAuth();
 
   return (
@@ -285,7 +247,15 @@ function Page({
       <TabBar
         label="You"
         options={{
-          ...TABS,
+          calls: TABS.calls,
+          stats: TABS.stats,
+          ...(recapsOf && { recaps: TABS.recaps }),
+          paper: (
+            <>
+              {TABS.paper}
+              {paperOpen > 0 && <span className="ml-1.5 font-mono text-xs text-subtle">{paperOpen}</span>}
+            </>
+          ),
           watchlist: (
             <>
               {TABS.watchlist}
@@ -300,6 +270,10 @@ function Page({
 
       {tab === "watchlist" ? (
         <Watchlist />
+      ) : tab === "paper" ? (
+        <PaperTrades />
+      ) : tab === "recaps" && recapsOf ? (
+        <Recaps userId={recapsOf} />
       ) : children ? (
         children
       ) : tab === "stats" ? (
@@ -308,8 +282,12 @@ function Page({
         <>
           <p className="mt-4 text-sm text-muted">
             Measured from the moment <em>you</em> pasted. {intro && <span className="text-subtle">{intro}</span>}
-            {accountsAvailable && (
-              <span className="text-subtle"> Calls reset with the boards on {resetDay(nextResetAt())}, 00:00 UTC.</span>
+            {accountsAvailable && mounted && (
+              <span className="text-subtle">
+                {" "}
+                Calls are cleared on {resetDay(nextResetAt())}, 00:00 UTC
+                {recapsOf && rows.length ? "; your month is kept as a private recap." : "."}
+              </span>
             )}
           </p>
           {!rows.length && !loading ? <NoCalls /> : <CallsView rows={rows} loading={loading} shareAs={shareAs} />}

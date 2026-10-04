@@ -9,7 +9,7 @@ import { SocialLinks } from "./Social";
 export const PROFILE_ACTION =
   "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg";
 
-/** The top of a caller's public page and of "You": avatar, name, board numbers, bio and links. */
+/** The top of a caller's public page and of "You": avatar, name, numbers, bio and links. */
 export function ProfileHeader({
   userId,
   username,
@@ -23,7 +23,7 @@ export function ProfileHeader({
   userId: string | null;
   username: string;
   official: boolean;
-  /** Board numbers; null while unknown. */
+  /** The caller's numbers; null while unknown. */
   stats: Pick<CallerView, "calls" | "hits" | "wins" | "avgMultiple"> | null;
   /** When the first call was made. */
   since: number | null;

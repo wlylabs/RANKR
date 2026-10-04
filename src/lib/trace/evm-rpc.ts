@@ -1,6 +1,7 @@
 // EVM JSON-RPC, for what the explorers don't say: what a contract's owner() is right now, and (on BSC, which has
-// no free explorer API) whether an address is a token at all. PublicNode's free endpoints by default (no key), or
-// <CHAIN>_RPC_URL (ETHEREUM_RPC_URL, BASE_RPC_URL, BSC_RPC_URL...).
+// no free explorer API) whether an address is a token at all. PublicNode's free endpoints by default (no key;
+// Robinhood Chain's own public RPC, which PublicNode doesn't serve), or <CHAIN>_RPC_URL (ETHEREUM_RPC_URL,
+// BASE_RPC_URL, BSC_RPC_URL...).
 const PUBLIC: Record<string, string> = {
   ethereum: "https://ethereum-rpc.publicnode.com",
   base: "https://base-rpc.publicnode.com",
@@ -8,6 +9,7 @@ const PUBLIC: Record<string, string> = {
   optimism: "https://optimism-rpc.publicnode.com",
   polygon: "https://polygon-bor-rpc.publicnode.com",
   bsc: "https://bsc-rpc.publicnode.com",
+  robinhood: "https://rpc.mainnet.chain.robinhood.com",
 };
 
 import { take } from "../budget";

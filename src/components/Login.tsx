@@ -72,7 +72,7 @@ export function Login() {
 
   if (userId) {
     return (
-      <Shell title="Pick a username" intro="This is how you show up on the caller board.">
+      <Shell title="Pick a username" intro="This is how you show up on your calls and your public page.">
         <UsernameForm submitLabel="Continue" />
         <p className="mt-6 text-xs text-subtle">
           <button type="button" onClick={() => void signOut()} className={LINK}>
@@ -86,7 +86,7 @@ export function Login() {
   return (
     <Shell
       title="Sign in to Rankr"
-      intro="Pasting a CA needs an account, so every call on the board has a name behind it."
+      intro="Pasting a CA needs an account, so every call has a name behind it."
     >
       {ca && (
         <div className="mb-6 flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 font-mono text-xs text-muted">

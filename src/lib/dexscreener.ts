@@ -16,12 +16,15 @@ export type Pair = {
   baseToken: { address: string; name: string; symbol: string };
   quoteToken: { address: string; name: string; symbol: string };
   priceUsd?: string;
+  /** Price in the quote coin. */
+  priceNative?: string;
   volume?: Partial<Record<"m5" | "h1" | "h6" | "h24", number>>;
   txns?: Partial<Record<"m5" | "h1" | "h6" | "h24", { buys?: number; sells?: number }>>;
   priceChange?: Partial<Record<"m5" | "h1" | "h6" | "h24", number>>;
   /** "v2", "v3", "DLMM"...: the kind of pool. */
   labels?: string[];
-  liquidity?: { usd?: number };
+  /** usd: both sides together; base and quote: each side, in its own coin. */
+  liquidity?: { usd?: number; base?: number; quote?: number };
   fdv?: number;
   marketCap?: number;
   pairCreatedAt?: number;
@@ -107,6 +110,10 @@ export function toSnapshot(p: Pair): MarketSnapshot {
     txns24h: p.txns?.h24 ? (num(p.txns.h24.buys) ?? 0) + (num(p.txns.h24.sells) ?? 0) : null,
     pairAddress: p.pairAddress,
     dexId: p.dexId,
+    ...(p.labels?.length ? { labels: p.labels } : {}),
+    quoteSymbol: p.quoteToken?.symbol ?? null,
+    priceNative: num(p.priceNative),
+    liquidityQuote: num(p.liquidity?.quote),
     url: p.url,
     pairCreatedAt: num(p.pairCreatedAt),
     websites: (p.info?.websites ?? []).map((w) => ({ label: w.label || "Website", url: w.url })),

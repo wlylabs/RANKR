@@ -43,8 +43,8 @@ export function Account() {
     <div className="mx-auto max-w-lg pt-10 sm:pt-14">
       <PageHeader title="Account">
         You are <span className="font-mono text-fg">@{username}</span>
-        {official && <OfficialBadge className="ml-1" />} on the caller board
-        {official ? ", as an official account." : hasKey ? "." : ", as a guest."}
+        {official && <OfficialBadge className="ml-1" />}
+        {official ? ", an official account." : hasKey ? "." : ", as a guest."}
       </PageHeader>
 
       {hasKey && !shownKey ? <KeySection {...keyProps} /> : <SaveKey {...keyProps} />}
@@ -83,7 +83,7 @@ export function Account() {
             ) : (
               <>
                 Without a key you can&apos;t sign back in. <span className="font-mono">@{username}</span> and its calls stay
-                on the board but you lose access. Save your key first to keep it.
+                public but you lose access. Save your key first to keep it.
               </>
             )}
           </p>
@@ -171,7 +171,7 @@ function SaveKey({ username, shownKey, setShownKey }: KeyProps) {
               <>
                 <p className="mb-4 text-sm text-muted">
                   This browser switches to the account the key belongs to.{" "}
-                  <span className="font-mono text-fg">@{username}</span> stays on the board, but without a key you
+                  <span className="font-mono text-fg">@{username}</span> stays public, but without a key you
                   can&apos;t come back to it.
                 </p>
                 <KeySignInForm autoFocus />

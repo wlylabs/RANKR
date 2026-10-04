@@ -19,7 +19,7 @@ import {
 } from "@/lib/format";
 import { fetcher, useAccountCalls, useMyCalls } from "@/lib/hooks";
 import { MILESTONES, ratio } from "@/lib/metrics";
-import { loginHref } from "@/lib/login";
+import { APP_HOME, loginHref } from "@/lib/login";
 import { PasteError, trackPaste } from "@/lib/track";
 import type { Link as TokenLink, MarketSnapshot, TokenResponse, TokenView } from "@/lib/types";
 import { useAuth } from "./AuthProvider";
@@ -27,6 +27,7 @@ import { CopyButton } from "./CopyButton";
 import { DecryptText } from "./DecryptText";
 import { ChangeText, Flash, MultipleBadge } from "./MultipleBadge";
 import { ShareCall } from "./ShareCall";
+import { SimulatePanel } from "./Simulate";
 import { TimeAgo } from "./TimeAgo";
 import { WatchButton } from "./Watchlist";
 
@@ -41,8 +42,8 @@ export function TokenDetail({ chain, address, initial }: { chain: string; addres
 
   return (
     <div className="pt-6 sm:pt-10">
-      <Link href="/leaderboard" className="text-sm text-muted hover:text-fg">
-        Back to leaderboard
+      <Link href={APP_HOME} className="text-sm text-muted hover:text-fg">
+        Back to home
       </Link>
       {token ? (
         <Tracked token={token} />
@@ -253,6 +254,15 @@ function Tracked({ token: t }: { token: TokenView }) {
                 </div>
               </div>
             </Section>
+          )}
+          {m && (
+            <SimulatePanel
+              market={m}
+              entries={[
+                { label: "The first paste", priceUsd: t.entryPriceUsd, marketCap: t.entryMarketCap },
+                ...(myCall ? [{ label: "Your call", priceUsd: myCall.entryPriceUsd, marketCap: myCall.entryMarketCap }] : []),
+              ]}
+            />
           )}
           <Milestones token={t} />
           <Section title="Stats">
@@ -476,8 +486,9 @@ function Untracked({ preview: p, onTracked }: { preview: MarketSnapshot; onTrack
           </button>
         </div>
       </section>
-      <div className="mt-6">
-        <Chart market={p} />
+      <div className="mt-6 grid gap-6 lg:grid-cols-3 lg:items-start">
+        <Chart market={p} className="lg:col-span-2" />
+        <SimulatePanel market={p} />
       </div>
     </>
   );

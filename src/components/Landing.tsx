@@ -5,13 +5,10 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
-import { useTokens } from "@/lib/hooks";
 import { APP_HOME } from "@/lib/login";
 import { isStandalone } from "@/lib/pwa";
 import { useAuth } from "./AuthProvider";
 import { Reveal } from "./Cinema";
-import { LiveDot } from "./PageHeader";
-import { ListSkeleton, TokenRow } from "./TokenList";
 
 /**
  * The installed app opens on /app; if it ever lands on the landing page (e.g. added from /), go there.
@@ -81,42 +78,3 @@ export function Faq({ items }: { items: { q: string; a: string }[] }) {
   );
 }
 
-const PREVIEW_ROWS = 5;
-
-/**
- * The product itself, under the hero: the board's top runners right now, live, in a frame lit from behind.
- * It tips upright as it scrolls into view (.tilt-in) and its last row fades into the page, like a shot that
- * runs on past the edge. Rows open their token pages. Nothing shows until there's a token to show.
- */
-export function BoardPreview() {
-  const { tokens, isLoading } = useTokens({ sort: "top", limit: PREVIEW_ROWS });
-  if (!isLoading && !tokens.length) return null;
-  return (
-    <section aria-label="Top runners right now" className="relative isolate pb-20 sm:pb-28">
-      <div
-        aria-hidden
-        className="absolute inset-x-[10%] top-6 -z-10 h-2/3 rounded-full bg-fg opacity-[0.07] blur-3xl"
-      />
-      <div className="tilt-in card overflow-hidden bg-bg [mask-image:linear-gradient(to_bottom,#000_72%,transparent)]">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
-          <span className="flex items-center gap-2 text-sm font-medium">
-            <LiveDot />
-            Top runners
-          </span>
-          <Link href="/leaderboard" className="font-mono text-[11px] text-subtle transition-colors hover:text-fg">
-            live from the board
-          </Link>
-        </div>
-        {isLoading ? (
-          <ListSkeleton rows={PREVIEW_ROWS} />
-        ) : (
-          <div className="divide-y divide-border">
-            {tokens.map((t, i) => (
-              <TokenRow key={t.id} token={t} rank={i + 1} meta="peak" />
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}

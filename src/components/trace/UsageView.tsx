@@ -177,7 +177,7 @@ export function UsageView() {
             <a href="https://dev.blockscout.com" target="_blank" rel="noreferrer" className="inline-flex items-center underline">
               Blockscout <ArrowUpRight className="size-3" />
             </a>
-            . The limits are set in the environment (README, Usage limits).
+            . The limits are set in the environment (.env.example, Usage limits).
           </p>
         </>
       )}

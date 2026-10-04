@@ -15,6 +15,8 @@ function hash(input: string): number {
 const PREFIX = ["PEPE", "DOGE", "WIF", "BONK", "CAT", "FROG", "CHAD", "GIGA", "MOON", "BASED", "TURBO", "SIGMA"];
 const SUFFIX = ["", "AI", "INU", "COIN", "404", "X", "2.0", "KING", "HAT", "CULT"];
 const DEX: Record<string, string> = { solana: "pumpswap", base: "aerodrome", ethereum: "uniswap", bsc: "pancakeswap" };
+/** The quote coin of a mock pair and a rough price of it. */
+const QUOTE: Record<string, [string, number]> = { solana: ["SOL", 150], bsc: ["WBNB", 600] };
 
 export function mockSnapshot(address: string, chainHint: string | null): MarketSnapshot {
   const h = hash(address);
@@ -31,6 +33,8 @@ export function mockSnapshot(address: string, chainHint: string | null): MarketS
   const swing = amp * Math.sin((2 * Math.PI * t) / period + phase) + 0.08 * Math.sin(t / 1.7 + phase);
   const priceUsd = basePrice * Math.exp(swing);
   const marketCap = priceUsd * supply;
+  const liquidityUsd = marketCap * (0.08 + (h % 7) / 100);
+  const [quoteSymbol, quoteUsd] = QUOTE[chainId] ?? ["WETH", 3000];
 
   return {
     chainId,
@@ -41,12 +45,15 @@ export function mockSnapshot(address: string, chainHint: string | null): MarketS
     priceUsd,
     marketCap,
     fdv: marketCap,
-    liquidityUsd: marketCap * (0.08 + (h % 7) / 100),
+    liquidityUsd,
     volume24h: marketCap * (0.5 + (h % 30) / 10),
     priceChange24h: Math.round((Math.exp(swing) - 1) * 1000) / 10,
     txns24h: h % 900,
     pairAddress: `mockpair${h.toString(16)}`,
     dexId: DEX[chainId] ?? "uniswap",
+    quoteSymbol,
+    priceNative: priceUsd / quoteUsd,
+    liquidityQuote: liquidityUsd / 2 / quoteUsd,
     url: `https://dexscreener.com/${chainId}/${address}`,
     pairCreatedAt: Date.now() - (h % 72) * 3_600_000,
     websites: [{ label: "Website", url: "https://example.com" }],

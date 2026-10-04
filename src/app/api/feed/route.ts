@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { accountsEnabled, feed, topCallerIds } from "@/lib/accounts";
+import { accountsEnabled, feed } from "@/lib/accounts";
 import { requireAccount } from "@/lib/api-auth";
 import { pasteEvents } from "@/lib/feed";
-import { FEED_TOP_CALLERS, parseFeedKind, parseFeedScope } from "@/lib/params";
+import { parseFeedKind, parseFeedScope } from "@/lib/params";
 import { queryTokens } from "@/lib/rankr";
 import type { FeedItem, FeedResponse } from "@/lib/types";
 
@@ -14,7 +14,7 @@ function int(value: string | null, fallback: number, min: number, max: number) {
 }
 
 /**
- * GET /api/feed?scope=all|top|you&kind=all|call|milestone&chain=solana&limit=20&offset=0
+ * GET /api/feed?scope=all|you&kind=all|call|milestone&chain=solana&limit=20&offset=0
  * Newest calls ("@userx called $SHIB at $1.2B mc") and milestones ("$PEPE hit 10x from @userx's call").
  * scope=you: the signed-in caller's own (`Authorization: Bearer <access token>`).
  * Without accounts (local dev) pastes stand in for calls, with no caller.
@@ -33,8 +33,7 @@ export async function GET(req: NextRequest) {
     let items: FeedItem[];
     if (accountsEnabled()) {
       let users: string[] | null = null;
-      if (scope === "top") users = await topCallerIds(FEED_TOP_CALLERS);
-      else if (scope === "you") {
+      if (scope === "you") {
         const account = await requireAccount(req);
         if (account instanceof NextResponse) return account;
         users = [account.id];
@@ -43,7 +42,7 @@ export async function GET(req: NextRequest) {
     } else if (scope !== "all") {
       items = []; // no callers without accounts
     } else {
-      const { tokens } = await queryTokens({ sort: "new", chain, limit: Math.min(offset + limit, 100), offset: 0 });
+      const { tokens } = await queryTokens({ chain, limit: Math.min(offset + limit, 100), offset: 0 });
       items = pasteEvents(tokens, kind).slice(offset, offset + limit);
     }
     const body: FeedResponse = { items, updatedAt: Date.now() };
