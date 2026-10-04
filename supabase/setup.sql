@@ -1559,10 +1559,11 @@ begin
 end $$;
 
 -- Ends the month: keeps each caller's recap, then deletes every token (calls and milestones go with them).
--- Each call goes into the recap of the month it was made in (UTC), so a reset that runs late, or by hand,
--- never mixes two months; calls of a month already kept are added to its recap. Nothing to clear (no
--- tokens): nothing happens. Returns {ok, month, tokens, calls, callers} or {ok, skipped}, `month` being the
--- one that just ended when run in the first hours of the 1st, else the current one.
+-- `month` is the one that just ended when run in the first hours of the 1st, else the current one. Each call
+-- goes into the recap of the month it was made in (UTC), so a reset that runs late, or by hand, never mixes
+-- two months; a call made after `month` (in the moments before an on-time reset takes its lock) counts in
+-- `month`. Calls of a month already kept are added to its recap. Nothing to clear (no tokens): nothing
+-- happens. Returns {ok, month, tokens, calls, callers} or {ok, skipped}.
 create or replace function public.rankr_end_month(p_at timestamptz default now()) returns jsonb
 language plpgsql as $$
 declare
@@ -1594,7 +1595,7 @@ begin
          max(p.tier)
   from (
     select c.user_id, c.called_at,
-           date_trunc('month', c.called_at at time zone 'UTC')::date as month,
+           least(date_trunc('month', c.called_at at time zone 'UTC')::date, v_month) as month,
            t.last_price_usd / c.entry_price_usd as m,
            jsonb_build_object('id', t.id, 'chain_id', t.chain_id, 'address', t.address,
                               'symbol', t.symbol, 'name', t.name) as token,
