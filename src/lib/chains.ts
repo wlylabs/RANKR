@@ -16,6 +16,7 @@ const CHAINS: Record<string, ChainMeta> = {
   sonic: { name: "Sonic", short: "S", color: "#FE9A4C" },
   abstract: { name: "Abstract", short: "ABS", color: "#00C16E" },
   hyperevm: { name: "HyperEVM", short: "HYPE", color: "#50E3C2" },
+  robinhood: { name: "Robinhood", short: "HOOD", color: "#CCFF00" },
 };
 
 /** Chains shown on the landing page. Everything DexScreener lists is accepted. */

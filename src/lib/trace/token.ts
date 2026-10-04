@@ -63,7 +63,7 @@ export async function traceToken(chainId: string, address: string, now = Date.no
   if (!chain)
     throw new TraceError(
       "unsupported",
-      "Token reports work on Solana, Ethereum, Base, Arbitrum, Optimism, Polygon and BSC.",
+      "Token reports work on Solana, Ethereum, Base, Arbitrum, Optimism, Polygon, Robinhood Chain and BSC.",
     );
   if (!validWallet(chain, address))
     throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);

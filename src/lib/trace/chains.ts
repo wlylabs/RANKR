@@ -23,6 +23,7 @@ export const TRACE_CHAINS: TraceChain[] = [
   { id: "arbitrum", kind: "evm", native: "ETH", chainId: 42161, explorer: "https://arbiscan.io" },
   { id: "optimism", kind: "evm", native: "ETH", chainId: 10, explorer: "https://optimistic.etherscan.io" },
   { id: "polygon", kind: "evm", native: "POL", chainId: 137, explorer: "https://polygonscan.com" },
+  { id: "robinhood", kind: "evm", native: "ETH", chainId: 4663, explorer: "https://robinhoodchain.blockscout.com" },
   { id: "bsc", kind: "evm", native: "BNB", chainId: 56, explorer: "https://bscscan.com", tokensOnly: true },
 ];
 
