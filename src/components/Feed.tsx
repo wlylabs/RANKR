@@ -84,11 +84,11 @@ export function Feed() {
   const pathname = usePathname();
   const { ready, userId } = useAuth();
   const now = useNow(60_000);
-  // The callers filter is in the URL; without one, the last one picked (the ticker shows it too).
+  // The callers filter is in the URL; without one, the last one picked.
   const stored = useFeedScope();
   const inUrl = params.get("scope");
   const scope = accountsAvailable ? (inUrl ? parseFeedScope(inUrl) : stored) : "all";
-  // A link with a filter becomes the one picked, so the ticker shows what the page shows.
+  // A link with a filter becomes the one picked, so the feed opens on it next time.
   useEffect(() => {
     if (accountsAvailable && inUrl && scope !== stored) setFeedScope(scope);
   }, [inUrl, scope, stored]);

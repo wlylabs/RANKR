@@ -80,7 +80,7 @@ export function feedKey(p: FeedParams, limit: number, offset = 0): string | null
   return `/api/feed?${qs}`;
 }
 
-/** The newest feed entries (the ticker). Sent with the session, which scope "you" needs. */
+/** The newest feed entries. Sent with the session, which scope "you" needs. */
 export function useFeed(params: FeedParams, limit = 20) {
   const { data, error, isLoading } = useSWR<FeedResponse>(feedKey(params, limit), authedFetcher, LIVE);
   return { items: data?.items ?? [], error, isLoading };
