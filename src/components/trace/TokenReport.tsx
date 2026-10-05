@@ -519,12 +519,12 @@ export function TokenReport({ chain: chainId, address }: { chain: string; addres
       {error && !report ? (
         <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
           <p className="text-sm">{error.message}</p>
-          {error.code === "nokey" && (
+          {(error.code === "nokey" || error.code === "allowance") && (
             <div className="mt-4">
               <KeysLink />
             </div>
           )}
-          {error.code !== "invalid" && error.code !== "unsupported" && error.code !== "nokey" && (
+          {error.code !== "invalid" && error.code !== "unsupported" && error.code !== "nokey" && error.code !== "allowance" && (
             <button
               type="button"
               onClick={() => void reload()}

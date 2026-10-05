@@ -1,6 +1,8 @@
 // Accounts' own Trace keys: read, checked and saved (encrypted, secret-box.ts) in trace_keys. Server only. See
 // trace/keys.ts for how a read runs on them.
+import type { Account } from "./accounts";
 import { canSeal, open, seal } from "./secret-box";
+import { allowanceOf } from "./trace-allowance";
 import { SupabaseRest, supabaseConfig } from "./supabase-rest";
 import { heliusUrl, type OwnKeys } from "./trace/keys";
 import type { TraceKeysResponse } from "./types";
@@ -39,10 +41,19 @@ export async function loadKeys(userId: string): Promise<OwnKeys> {
 /** The end of a key, enough to tell which one it is: "…a1b2". */
 const hint = (key: string | null) => (key ? `…${key.slice(-4)}` : null);
 
-export async function keysView(userId: string, official: boolean): Promise<TraceKeysResponse> {
+export async function keysView(account: Account): Promise<TraceKeysResponse> {
   const storable = keysStorable();
-  const keys = storable ? await loadKeys(userId) : null;
-  return { official, storable, blockscout: hint(keys?.blockscout ?? null), helius: hint(keys?.helius ?? null) };
+  const [keys, free] = await Promise.all([
+    storable ? loadKeys(account.id) : null,
+    account.official ? null : allowanceOf(account.id, !account.hasKey),
+  ]);
+  return {
+    official: account.official,
+    storable,
+    blockscout: hint(keys?.blockscout ?? null),
+    helius: hint(keys?.helius ?? null),
+    free,
+  };
 }
 
 /** A Helius API key, pasted alone or in its RPC URL (…helius-rpc.com/?api-key=…); null if it isn't one. */

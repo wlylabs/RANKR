@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import useSWR from "swr";
 import { apiFetch, authedFetcher } from "@/lib/supabase-browser";
-import type { TraceKeysResponse } from "@/lib/types";
+import type { TraceAllowance, TraceKeysResponse } from "@/lib/types";
 import { PageHeader } from "../PageHeader";
 
 export const KEYS_URL = "/api/me/trace-keys";
@@ -136,8 +136,9 @@ function KeyRow({ name, saved, onSaved }: { name: Name; saved: string | null; on
 }
 
 /**
- * Your own API keys for Trace: every account traces on keys of its own, never on Rankr's, each within its own
- * free plan. Saved encrypted, shown by their last characters only.
+ * Your own API keys for Trace, and today's free reads: a chain without a key of yours reads on Rankr's keys, a few
+ * wallets and reports a day; with one, as much as its own free plan allows. Saved encrypted, shown by their last
+ * characters only.
  */
 export function TraceKeys() {
   const { data, error, mutate } = useTraceKeys();
@@ -149,8 +150,8 @@ export function TraceKeys() {
         <ArrowLeft className="size-3.5" /> Trace
       </Link>
       <PageHeader title="Your API keys">
-        Trace reads the chains on your own keys: free from each provider, and only yours. Rankr keeps them
-        encrypted and only ever shows their last characters.
+        Every account gets a few free reads a day on Rankr&apos;s keys. Add your own (free from each provider) to
+        trace as much as you like: they&apos;re only yours, kept encrypted, and only their last characters are shown.
       </PageHeader>
 
       {error ? (
@@ -166,26 +167,61 @@ export function TraceKeys() {
           Saving keys isn&apos;t set up on this site yet.
         </p>
       ) : (
-        <section className="card px-4 sm:px-5" aria-label="Keys">
-          <div className="flex items-center gap-2 border-b border-border py-3">
-            <KeyRound className="size-3.5 text-subtle" />
-            <h2 className="label text-fg">One per provider</h2>
-          </div>
-          <ul className="divide-y divide-border">
-            <KeyRow name="helius" saved={data.helius} onSaved={onSaved} />
-            <KeyRow name="blockscout" saved={data.blockscout} onSaved={onSaved} />
-          </ul>
-        </section>
+        <>
+          {data.free && <FreeReads free={data.free} />}
+          <section className="card px-4 sm:px-5" aria-label="Keys">
+            <div className="flex items-center gap-2 border-b border-border py-3">
+              <KeyRound className="size-3.5 text-subtle" />
+              <h2 className="label text-fg">One per provider</h2>
+            </div>
+            <ul className="divide-y divide-border">
+              <KeyRow name="helius" saved={data.helius} onSaved={onSaved} />
+              <KeyRow name="blockscout" saved={data.blockscout} onSaved={onSaved} />
+            </ul>
+          </section>
+        </>
       )}
     </div>
   );
 }
 
-/** On the trace page, for an account missing a key: what it can't trace yet, and where to add one. */
+const left = (r: { used: number; limit: number }) => Math.max(0, r.limit - r.used);
+
+/** Today's free reads: how many wallets and reports are left, and when they come back. */
+function FreeReads({ free }: { free: TraceAllowance }) {
+  const rows = [
+    ["Wallets", free.wallets],
+    ["Token reports", free.reports],
+  ] as const;
+  return (
+    <section className="card px-4 sm:px-5" aria-label="Free reads today">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border py-3">
+        <h2 className="label text-fg">Free reads today</h2>
+        <span className="text-[12px] text-subtle">Back at 00:00 UTC · for chains without a key of yours</span>
+      </div>
+      <ul className="divide-y divide-border">
+        {rows.map(([name, r]) => (
+          <li key={name} className="flex items-baseline justify-between gap-3 py-3 text-sm">
+            <span>{name}</span>
+            <span className="tabular font-mono text-[12.5px]">
+              {left(r)} <span className="text-subtle">/ {r.limit} left</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-border py-3 text-[12px] text-subtle">
+        A wallet anyone has opened lately is free: it comes from Rankr&apos;s shared reads.
+        {free.guest && " Save a sign-in key (Account) for more free reads."}
+      </p>
+    </section>
+  );
+}
+
+/** On the trace page, for an account missing a key: its free reads left today, and where to add a key. */
 export function KeysNote() {
   const { data } = useTraceKeys();
-  if (!data || data.official || !data.storable || (data.helius && data.blockscout)) return null;
-  const missing = [!data.helius && "Solana (Helius)", !data.blockscout && "EVM chains (Blockscout)"].filter(Boolean);
+  if (!data || data.official || !data.free || (data.helius && data.blockscout)) return null;
+  const { wallets, reports } = data.free;
   return (
     <Link
       href="/trace/keys"
@@ -193,14 +229,14 @@ export function KeysNote() {
     >
       <KeyRound className="mt-0.5 size-4 shrink-0" />
       <span>
-        Trace runs on your own free API keys. Add one for {missing.join(" and ")}{" "}
-        <span className="text-muted">→</span>
+        Free today: {left(wallets)} wallets and {left(reports)} token reports left.{" "}
+        <span className="text-muted">Add your own free API key for unlimited tracing →</span>
       </span>
     </Link>
   );
 }
 
-/** To /trace/keys, for a read that needs a key the account hasn't added. */
+/** To /trace/keys, for a read that needs a key the account hasn't added (or its free reads are spent). */
 export function KeysLink() {
   return (
     <Link

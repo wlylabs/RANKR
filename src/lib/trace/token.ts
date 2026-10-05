@@ -8,7 +8,7 @@ import { MOCK, searchPairs, tokenPairs, type Pair } from "../dexscreener";
 import { traceChain, validWallet, type TraceChain } from "./chains";
 import { TraceError } from "./errors";
 import { poolTrades, poolWindows } from "./gecko";
-import { keyScope, needKeyFor } from "./keys";
+import { callerId, onKeysFor, shareRead } from "./keys";
 import { labelOf, solanaDeposits } from "./labels";
 import { assessToken, copycatOf, type TokenFacts } from "./token-assess";
 import { evmTokenFacts, liteTokenFacts } from "./token-evm";
@@ -18,7 +18,7 @@ import type { TokenReport } from "./types";
 
 const TTL = 60_000;
 const MAX_ENTRIES = 200;
-const cache = new Map<string, { at: number; value: Promise<TokenReport> }>();
+const cache = new Map<string, { at: number; who: string; value: Promise<TokenReport> }>();
 
 async function readToken(chain: TraceChain, address: string, now: number): Promise<TokenReport> {
   const pairs = await tokenPairs(chain.id, address).catch((err) => {
@@ -69,22 +69,24 @@ export async function traceToken(chainId: string, address: string, now = Date.no
   if (!validWallet(chain, address))
     throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);
   if (MOCK) return assessToken(mockTokenFacts(chain, address, now));
-  needKeyFor(chain);
 
-  // Per key, like trails: a report read on one account's keys stays its own.
-  const key = `${keyScope()}${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
+  // Shared by everyone (public data); a report read on someone's own keys or allowance is everyone's for a minute.
+  const key = `${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
   const hit = cache.get(key);
-  if (hit && now - hit.at < TTL) return hit.value;
-  const value = tracked(() => readToken(chain, address, now)).then(({ value: report, refused }) => ({
-    ...report,
-    skipped: [...new Set(refused.map((u) => UPSTREAM_NAMES[u]))],
-  }));
-  cache.set(key, { at: now, value });
-  // A failed read isn't kept, nor one a spent budget cut short: the next request tries again.
-  const drop = () => cache.get(key)?.value === value && cache.delete(key);
-  value.then((r) => r.skipped.length && drop(), drop);
-  if (cache.size > MAX_ENTRIES) {
-    for (const [k, v] of cache) if (now - v.at >= TTL || cache.size > MAX_ENTRIES) cache.delete(k);
-  }
-  return value;
+  return shareRead(hit && now - hit.at < TTL ? hit : undefined, () => {
+    const value = onKeysFor(chain, "report", () => tracked(() => readToken(chain, address, now))).then(
+      ({ value: report, refused }) => ({
+        ...report,
+        skipped: [...new Set(refused.map((u) => UPSTREAM_NAMES[u]))],
+      }),
+    );
+    cache.set(key, { at: now, who: callerId(), value });
+    // A failed read isn't kept, nor one a spent budget cut short: the next request tries again.
+    const drop = () => cache.get(key)?.value === value && cache.delete(key);
+    value.then((r) => r.skipped.length && drop(), drop);
+    if (cache.size > MAX_ENTRIES) {
+      for (const [k, v] of cache) if (now - v.at >= TTL || cache.size > MAX_ENTRIES) cache.delete(k);
+    }
+    return value;
+  });
 }

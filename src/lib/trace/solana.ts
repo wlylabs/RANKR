@@ -12,7 +12,7 @@ import { labelOf, solanaBridge, solanaDeposits, solanaDex } from "./labels";
 import { resetOf, solanaCredits, take } from "../budget";
 import { untilReset } from "../rate-limit";
 import { TraceError } from "./errors";
-import { ownKeys, solanaRpcUrls } from "./keys";
+import { FREE_SPENT, freeRead, ownKeys, solanaRpcUrls } from "./keys";
 import type { TraceResponse } from "./types";
 
 /** Free, keyless: Solana's own, then PublicNode's (Allnodes), taken in turn when one says 429. */
@@ -95,11 +95,13 @@ async function pace(url: string) {
  */
 export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
   // Your own RPC's credits: within the budget set for it (SOLANA_RPC_MONTHLY_CREDITS), or not at all.
-  if (custom() && !(await take("solana", solanaCredits(method))))
+  if (custom() && !(await take("solana", solanaCredits(method)))) {
+    if (freeRead()) throw new TraceError("allowance", FREE_SPENT("Helius"));
     throw new TraceError(
       "quota",
       `The Solana RPC's budget is used up for now. It comes back in ${untilReset(resetOf("solana"))}.`,
     );
+  }
   const urls = endpoints();
   const tries = urls.length * 3;
   let unreachable = 0;

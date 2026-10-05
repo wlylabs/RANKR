@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthError, accountFromRequest, accountsEnabled, type Account } from "./accounts";
-import type { OwnKeys } from "./trace/keys";
+import type { Caller } from "./trace/keys";
+import { takeAllowance } from "./trace-allowance";
 import { loadKeys } from "./trace-keys";
 
 /** Resolves the caller or returns the error response to send instead. */
@@ -17,18 +18,20 @@ export async function requireAccount(req: Request): Promise<Account | NextRespon
 }
 
 /**
- * Trace is open to every account, each on its own API keys (trace/keys.ts): `keys` are the account's, to run
- * the read on. Official accounts (the project's own, given by its owner with rankr_set_official) read on the
+ * Trace is open to every account (trace/keys.ts): `keys` are the account's own keys and its free allowance, to
+ * run the read on. Official accounts (the project's own, given by its owner with rankr_set_official) read on the
  * site's (keys: null), and so does everyone without accounts (local dev). The response to send when the caller
  * isn't signed in.
  */
-export async function traceCaller(req: Request): Promise<{ keys: OwnKeys | null } | NextResponse> {
+export async function traceCaller(req: Request): Promise<{ keys: Caller | null } | NextResponse> {
   if (!accountsEnabled()) return { keys: null };
   const account = await requireAccount(req);
   if (account instanceof NextResponse) return account;
   if (account.official) return { keys: null };
   try {
-    return { keys: await loadKeys(account.id) };
+    const keys = await loadKeys(account.id);
+    // Guests (no sign-in key yet) get the smaller allowance.
+    return { keys: { ...keys, allowance: (what) => takeAllowance(account.id, !account.hasKey, what) } };
   } catch (err) {
     console.error("[rankr] trace keys unreadable", err);
     return NextResponse.json({ error: "Couldn't read your API keys. Try again." }, { status: 502 });

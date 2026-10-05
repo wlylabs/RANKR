@@ -8,7 +8,7 @@ import { untilReset } from "../rate-limit";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
 import { labelOf } from "./labels";
 import { TraceError } from "./errors";
-import { blockscoutKey, keyScope } from "./keys";
+import { blockscoutKey, FREE_SPENT, freeRead, keyScope } from "./keys";
 import type { TraceChain } from "./chains";
 import type { TraceHoldings, TraceLabel, TraceResponse } from "./types";
 
@@ -99,6 +99,7 @@ async function pace() {
 /** Takes one request's credits from today's Blockscout budget (BLOCKSCOUT_DAILY_CREDITS), or says it's used up. */
 async function budget() {
   if (await take("blockscout", BLOCKSCOUT_CREDITS)) return;
+  if (freeRead()) throw new TraceError("allowance", FREE_SPENT("Blockscout"));
   throw new TraceError(
     "quota",
     `Today's Blockscout budget is used up. It comes back in ${untilReset(resetOf("blockscout"))} (00:00 UTC).`,

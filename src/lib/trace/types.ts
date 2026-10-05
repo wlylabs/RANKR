@@ -110,7 +110,8 @@ export type TraceErrorCode =
   | "busy"
   | "nokey"
   | "limit"
-  | "quota";
+  | "quota"
+  | "allowance";
 
 // ---- A token's report: a contract address pasted on Trace opens this instead of a trail.
 

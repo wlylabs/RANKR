@@ -72,8 +72,9 @@ function RootError({ error, onRetry }: { error: ReadError; onRetry: () => void }
     <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
       <p className="text-sm">{error.message}</p>
       <div className="mt-4 flex justify-center gap-2">
-        {error.code === "nokey" && <KeysLink />}
+        {(error.code === "nokey" || error.code === "allowance") && <KeysLink />}
         {error.code === "nokey" ||
+          error.code === "allowance" ||
           error.code === "unsupported" ||
           error.code === "invalid" ||
           error.code === "program" ? null : (

@@ -10,10 +10,12 @@
 //
 // An account tracing on its own keys (trace/keys.ts) has its own day's and month's budgets, at the free plans'
 // defaults (the environment's limits are for the site's keys, which may be on a paid plan). The per-minute ones
-// stay shared: they're per server IP, whoever's read it is.
+// stay shared: they're per server IP, whoever's read it is. Reads on an account's free allowance (site keys) take
+// from the site's budgets and, first, from the free share of them (TRACE_FREE_SHARE, 60% by default): what's left
+// is always there for official accounts.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { peek, spend, type Quota } from "./rate-limit";
-import { blockscoutKey, keyScope, ownKeys, solanaRpcUrls } from "./trace/keys";
+import { blockscoutKey, freeRead, keyScope, ownKeys, solanaRpcUrls } from "./trace/keys";
 
 type Window = "minute" | "day" | "month";
 type Rule = { window: Window; max: number };
@@ -102,9 +104,21 @@ function takeMinute(name: string, max: number, cost: number, now: number): boole
   return true;
 }
 
-async function takeShared(name: string, rule: Rule & { window: "day" | "month" }, cost: number, now: number) {
+/** The share of the site's day's and month's budgets that free reads may take together. */
+export const freeShare = () => {
+  const n = Number(process.env.TRACE_FREE_SHARE);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.6;
+};
+
+async function takeShared(
+  name: string,
+  rule: Rule & { window: "day" | "month" },
+  cost: number,
+  now: number,
+  prefix = keyScope(),
+) {
   const { key, ends } = period(rule.window, now);
-  const bucket = `budget:${keyScope()}${name}:${rule.window}:${key}`;
+  const bucket = `budget:${prefix}${name}:${rule.window}:${key}`;
   const left = leases.get(bucket) ?? 0;
   if (left >= cost) {
     leases.set(bucket, left - cost);
@@ -136,7 +150,15 @@ export async function take(name: Upstream, cost = 1, now = Date.now()): Promise<
     const ok =
       rule.window === "minute"
         ? takeMinute(name, rule.max, cost, now)
-        : await takeShared(name, rule as Rule & { window: "day" | "month" }, cost, now);
+        : (!freeRead() ||
+            (await takeShared(
+              name,
+              { window: rule.window, max: Math.floor(rule.max * freeShare()) },
+              cost,
+              now,
+              "free:",
+            ))) &&
+          (await takeShared(name, rule as Rule & { window: "day" | "month" }, cost, now));
     if (!ok) {
       if (resets.size > 1_000) resets.clear();
       resets.set(

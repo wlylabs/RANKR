@@ -7,12 +7,12 @@ export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
-/** GET /api/me/trace-keys -> your own Trace keys, by their last characters only (never the keys). */
+/** GET /api/me/trace-keys -> your own Trace keys, by their last characters only (never the keys), and today's free reads. */
 export async function GET(req: Request) {
   const account = await requireAccount(req);
   if (account instanceof NextResponse) return account;
   try {
-    return NextResponse.json(await keysView(account.id, account.official), { headers: NO_STORE });
+    return NextResponse.json(await keysView(account), { headers: NO_STORE });
   } catch (err) {
     console.error("[rankr] trace keys read failed", err);
     return NextResponse.json({ error: "Couldn't read your API keys." }, { status: 502 });
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   try {
     const out = await saveKeys(account.id, change);
     if (!out.ok) return NextResponse.json({ error: out.error }, { status: out.status });
-    return NextResponse.json(await keysView(account.id, account.official), { headers: NO_STORE });
+    return NextResponse.json(await keysView(account), { headers: NO_STORE });
   } catch (err) {
     console.error("[rankr] trace keys save failed", err);
     return NextResponse.json({ error: "Couldn't save your API keys. Try again." }, { status: 500 });
