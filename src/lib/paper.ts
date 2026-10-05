@@ -470,6 +470,11 @@ function valueOf(m: MarketSnapshot | null, tokens: number, at: number): number |
   return Math.max(0, grossSell(m, tokens) - poolOf(m).networkUsd);
 }
 
+/** `tokens` at the market price now, with no price impact or costs; null without fresh live data. */
+function marketValueOf(m: MarketSnapshot | null, tokens: number, at: number): number | null {
+  return m && isFresh(m, at) && m.priceUsd > 0 ? tokens * m.priceUsd : null;
+}
+
 /** Every trade together: a token held in several trades is valued as one sale of all of it, as it would sell. */
 export function summaryOf(
   trades: PaperTrade[],
@@ -512,9 +517,11 @@ export type Holding = {
   costUsd: number;
   /** What selling them all now would bring in; null without fresh live data. */
   valueUsd: number | null;
+  /** What they're worth at the market price, as a wallet shows a balance; null without fresh live data. */
+  marketUsd: number | null;
 };
 
-/** The tokens held, most worth first (by what they cost, without live data). */
+/** The tokens held, most worth first at the market price (by what they cost, without live data). */
 export function holdingsList(
   trades: PaperTrade[],
   marketOf: (tokenId: string) => MarketSnapshot | null,
@@ -534,9 +541,10 @@ export function holdingsList(
         tokens: h.tokens,
         costUsd: h.costUsd,
         valueUsd: valueOf(marketOf(id), h.tokens, at),
+        marketUsd: marketValueOf(marketOf(id), h.tokens, at),
       };
     })
-    .sort((a, b) => (b.valueUsd ?? b.costUsd) - (a.valueUsd ?? a.costUsd));
+    .sort((a, b) => (b.marketUsd ?? b.costUsd) - (a.marketUsd ?? a.costUsd));
 }
 
 /**
