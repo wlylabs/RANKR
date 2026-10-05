@@ -10,7 +10,7 @@ import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
 import { formatAmount, formatMultiple, formatPrice, formatUsd, tokenHref } from "@/lib/format";
 import { fetcher } from "@/lib/hooks";
 import { MAX_TRADES, holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
-import { CONFIRM_IMPACT, WARN_IMPACT, atMultiple, poolOf, quoteBuy, quoteSell } from "@/lib/sim";
+import { CONFIRM_IMPACT, WARN_IMPACT, atMultiple, autoSlippage, poolOf, quoteBuy, quoteSell } from "@/lib/sim";
 import { lookupPaste } from "@/lib/track";
 import type { MarketSnapshot, TokenResponse } from "@/lib/types";
 import { tokenId } from "@/lib/address";
@@ -30,9 +30,6 @@ const EXITS = [
   { k: 10, label: "10x" },
   { k: 0.5, label: "-50%" },
 ];
-
-/** Slippage you accept between the quote and the swap; memecoins move fast, so 3% by default. */
-const SLIPPAGES = [0.01, 0.03, 0.05, 0.1];
 
 const pct = (x: number) => `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%`;
 const impactLabel = (x: number) => (x >= 1 ? `${formatMultiple(1 + x)} the market price` : pct(x));
@@ -54,7 +51,7 @@ function parseTokens(input: string): number | null {
 /**
  * A paper swap, the way a wallet does it: paste a token, pick how much, swap. Buys pay from the paper balance,
  * sales pay into it; nothing real is traded. The quote is fetched again at the moment of the swap, and the
- * swap fails, as a real one would, if the price moved past the slippage you accept.
+ * swap fails, as a real one would, if the price moved past the slippage (set automatically, see autoSlippage).
  */
 export function Swap() {
   const params = useSearchParams();
@@ -73,7 +70,6 @@ export function Swap() {
 
   const [side, setSide] = useState<Side>(params.get("side") === "sell" ? "sell" : "buy");
   const [typed, setTyped] = useState("");
-  const [slippage, setSlippage] = useState(0.03);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<{ message: string; n: number } | null>(null);
@@ -117,6 +113,8 @@ export function Swap() {
   const sell = market && sellTokens ? quoteSell(market, sellTokens) : null;
   const impact = side === "buy" ? (buy?.impact ?? 0) : (sell?.impact ?? 0);
   const receive = side === "buy" ? (buy?.tokens ?? null) : (sell?.proceedsUsd ?? null);
+  // Auto: set from the pool and the swap's own impact, as wallets do.
+  const slippage = market ? autoSlippage(market, impact) : 0.03;
   const minReceive = receive === null ? null : receive * (1 - slippage);
   const quality = side === "buy" ? buy?.quality : sell?.quality;
 
@@ -146,9 +144,9 @@ export function Swap() {
       const now = side === "buy" ? (quoteBuy(m, spendUsd!)?.tokens ?? 0) : (quoteSell(m, sellTokens!)?.proceedsUsd ?? 0);
       if (now < minReceive) {
         const got = side === "buy" ? `${formatAmount(now)} $${m.symbol}` : money.format(now);
-        throw new Error(`The price moved past your ${pct(slippage)} slippage: you'd get ${got} now. Nothing was swapped: check the new quote and swap again.`);
+        throw new Error(`The price moved past the ${pct(slippage)} slippage: you'd get ${got} now. Nothing was swapped: check the new quote and swap again.`);
       }
-      const note = `Within your ${pct(slippage)} slippage.`;
+      const note = `Within the ${pct(slippage)} auto slippage.`;
       if (side === "buy") {
         const out = swapBuy(m, spendUsd!, money.rate?.usdIdr ?? null);
         if (typeof out === "string") throw new Error(ERRORS[out]);
@@ -361,12 +359,12 @@ export function Swap() {
                     "0"
                   ) : (
                     <RollingNumber
-                      key={`${side}:${typed}:${slippage}:${money.shown}`}
+                      key={`${side}:${typed}:${money.shown}`}
                       text={side === "buy" ? `≈ ${formatAmount(receive)}` : `≈ ${money.format(receive)}`}
                     />
                   )}
                   {/* A new quote moving what you'd get: a wash in its direction (not while typing). */}
-                  {receive !== null && <Flash key={`${side}:${typed}:${slippage}`} value={receive} />}
+                  {receive !== null && <Flash key={`${side}:${typed}`} value={receive} />}
                 </span>
                 <span className="shrink-0 rounded-md border border-border px-2 py-1 font-mono text-xs">
                   {side === "buy" ? (market ? `$${market.symbol}` : "token") : money.shown.toUpperCase()}
@@ -399,21 +397,9 @@ export function Swap() {
                 {side === "buy" ? `${formatAmount(minReceive)} $${market.symbol}` : money.format(minReceive)}
               </Row>
               <Row label="Slippage">
-                <span className="inline-flex gap-1">
-                  {SLIPPAGES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      aria-pressed={slippage === s}
-                      onClick={() => setSlippage(s)}
-                      className={clsx(
-                        "rounded px-1.5 py-0.5 transition-colors",
-                        slippage === s ? "bg-fg text-bg" : "text-muted hover:bg-surface-2 hover:text-fg",
-                      )}
-                    >
-                      {pct(s)}
-                    </button>
-                  ))}
+                <span title="Set from the pool's liquidity and this swap's price impact">
+                  <span className="mr-1.5 rounded border border-border px-1 py-px text-[10px] text-muted uppercase">Auto</span>
+                  {pct(slippage)}
                 </span>
               </Row>
               <div className="flex items-center gap-3">
