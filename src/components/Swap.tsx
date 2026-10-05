@@ -9,18 +9,25 @@ import useSWR from "swr";
 import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
 import { formatAmount, formatMultiple, formatPrice, formatUsd, tokenHref } from "@/lib/format";
 import { fetcher } from "@/lib/hooks";
-import { holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
-import { CONFIRM_IMPACT, WARN_IMPACT, poolOf, quoteBuy, quoteSell } from "@/lib/sim";
+import { PAPER_NOTE, holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
+import { CONFIRM_IMPACT, WARN_IMPACT, atMultiple, poolOf, quoteBuy, quoteSell } from "@/lib/sim";
 import { lookupPaste } from "@/lib/track";
 import type { MarketSnapshot, TokenResponse } from "@/lib/types";
 import { tokenId } from "@/lib/address";
 import { ChainTag } from "./Chain";
 import { PaperBalance } from "./PaperBalance";
 import { RateNote } from "./RateNote";
-import { PAPER_NOTE } from "./Simulate";
 import { TokenName } from "./TokenList";
 
 type Side = "buy" | "sell";
+
+/** Price moves to show a buy's exit at, "if the liquidity holds". */
+const EXITS = [
+  { k: 2, label: "2x" },
+  { k: 5, label: "5x" },
+  { k: 10, label: "10x" },
+  { k: 0.5, label: "-50%" },
+];
 
 /** Slippage you accept between the quote and the swap; memecoins move fast, so 3% by default. */
 const SLIPPAGES = [0.01, 0.03, 0.05, 0.1];
@@ -68,7 +75,7 @@ export function Swap() {
   const [done, setDone] = useState<{ paid: string; got: string } | null>(null);
   const amountId = useId();
 
-  // A link with an amount (from a token page's Simulate) starts with it, once the currency it's shown in is known.
+  // A link with an amount (?usd=) starts with it, once the currency it's shown in is known.
   const preset = Number(params.get("usd"));
   const presetDone = useRef(false);
   useEffect(() => {
@@ -333,6 +340,26 @@ export function Swap() {
                 </span>
               </Row>
             </dl>
+          )}
+
+          {side === "buy" && market && buy && spendUsd && (
+            <div className="mt-3 px-1">
+              <div className="label mb-1.5 text-subtle">If sold at</div>
+              <div className="grid grid-cols-4 gap-1 text-center font-mono text-[11px]">
+                {EXITS.map((e) => {
+                  const out = quoteSell(atMultiple(market, e.k), buy.tokens);
+                  return (
+                    <div key={e.label} className="rounded-md bg-surface-2 px-1 py-1.5">
+                      <div className="text-subtle">{e.label}</div>
+                      <div className={clsx("tabular mt-0.5 truncate", out && out.proceedsUsd > spendUsd ? "text-up" : "text-down")}>
+                        {out ? money.format(out.proceedsUsd, { short: true }) : "—"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-[11px] text-subtle">After fees and price impact, if the pool&apos;s liquidity holds.</p>
+            </div>
           )}
 
           {impact >= WARN_IMPACT && receive !== null && (

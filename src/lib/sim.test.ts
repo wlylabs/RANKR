@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atMultiple, poolOf, quoteBuy, quoteSell, whatIf } from "./sim";
+import { atMultiple, poolOf, quoteBuy, quoteSell } from "./sim";
 import type { MarketSnapshot } from "./types";
 
 const SOL_USD = 150;
@@ -132,16 +132,6 @@ describe("quoteSell", () => {
     const buy = quoteBuy(pair(), 100)!;
     const later = pair({ priceUsd: 0.0005, priceNative: 0.0005 / SOL_USD, liquidityUsd: 150_000, liquidityQuote: 75_000 / SOL_USD });
     expect(quoteSell(later, buy.tokens)!.proceedsUsd / 100).toBeGreaterThan(4.8);
-  });
-});
-
-describe("whatIf", () => {
-  it("is what an amount put in at an earlier price would bring in now", () => {
-    const now = pair({ priceUsd: 0.0003, priceNative: 0.0003 / SOL_USD });
-    const out = whatIf(now, 100, 0.0001)!;
-    expect(out.valueUsd).toBeCloseTo((100 - 0.3) * 0.9975 * 3, 6);
-    expect(out.proceedsUsd).toBeLessThan(out.valueUsd);
-    expect(whatIf(now, 100, 0)).toBeNull();
   });
 });
 

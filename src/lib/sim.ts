@@ -193,18 +193,6 @@ export function quoteSell(m: MarketSnapshot, tokens: number): SellFill | null {
 }
 
 /**
- * Had `spendUsd` gone in at `entryPriceUsd` (a call, or the first paste): what selling now would bring in.
- * The buy pays the fee and network costs on today's pool (the pool back then isn't known, so its price
- * impact isn't counted); the sell is priced on today's pool.
- */
-export function whatIf(m: MarketSnapshot, spendUsd: number, entryPriceUsd: number): SellFill | null {
-  if (!(entryPriceUsd > 0) || !(spendUsd > 0)) return null;
-  const pool = poolOf(m);
-  const a = (spendUsd - Math.min(pool.networkUsd, spendUsd)) * (1 - pool.fee);
-  return a > 0 ? quoteSell(m, a / entryPriceUsd) : null;
-}
-
-/**
  * The pair as it would be had the price moved `k` times (2 = doubled, 0.5 = halved) through trading in an
  * x·y = k pool: each side's reserve moves by √k, so the depth a sell meets grows with the price. Only "if the
  * liquidity holds": a pulled pool skips past any level.

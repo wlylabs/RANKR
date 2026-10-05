@@ -15,6 +15,7 @@ import {
   summaryOf,
   usePaperTrades,
   usePaperWallet,
+  PAPER_NOTE,
   type PaperTrade,
 } from "@/lib/paper";
 import type { MarketSnapshot } from "@/lib/types";
@@ -22,7 +23,6 @@ import { ChainTag } from "./Chain";
 import { PaperBalance } from "./PaperBalance";
 import { Cascade } from "./Cinema";
 import { RateNote } from "./RateNote";
-import { PAPER_NOTE } from "./Simulate";
 import { TimeAgo } from "./TimeAgo";
 import { TokenName } from "./TokenList";
 

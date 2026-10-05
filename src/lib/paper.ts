@@ -46,6 +46,10 @@ export type PaperTrade = {
   sales: Sale[];
 };
 
+/** Said wherever paper trades are: what they are, and what they leave out. */
+export const PAPER_NOTE =
+  "Simulated with public DexScreener data: no real money, no wallet, nothing is traded. Fills are estimated from the pool's liquidity (x·y = k), the DEX's fee and network costs; real trades can fill worse (bots, MEV, token taxes, launch fees, failed transactions, liquidity pulls). Not financial advice.";
+
 const KEY = "rankr:paper:v1";
 const WALLET_KEY = "rankr:paper:wallet:v1";
 /** Trades kept: the newest. */
