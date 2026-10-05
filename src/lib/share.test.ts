@@ -55,8 +55,8 @@ describe("paperShareText", () => {
 
 describe("paperCardFile", () => {
   it("names the saved card after the ticker, or the portfolio", () => {
-    expect(paperCardFile({ ...trade, symbol: "WIF/2.0" })).toBe("rankr-paper-WIF20.png");
-    expect(paperCardFile(wallet)).toBe("rankr-paper-portfolio.png");
+    expect(paperCardFile({ ...trade, symbol: "WIF/2.0" })).toBe("rankr-pnl-WIF20.png");
+    expect(paperCardFile(wallet)).toBe("rankr-pnl-portfolio.png");
   });
 });
 

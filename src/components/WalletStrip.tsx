@@ -163,7 +163,7 @@ export function WalletStrip({
               Share
             </button>
           )}
-          <Link href="/me?tab=paper" className={TILE}>
+          <Link href="/me?tab=portfolio" className={TILE}>
             <span className={TILE_ICON}>
               <History className="size-[18px]" />
             </span>

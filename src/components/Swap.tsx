@@ -278,7 +278,7 @@ export function Swap() {
       {done ? (
         <Receipt title={done.title} rows={done.rows} note={done.note}>
           <div className="cine-in mt-4 flex justify-center gap-2" style={{ "--d": "900ms" } as CSSProperties}>
-            <Link href="/me?tab=paper" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg">
+            <Link href="/me?tab=portfolio" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg">
               Your trades
             </Link>
             {done.pnl && market && <SharePnl variant="action" card={done.pnl} href={tokenHref(market)} />}

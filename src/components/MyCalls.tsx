@@ -189,7 +189,7 @@ function DeviceCalls() {
   return <Page intro="Saved on this device." rows={rows} loading={isLoading && calls.length > 0} />;
 }
 
-const TABS = { calls: "Calls", stats: "Stats", recaps: "Recaps", paper: "Paper", watchlist: "Watchlist" } as const;
+const TABS = { calls: "Calls", stats: "Stats", recaps: "Recaps", portfolio: "Portfolio", watchlist: "Watchlist" } as const;
 type TabKey = keyof typeof TABS;
 
 /** The tab in the URL (?tab=stats), so it survives a reload and can be linked to. */
@@ -198,8 +198,13 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   const router = useRouter();
   const pathname = usePathname();
   const picked = params.get("tab");
+  // ?tab=paper: old links to the portfolio.
   const tab: TabKey =
-    picked === "stats" || picked === "recaps" || picked === "paper" || picked === "watchlist" ? picked : "calls";
+    picked === "paper"
+      ? "portfolio"
+      : picked === "stats" || picked === "recaps" || picked === "portfolio" || picked === "watchlist"
+        ? picked
+        : "calls";
   // Old links: /me#watchlist.
   useEffect(() => {
     if (window.location.hash === "#watchlist") router.replace(`${pathname}?tab=watchlist`, { scroll: false });
@@ -207,7 +212,7 @@ function useTab(): [TabKey, (tab: TabKey) => void] {
   return [tab, (next) => router.replace(next === "calls" ? pathname : `${pathname}?tab=${next}`, { scroll: false })];
 }
 
-/** "You": your calls, how they're doing, your past months, your paper trades and your watchlist. */
+/** "You": your calls, how they're doing, your past months, your portfolio and your watchlist. */
 function Page({
   header,
   intro,
@@ -250,9 +255,9 @@ function Page({
           calls: TABS.calls,
           stats: TABS.stats,
           ...(recapsOf && { recaps: TABS.recaps }),
-          paper: (
+          portfolio: (
             <>
-              {TABS.paper}
+              {TABS.portfolio}
               {paperOpen > 0 && <span className="ml-1.5 font-mono text-xs text-subtle">{paperOpen}</span>}
             </>
           ),
@@ -270,7 +275,7 @@ function Page({
 
       {tab === "watchlist" ? (
         <Watchlist />
-      ) : tab === "paper" ? (
+      ) : tab === "portfolio" ? (
         <PaperTrades />
       ) : tab === "recaps" && recapsOf ? (
         <Recaps userId={recapsOf} />

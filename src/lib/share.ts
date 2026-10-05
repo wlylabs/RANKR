@@ -67,9 +67,9 @@ export function paperShareText(card: PaperCard): string {
   return moved ? `${did}: ${formatMultiple(card.multiple)}${card.open ? " so far" : ""}.` : `${did}.`;
 }
 
-/** The card's file name when saved: rankr-paper-PEPE.png, rankr-paper-portfolio.png */
+/** The card's file name when saved: rankr-pnl-PEPE.png, rankr-pnl-portfolio.png */
 export function paperCardFile(card: PaperCard): string {
-  return `rankr-paper-${card.kind === "wallet" ? "portfolio" : card.symbol.replace(/[^\w-]/g, "") || "trade"}.png`;
+  return `rankr-pnl-${card.kind === "wallet" ? "portfolio" : card.symbol.replace(/[^\w-]/g, "") || "trade"}.png`;
 }
 
 /** The card as the query of its image's URL (see api/paper/card): only what's on it. */
