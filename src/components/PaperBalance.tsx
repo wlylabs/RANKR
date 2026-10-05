@@ -47,7 +47,7 @@ export function PaperFunds() {
     <div className="border-t border-border px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-muted">
-          Paper wallet
+          Wallet
           <span className="block text-xs text-subtle">
             {wallet ? (
               <>

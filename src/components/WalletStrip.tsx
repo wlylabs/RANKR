@@ -38,11 +38,10 @@ export function WalletStrip({ current, onSell, className }: { current: string | 
   const multiple = wallet.depositedUsd > 0 ? total / wallet.depositedUsd : null;
 
   return (
-    <section aria-label="Paper wallet" className={clsx("card p-4", className)}>
+    <section aria-label="Wallet" className={clsx("card p-4", className)}>
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-2 text-xs text-muted">
-          Paper balance
-          <span className="rounded border border-border px-1 py-px font-mono text-[10px] tracking-[0.12em] text-subtle">PAPER</span>
+          Balance
           {ids.length > 0 && <LiveDot />}
         </span>
         {trades.length > 0 && multiple !== null && !pending && (

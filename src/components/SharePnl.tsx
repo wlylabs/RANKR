@@ -23,7 +23,7 @@ export function SharePnl({
   className?: string;
 }) {
   const [opened, setOpened] = useState(0);
-  const label = card.kind === "wallet" ? "Share your paper PnL" : `Share your $${card.symbol} paper PnL`;
+  const label = card.kind === "wallet" ? "Share your PnL" : `Share your $${card.symbol} PnL`;
 
   return (
     <>
