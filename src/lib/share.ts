@@ -57,7 +57,7 @@ export function tickerLine(tickers: string[], tokens: number): string {
 }
 
 /**
- * "Paper-traded $PEPE on Rankr: 2.40x." Always says it's paper (as the card does): a paper trade passed off as a
+ * "Paper-traded $PEPE on Rankr: 2.40x." The post always says it's paper: a paper trade passed off as a
  * real one is the card's one way to mislead.
  */
 export function paperShareText(card: PaperCard): string {
