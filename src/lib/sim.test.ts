@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atMultiple, poolOf, quoteBuy, quoteSell, whatIf } from "./sim";
+import { MAX_QUOTE_AGE_MS, atMultiple, grossSell, isFresh, poolOf, quoteBuy, quoteSell } from "./sim";
 import type { MarketSnapshot } from "./types";
 
 const SOL_USD = 150;
@@ -38,7 +38,23 @@ describe("poolOf", () => {
     expect(poolOf(pair({ liquidityQuote: 5_000 / SOL_USD })).depthUsd).toBeCloseTo(5_000, 6);
     // Snapshots stored before the quote side was kept: half the TVL.
     expect(poolOf(pair({ liquidityQuote: undefined, priceNative: undefined })).depthUsd).toBe(15_000);
-    expect(poolOf(pair({ liquidityUsd: null }))).toMatchObject({ depthUsd: null, quality: "none" });
+    expect(poolOf(pair({ liquidityUsd: null, liquidityQuote: null }))).toMatchObject({ depthUsd: null, quality: "none", drained: false });
+    // Only the quote side known: that's the depth.
+    expect(poolOf(pair({ liquidityUsd: null })).depthUsd).toBeCloseTo(15_000, 6);
+  });
+
+  it("calls a pool that reports nothing left drained, not unknown", () => {
+    expect(poolOf(pair({ liquidityUsd: 0, liquidityQuote: 0 }))).toMatchObject({ depthUsd: 0, drained: true });
+    // All base tokens, no SOL left: a rug.
+    expect(poolOf(pair({ liquidityUsd: 20_000, liquidityQuote: 0 }))).toMatchObject({ depthUsd: 0, drained: true });
+    expect(poolOf(pair({ liquidityUsd: 0, liquidityQuote: null })).drained).toBe(true);
+  });
+
+  it("says when the depth or the fee is a guess", () => {
+    // A pump.fun pair without a market cap: its depth from the TVL, which isn't how a curve works.
+    expect(poolOf(pair({ dexId: "pumpfun", marketCap: null })).quality).toBe("rough");
+    // Raydium CPMM pools pick their own fee tier.
+    expect(poolOf(pair({ dexId: "raydium", labels: ["CPMM"] }))).toMatchObject({ fee: 0.0025, quality: "rough" });
   });
 
   it("knows the fee by DEX and pool kind, and says when it is guessing", () => {
@@ -107,7 +123,8 @@ describe("quoteBuy", () => {
   it("has no fill without a price, and counts no impact without depth", () => {
     expect(quoteBuy(pair({ priceUsd: 0 }), 100)).toBeNull();
     expect(quoteBuy(pair(), 0)).toBeNull();
-    expect(quoteBuy(pair({ liquidityUsd: null }), 100)).toMatchObject({ impact: 0, quality: "none" });
+    expect(quoteBuy(pair({ liquidityUsd: null, liquidityQuote: null }), 100)).toMatchObject({ impact: 0, quality: "none" });
+    expect(quoteBuy(pair({ liquidityUsd: 0, liquidityQuote: 0 }), 100)).toBeNull(); // drained: nothing to buy into
   });
 });
 
@@ -128,20 +145,24 @@ describe("quoteSell", () => {
     expect(rugged.proceedsUsd).toBeLessThan(1); // the $1 left on its quote side, at most
   });
 
+  it("brings in nothing from a drained pool", () => {
+    const buy = quoteBuy(pair(), 1000)!;
+    for (const drained of [pair({ liquidityUsd: 0, liquidityQuote: 0 }), pair({ liquidityUsd: 20_000, liquidityQuote: 0 })]) {
+      expect(quoteSell(drained, buy.tokens)).toMatchObject({ proceedsUsd: 0, impact: 1 });
+    }
+  });
+
+  it("brings in less per token the more is sold at once", () => {
+    const t = quoteBuy(pair(), 1000)!.tokens;
+    expect(grossSell(pair(), t)).toBeLessThan(2 * grossSell(pair(), t / 2));
+    expect(grossSell(pair(), t)).toBeGreaterThan(grossSell(pair(), t / 2));
+    expect(grossSell(pair({ liquidityUsd: 0, liquidityQuote: 0 }), t)).toBe(0);
+  });
+
   it("follows the price up", () => {
     const buy = quoteBuy(pair(), 100)!;
     const later = pair({ priceUsd: 0.0005, priceNative: 0.0005 / SOL_USD, liquidityUsd: 150_000, liquidityQuote: 75_000 / SOL_USD });
     expect(quoteSell(later, buy.tokens)!.proceedsUsd / 100).toBeGreaterThan(4.8);
-  });
-});
-
-describe("whatIf", () => {
-  it("is what an amount put in at an earlier price would bring in now", () => {
-    const now = pair({ priceUsd: 0.0003, priceNative: 0.0003 / SOL_USD });
-    const out = whatIf(now, 100, 0.0001)!;
-    expect(out.valueUsd).toBeCloseTo((100 - 0.3) * 0.9975 * 3, 6);
-    expect(out.proceedsUsd).toBeLessThan(out.valueUsd);
-    expect(whatIf(now, 100, 0)).toBeNull();
   });
 });
 
@@ -180,5 +201,14 @@ describe("atMultiple", () => {
   it("moves a pump.fun curve's depth with the root of its market cap", () => {
     const curve = pair({ dexId: "pumpfun", marketCap: 10_000 });
     expect(poolOf(atMultiple(curve, 4)).depthUsd! / poolOf(curve).depthUsd!).toBeCloseTo(2, 9);
+  });
+});
+
+describe("isFresh", () => {
+  it("fills only on a recent quote", () => {
+    const m = pair({ fetchedAt: 1_000_000 });
+    expect(isFresh(m, 1_000_000 + 30_000)).toBe(true);
+    expect(isFresh(m, 1_000_000 + MAX_QUOTE_AGE_MS)).toBe(true);
+    expect(isFresh(m, 1_000_000 + MAX_QUOTE_AGE_MS + 1)).toBe(false);
   });
 });

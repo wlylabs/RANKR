@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { GitCommitVertical, House, Plus, Radio, UserRound, X } from "lucide-react";
+import { ArrowLeftRight, GitCommitVertical, House, Plus, Radio, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ import { useTraceAccess } from "./trace/TraceGate";
 export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
   { href: "/feed", label: "Feed", icon: Radio },
+  { href: "/swap", label: "Swap", icon: ArrowLeftRight },
   { href: "/trace", label: "Trace", icon: GitCommitVertical, private: true },
   { href: "/me", label: "You", icon: UserRound },
 ];

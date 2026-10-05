@@ -383,23 +383,6 @@ body {
   }
 }
 
-/* The product shot under the hero: tipped back like a screen on a desk, it swings upright as it scrolls into
-   view, the counter-move to the hero pulling away (scroll-driven; elsewhere it simply stands upright). */
-@keyframes tilt-in {
-  from {
-    opacity: 0.35;
-    transform: perspective(1400px) rotateX(22deg) scale(0.9);
-  }
-}
-@supports (animation-timeline: view()) {
-  .tilt-in {
-    transform-origin: 50% 0;
-    animation: tilt-in linear both;
-    animation-timeline: view();
-    animation-range: entry 0% cover 42%;
-  }
-}
-
 /* Film grain over the landing page: static, very faint, never in the way of clicks. */
 .grain::after {
   content: "";
@@ -641,6 +624,236 @@ body {
   animation: sweep 1.3s var(--ease-enter) 0.5s;
 }
 
+/* Swap: the pool's own curve, x·y = k (Uniswap v2's "How Uniswap works": every pool state is a point on it, and
+   a trade moves the point along). It draws itself in behind the page's top, then a dot rides down it once, the
+   way a swap moves a pool along it, and settles at the bend: one pass, so nothing moves on its own for long
+   (offset-path, on a fixed-size field so the path's pixels are the dot's). */
+@keyframes curve-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+.curve-draw {
+  stroke-dasharray: 1;
+  animation: curve-draw 1.6s var(--ease-enter) 0.2s backwards;
+}
+@keyframes curve-ride {
+  from {
+    offset-distance: 4%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+}
+.curve-ride {
+  offset-rotate: 0deg;
+  offset-distance: 30%;
+  animation: curve-ride 3.2s var(--ease-emphasized) 1.2s backwards;
+}
+
+/* The quote's age: a ring that empties until the next quote comes in (restarted for each one). */
+@keyframes quote-ring {
+  to {
+    stroke-dashoffset: 1;
+  }
+}
+.quote-ring {
+  stroke-dasharray: 1;
+  animation: quote-ring var(--t, 15s) linear var(--d, 0ms) forwards;
+}
+
+/* Flipping buy and sell: the arrow turns half a turn, always the same way (its rotation adds up, as in beUI's
+   swap, MIT), and the two sides come in from where the other one was. */
+@keyframes from-below {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+@keyframes from-above {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+.from-below {
+  animation: from-below 0.4s var(--ease-emphasized) backwards;
+}
+.from-above {
+  animation: from-above 0.4s var(--ease-emphasized) backwards;
+}
+
+/* A new quote runs its route once: a dot from what you pay, through the pool, to what you get (after Magic UI's
+   Animated Beam, MIT, and the route lines of DEX aggregators). */
+@keyframes route-run {
+  from {
+    left: 0;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  to {
+    left: 100%;
+    opacity: 0;
+  }
+}
+.route-run {
+  opacity: 0;
+  animation: route-run 0.5s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+/* A swap on its way: what you pay goes down through the seam to what you get. */
+@keyframes packet {
+  from {
+    opacity: 0;
+    transform: translateY(-7px);
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
+.packet {
+  animation: packet 0.7s var(--ease-enter) infinite;
+}
+
+/* The estimate rolls: each digit in its own column, sliding to its new value (after NumberFlow, MIT: digits roll
+   rather than snap, and only the ones that changed move). */
+.odo {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+  vertical-align: top;
+  /* Digits rolling past the edges fade rather than cut off. */
+  mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent);
+}
+.odo-col {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.odo-col > span {
+  height: 1em;
+  line-height: 1em;
+}
+
+/* A token locked on: one scan passes down the chip. */
+@keyframes chip-scan {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(3.5rem);
+    opacity: 0;
+  }
+}
+.chip-scan {
+  animation: chip-scan 0.8s var(--ease-enter) 0.25s both;
+}
+
+/* Waiting on a price: a soft light passes over the words (after motion-primitives' Text Shimmer, MIT). */
+@keyframes text-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+.text-shimmer {
+  color: transparent;
+  background: linear-gradient(90deg, transparent 35%, var(--fg) 50%, transparent 65%) 100% 0 / 250% 100% no-repeat,
+    linear-gradient(var(--muted), var(--muted));
+  background-clip: text;
+  animation: text-shimmer 2s linear infinite;
+}
+
+/* The Swap button, hovered or focused: one glare across it, not a loop. */
+.glare {
+  position: relative;
+  overflow: hidden;
+}
+.glare::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--bg) 30%, transparent) 50%, transparent 60%)
+    150% 0 / 250% 100% no-repeat;
+  transition: background-position 0.7s ease;
+}
+.glare:is(:hover, :focus-visible):not(:disabled)::after {
+  background-position: -50% 0;
+}
+
+/* Filled: the receipt prints (rolling out downwards), the check draws itself and a spark goes off it, then the
+   FILLED stamp comes down (.stamp). The spark's eight rays are after react-bits' Click Spark (the idea only). */
+@keyframes ticket-print {
+  from {
+    clip-path: inset(0 0 99.9% 0 round 12px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 12px);
+  }
+}
+.ticket-print {
+  animation: ticket-print 0.7s var(--ease-enter) backwards;
+}
+@keyframes spark {
+  from {
+    transform: rotate(var(--a)) translateX(14px) scaleX(0);
+  }
+  45% {
+    transform: rotate(var(--a)) translateX(22px) scaleX(1);
+  }
+  to {
+    transform: rotate(var(--a)) translateX(32px) scaleX(0);
+  }
+}
+.spark {
+  transform-origin: 0 50%;
+  transform: rotate(var(--a)) translateX(32px) scaleX(0);
+  animation: spark 0.5s ease-out 0.75s backwards;
+}
+
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+.check-draw {
+  stroke-dasharray: 1;
+  animation: check-draw 0.5s var(--ease-enter) var(--d, 0ms) backwards;
+}
+
+/* Refused: a short damped nudge, the way a wallet says no (Rankr's own; the red and the alert carry it too). */
+@keyframes shake {
+  20% {
+    transform: translateX(6px);
+  }
+  40% {
+    transform: translateX(-5px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+  80% {
+    transform: translateX(-2px);
+  }
+}
+.shake {
+  animation: shake 0.38s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
 /* Home: a call sealed. Its hash decrypts and a SEALED stamp comes down (.stamp, as at the end of a trail). */
 
 /* Scrolling down a trail, the camera follows the money: each line between two cards draws itself down as it
@@ -689,7 +902,6 @@ body {
     transition-delay: 0ms !important;
   }
   .hero-exit,
-  .tilt-in,
   .twinkle,
   .ticker,
   .trace-flow,
@@ -698,6 +910,11 @@ body {
   .signal-ring,
   .id-scan,
   .sweep::after,
+  .quote-ring,
+  .packet,
+  .chip-scan,
+  .text-shimmer,
+  .shake,
   .skeleton {
     animation: none !important;
   }
@@ -706,6 +923,13 @@ body {
     scrollbar-width: none;
   }
   .ticker-copy {
+    display: none;
+  }
+  .text-shimmer {
+    color: var(--muted);
+    background: none;
+  }
+  .spark {
     display: none;
   }
 }

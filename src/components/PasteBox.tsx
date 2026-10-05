@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ClipboardPaste, KeyRound, LoaderCircle, Lock, Star, TriangleAlert, X } from "lucide-react";
+import { ArrowLeftRight, ClipboardPaste, KeyRound, LoaderCircle, Lock, Star, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -300,7 +300,7 @@ export function PasteBox({
   );
 }
 
-/** The looked-up token and the two ways to keep it: a call (public, sealed) or the watchlist (private). */
+/** The looked-up token and what to do with it: a call (public, sealed), the watchlist (private), or a paper swap. */
 function ChoiceCard({
   choice: c,
   as,
@@ -344,7 +344,7 @@ function ChoiceCard({
           <X className="size-4" />
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 border-t border-border px-4 py-3">
         <button
           type="button"
           onClick={onCall}
@@ -366,9 +366,17 @@ function ChoiceCard({
           <span className="sm:hidden">{onWatchlist ? "Watching" : "Watchlist"}</span>
           <span className="hidden sm:inline">{onWatchlist ? "On your watchlist" : "Save to watchlist"}</span>
         </button>
-        <p className="col-span-2 text-xs text-subtle">
+        <Link
+          href={`/swap?chain=${encodeURIComponent(p.chainId)}&ca=${encodeURIComponent(p.address)}`}
+          title="Swap it on paper: pick how much, no real money"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium whitespace-nowrap transition-colors hover:bg-surface-2"
+        >
+          <ArrowLeftRight className="size-3.5 shrink-0" />
+          Swap
+        </Link>
+        <p className="col-span-3 text-xs text-subtle">
           A call is public and sealed{as ? <> under <span className="font-mono text-muted">@{as}</span></> : null}, from the
-          price right now. The watchlist is private, on this device, and not a call.
+          price right now. The watchlist is private, on this device, and not a call. Swap is on paper: no real money.
         </p>
       </div>
     </div>

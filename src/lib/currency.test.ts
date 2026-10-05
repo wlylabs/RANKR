@@ -60,4 +60,37 @@ describe("parseAmount", () => {
     expect(parseAmount("abc", "idr", RATE)).toBeNull();
     expect(parseAmount("0", "usd", null)).toBeNull();
   });
+
+  it("reads the short ways amounts are written", () => {
+    const idr = (s: string) => parseAmount(s, "idr", RATE)! * RATE;
+    expect(idr("2,5 jt")).toBeCloseTo(2_500_000, 3);
+    expect(idr("1.5jt")).toBeCloseTo(1_500_000, 3);
+    expect(idr("Rp500rb")).toBeCloseTo(500_000, 3);
+    expect(idr("750 ribu")).toBeCloseTo(750_000, 3);
+    expect(idr("2 juta")).toBeCloseTo(2_000_000, 3);
+    expect(idr("1M")).toBeCloseTo(1e9, 3); // a miliar, as Indonesians write it
+    expect(idr("1,2 miliar")).toBeCloseTo(1.2e9, 3);
+    expect(idr("1.500")).toBeCloseTo(1500, 6);
+    expect(parseAmount("10k", "usd", null)).toBe(10_000);
+    expect(parseAmount("$1.5m", "usd", null)).toBe(1_500_000); // a million, in dollars
+    expect(parseAmount("2.5K", "usd", null)).toBe(2_500);
+    expect(parseAmount("1,234.5", "usd", null)).toBe(1234.5);
+    expect(parseAmount("1.234,5", "usd", null)).toBe(1234.5);
+    expect(parseAmount("2,5", "usd", null)).toBe(2.5);
+    expect(parseAmount("10 apples", "usd", null)).toBeNull();
+    expect(parseAmount("-5", "usd", null)).toBeNull();
+  });
+});
+
+describe("formatMoney edges", () => {
+  it("puts no sign on what rounds to nothing", () => {
+    expect(formatMoney(-0.001, "usd", null)).toBe("$0.00");
+    expect(formatMoney(0.001, "usd", null, { signed: true })).toBe("$0.00");
+    expect(formatMoney(-0.00001, "idr", RATE)).toBe("Rp0");
+  });
+
+  it("writes out a miliar rather than round up to \"1 M\"", () => {
+    expect(formatMoney(999_960_000 / RATE, "idr", RATE, { short: true })).toBe("Rp1 miliar");
+    expect(formatMoney(999_000_000 / RATE, "idr", RATE, { short: true })).toBe("Rp999 jt");
+  });
 });
