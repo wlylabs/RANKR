@@ -1,10 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowDownUp, Check, ClipboardPaste, LoaderCircle, X } from "lucide-react";
+import { ArrowDown, ArrowDownUp, ClipboardPaste, LoaderCircle, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import useSWR from "swr";
 import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
 import { formatAmount, formatMultiple, formatPrice, formatUsd, tokenHref } from "@/lib/format";
@@ -15,9 +15,11 @@ import { lookupPaste } from "@/lib/track";
 import type { MarketSnapshot, TokenResponse } from "@/lib/types";
 import { tokenId } from "@/lib/address";
 import { ChainTag } from "./Chain";
+import { DecryptText } from "./DecryptText";
+import { Flash } from "./MultipleBadge";
 import { PaperBalance } from "./PaperBalance";
 import { RateNote } from "./RateNote";
-import { TokenName } from "./TokenList";
+import { PoolCurve, PoolField, QuoteRing, Receipt, RollingNumber, RouteLine } from "./SwapCinema";
 
 type Side = "buy" | "sell";
 
@@ -74,8 +76,13 @@ export function Swap() {
   const [slippage, setSlippage] = useState(0.03);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
-  const [done, setDone] = useState<{ paid: string; got: string } | null>(null);
+  const [failure, setFailure] = useState<{ message: string; n: number } | null>(null);
+  const [done, setDone] = useState<{ title: string; rows: [string, ReactNode][]; note: string } | null>(null);
+  // Flips so far: the arrow turns half a turn each time, and the two sides come in from where the other was.
+  const [turns, setTurns] = useState(0);
+  // Said to screen readers when a swap fills: a live region that's there from the start, so it's heard.
+  const [announce, setAnnounce] = useState("");
+  const [sellAll, setSellAll] = useState(false);
   const amountId = useId();
 
   // An amount typed in one currency means nothing in the other: switching clears it.
@@ -97,13 +104,15 @@ export function Swap() {
 
   function reset() {
     setTyped("");
+    setSellAll(false);
     setConfirming(false);
     setFailure(null);
   }
 
   // What's typed: dollars (or rupiah) to pay when buying, tokens when selling.
   const spendUsd = side === "buy" && typed ? parseAmount(typed, money.shown, money.rate?.usdIdr ?? null) : null;
-  const sellTokens = side === "sell" && typed ? parseTokens(typed) : null;
+  // Max sells exactly what's held, not the rounded number shown for it.
+  const sellTokens = side === "sell" && typed ? (sellAll && held?.tokens ? held.tokens : parseTokens(typed)) : null;
   const buy = market && spendUsd ? quoteBuy(market, spendUsd) : null;
   const sell = market && sellTokens ? quoteSell(market, sellTokens) : null;
   const impact = side === "buy" ? (buy?.impact ?? 0) : (sell?.impact ?? 0);
@@ -125,6 +134,7 @@ export function Swap() {
     if (impact >= CONFIRM_IMPACT && !confirming) return setConfirming(true);
     setBusy(true);
     setFailure(null);
+    setAnnounce("");
     try {
       // The price now, not the one on screen: a swap fills at the moment it's sent.
       const fresh = await fetcher<TokenResponse>(key);
@@ -134,20 +144,43 @@ export function Swap() {
       const now = side === "buy" ? (quoteBuy(m, spendUsd!)?.tokens ?? 0) : (quoteSell(m, sellTokens!)?.proceedsUsd ?? 0);
       if (now < minReceive) {
         const got = side === "buy" ? `${formatAmount(now)} $${m.symbol}` : money.format(now);
-        throw new Error(`The price moved past your ${pct(slippage)} slippage: you'd get ${got} now. Check the new quote and swap again.`);
+        throw new Error(`The price moved past your ${pct(slippage)} slippage: you'd get ${got} now. Nothing was swapped: check the new quote and swap again.`);
       }
+      const note = `Within your ${pct(slippage)} slippage. On paper: no real money moved.`;
       if (side === "buy") {
         const out = swapBuy(m, spendUsd!, money.rate?.usdIdr ?? null);
         if (typeof out === "string") throw new Error(ERRORS[out]);
-        setDone({ paid: money.format(out.spentUsd), got: `${formatAmount(out.tokens)} $${m.symbol}` });
+        setAnnounce(`Swapped ${money.format(out.spentUsd)} for about ${formatAmount(out.tokens)} $${m.symbol}, on paper.`);
+        setDone({
+          title: `Swapped ${money.format(out.spentUsd)} for ≈ ${formatAmount(out.tokens)} $${m.symbol}`,
+          rows: [
+            ["Paid", money.format(out.spentUsd)],
+            ["Received", `${formatAmount(out.tokens)} $${m.symbol}`],
+            ["Price", formatPrice(out.fillPriceUsd)],
+            ["Price impact", out.quality === "none" ? "unknown" : impactLabel(out.impact)],
+            ["Fees", money.format(out.feeUsd + out.networkUsd)],
+            ["Route", m.dexId],
+          ],
+          note,
+        });
       } else {
         const out = swapSell(tokenId(m.chainId, m.address), sellTokens!, m);
         if (typeof out === "string") throw new Error(ERRORS[out]);
-        setDone({ paid: `${formatAmount(out.tokens)} $${m.symbol}`, got: money.format(out.proceedsUsd) });
+        setAnnounce(`Swapped ${formatAmount(out.tokens)} $${m.symbol} for about ${money.format(out.proceedsUsd)}, on paper.`);
+        setDone({
+          title: `Swapped ${formatAmount(out.tokens)} $${m.symbol} for ≈ ${money.format(out.proceedsUsd)}`,
+          rows: [
+            ["Sold", `${formatAmount(out.tokens)} $${m.symbol}`],
+            ["Received", money.format(out.proceedsUsd)],
+            ["Price", formatPrice(out.proceedsUsd / out.tokens)],
+            ["Route", m.dexId],
+          ],
+          note,
+        });
       }
       reset();
     } catch (err) {
-      setFailure((err as Error).message);
+      setFailure((f) => ({ message: (err as Error).message, n: (f?.n ?? 0) + 1 }));
       setConfirming(false);
     } finally {
       setBusy(false);
@@ -172,7 +205,11 @@ export function Swap() {
 
   return (
     <div className="mx-auto max-w-md pt-8 sm:pt-12">
-      <div className="flex items-center justify-between gap-3">
+      <p role="status" className="sr-only">
+        {announce}
+      </p>
+      <div className="relative isolate flex items-center justify-between gap-3">
+        <PoolField />
         <h1 className="text-xl font-semibold tracking-tight">Swap</h1>
         <span className="rounded border border-border px-1.5 font-mono text-[10px] tracking-wide text-subtle uppercase">paper</span>
       </div>
@@ -194,13 +231,8 @@ export function Swap() {
       />
 
       {done ? (
-        <div role="status" className="mt-4 card p-5 text-center">
-          <Check className="mx-auto size-6 text-up" />
-          <p className="mt-2 font-medium">
-            Swapped {done.paid} for ≈ {done.got}
-          </p>
-          <p className="mt-1 text-xs text-muted">On paper: no real money moved.</p>
-          <div className="mt-4 flex justify-center gap-2">
+        <Receipt title={done.title} rows={done.rows} note={done.note}>
+          <div className="cine-in mt-4 flex justify-center gap-2" style={{ "--d": "900ms" } as CSSProperties}>
             <Link href="/me?tab=paper" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg">
               Your paper trades
             </Link>
@@ -208,14 +240,14 @@ export function Swap() {
               Swap again
             </button>
           </div>
-        </div>
+        </Receipt>
       ) : (
         <>
           {!wallet && side === "buy" && <PaperBalance className="mt-4" />}
 
           <div className="mt-4 space-y-1">
             {/* You pay */}
-            <div className="card p-4">
+            <div key={`pay-${turns}`} className={clsx("card p-4", turns > 0 && "from-below")}>
               <div className="flex items-center justify-between gap-3 text-xs text-muted">
                 <label htmlFor={amountId}>You pay</label>
                 {side === "buy" && wallet && (
@@ -236,7 +268,8 @@ export function Swap() {
                     {!!held?.tokens && (
                       <MaxButtons
                         onPick={(f) => {
-                          setTyped(String(f >= 1 ? held.tokens : held.tokens * f));
+                          setTyped((f >= 1 ? held.tokens : held.tokens * f).toLocaleString("en-US", { maximumFractionDigits: 4 }));
+                          setSellAll(f >= 1);
                           setConfirming(false);
                         }}
                       />
@@ -251,6 +284,7 @@ export function Swap() {
                   value={typed}
                   onChange={(e) => {
                     setTyped(e.target.value);
+                    setSellAll(false);
                     setConfirming(false);
                     setFailure(null);
                   }}
@@ -286,22 +320,52 @@ export function Swap() {
                 type="button"
                 onClick={() => {
                   setSide((s) => (s === "buy" ? "sell" : "buy"));
+                  setTurns((t) => t + 1);
                   reset();
                 }}
                 aria-label={side === "buy" ? "Switch to selling" : "Switch to buying"}
                 title={side === "buy" ? "Sell instead" : "Buy instead"}
-                className="absolute top-1/2 left-1/2 grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-border bg-bg text-muted shadow-sm transition-colors hover:text-fg"
+                className="absolute top-1/2 left-1/2 grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-border bg-bg text-muted shadow-sm ring-4 ring-bg transition-[color,scale] duration-150 hover:text-fg active:scale-90"
               >
-                <ArrowDownUp className="size-4" />
+                {busy ? (
+                  <ArrowDown className="packet size-4 text-fg" />
+                ) : (
+                  <ArrowDownUp
+                    className="size-4 transition-transform duration-500 ease-[var(--ease-emphasized)]"
+                    style={{ transform: `rotate(${turns * 180}deg)` }}
+                  />
+                )}
               </button>
             </div>
 
             {/* You receive */}
-            <div className="card p-4">
-              <div className="text-xs text-muted">You receive (estimate)</div>
+            <div key={`get-${turns}`} className={clsx("card p-4", turns > 0 && "from-above")}>
+              <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                <span>You receive (estimate)</span>
+                {market && (
+                  <span className="flex items-center gap-1.5" title="The quote is read again every 15 seconds, and once more as you swap">
+                    <QuoteRing key={market.fetchedAt} at={market.fetchedAt} />
+                    <span className="font-mono text-[10px] text-subtle">live</span>
+                  </span>
+                )}
+              </div>
               <div className="mt-2 flex items-center gap-3">
-                <span className={clsx("tabular min-w-0 flex-1 truncate font-mono text-3xl font-medium tracking-tight", receive === null && "text-subtle")}>
-                  {receive === null ? "0" : side === "buy" ? `≈ ${formatAmount(receive)}` : `≈ ${money.format(receive)}`}
+                <span
+                  className={clsx(
+                    "tabular relative isolate min-w-0 flex-1 truncate font-mono text-3xl font-medium tracking-tight",
+                    receive === null && "text-subtle",
+                  )}
+                >
+                  {receive === null ? (
+                    "0"
+                  ) : (
+                    <RollingNumber
+                      key={`${side}:${typed}:${slippage}:${money.shown}`}
+                      text={side === "buy" ? `≈ ${formatAmount(receive)}` : `≈ ${money.format(receive)}`}
+                    />
+                  )}
+                  {/* A new quote moving what you'd get: a wash in its direction (not while typing). */}
+                  {receive !== null && <Flash key={`${side}:${typed}:${slippage}`} value={receive} />}
                 </span>
                 <span className="shrink-0 rounded-md border border-border px-2 py-1 font-mono text-xs">
                   {side === "buy" ? (market ? `$${market.symbol}` : "token") : money.shown.toUpperCase()}
@@ -309,6 +373,12 @@ export function Swap() {
               </div>
             </div>
           </div>
+
+          {market && receive !== null && receive > 0 && quality && quality !== "none" && (
+            <div className="mt-3">
+              <PoolCurve side={side} impact={impact} />
+            </div>
+          )}
 
           {market && receive !== null && minReceive !== null && (
             <dl className="mt-3 space-y-1.5 px-1 font-mono text-xs">
@@ -345,13 +415,22 @@ export function Swap() {
                   ))}
                 </span>
               </Row>
-              <Row label="Route">
-                <span className="text-muted">
-                  {market.dexId}
-                  {market.quoteSymbol ? ` · ${market.quoteSymbol} pool` : ""}
-                  {quality && quality !== "good" ? ` · ${quality === "none" ? "no depth" : "rough"}` : ""}
-                </span>
-              </Row>
+              <div className="flex items-center gap-3">
+                <dt className="shrink-0 font-sans text-muted">Route</dt>
+                <dd className="min-w-0 flex-1">
+                  <span className="sr-only">
+                    {market.dexId}
+                    {market.quoteSymbol ? ` · ${market.quoteSymbol} pool` : ""}
+                    {quality && quality !== "good" ? ` · ${quality === "none" ? "no depth" : "rough"}` : ""}
+                  </span>
+                  <RouteLine
+                    key={`${market.fetchedAt}:${side}`}
+                    from={side === "buy" ? money.shown.toUpperCase() : `$${market.symbol}`}
+                    to={side === "buy" ? `$${market.symbol}` : money.shown.toUpperCase()}
+                    via={`${market.dexId}${market.quoteSymbol ? ` · ${market.quoteSymbol} pool` : ""}${quality && quality !== "good" ? ` · ${quality === "none" ? "no depth" : "rough"}` : ""}`}
+                  />
+                </dd>
+              </div>
             </dl>
           )}
 
@@ -381,8 +460,8 @@ export function Swap() {
             </p>
           )}
           {failure && (
-            <p role="alert" className="mt-3 rounded-md border border-down/40 px-2.5 py-2 text-xs text-down">
-              {failure}
+            <p key={failure.n} role="alert" className="shake mt-3 rounded-md border border-down/40 px-2.5 py-2 text-xs text-down">
+              {failure.message}
             </p>
           )}
 
@@ -391,7 +470,7 @@ export function Swap() {
             onClick={swap}
             disabled={!canSwap || busy || tooSmall}
             className={clsx(
-              "mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-medium hover:opacity-90 disabled:opacity-40",
+              "glare mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-medium hover:opacity-90 disabled:opacity-40",
               confirming ? "border border-down text-down" : "bg-fg text-bg",
             )}
           >
@@ -427,6 +506,14 @@ function MaxButtons({ onPick }: { onPick: (fraction: number) => void }) {
     </span>
   );
 }
+
+/** The corners of a lock-on frame, just outside the card. */
+const BRACKETS = [
+  "-top-1 -left-1 rounded-tl border-t-2 border-l-2",
+  "-top-1 -right-1 rounded-tr border-t-2 border-r-2",
+  "-bottom-1 -left-1 rounded-bl border-b-2 border-l-2",
+  "-right-1 -bottom-1 rounded-br border-r-2 border-b-2",
+];
 
 /** Paste a CA (or a link) to pick the token; once picked, the token with a way to change it. */
 function TokenPicker({
@@ -474,9 +561,19 @@ function TokenPicker({
 
   if (market) {
     return (
-      <div className="mt-4 flex items-center gap-3 card px-4 py-3">
+      // Target acquired: brackets close in on the token picked, once for each one.
+      <div key={`${market.chainId}:${market.address}`} className="cine-in relative mt-4 flex items-center gap-3 card px-4 py-3">
+        {BRACKETS.map((b) => (
+          <span key={b} aria-hidden className={clsx("lock-on pointer-events-none absolute size-3 border-fg/70", b)} />
+        ))}
+        <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+          <span className="chip-scan absolute inset-x-0 top-0 h-px bg-fg/60 shadow-[0_0_10px_1px_color-mix(in_srgb,var(--fg)_30%,transparent)]" />
+        </span>
         <Link href={tokenHref(market)} className="min-w-0 flex-1">
-          <TokenName symbol={market.symbol} name={market.name} />
+          <span className="flex min-w-0 items-baseline gap-2">
+            <DecryptText text={`$${market.symbol}`} className="shrink-0 font-medium" duration={600} />
+            <span className="truncate text-sm text-muted">{market.name}</span>
+          </span>
           <div className="tabular mt-0.5 truncate font-mono text-[11px] text-subtle">
             <ChainTag chainId={market.chainId} /> · {formatPrice(market.priceUsd)} · mc {formatUsd(market.marketCap ?? market.fdv)} · liq{" "}
             {formatUsd(market.liquidityUsd)}
@@ -526,7 +623,7 @@ function TokenPicker({
         )}
       </form>
       {(failure || error) && <p className="mt-2 text-xs text-down">{failure ?? error}</p>}
-      {loading && <p className="mt-2 text-xs text-muted">Loading the token…</p>}
+      {loading && <p className="text-shimmer mt-2 w-fit text-xs">Finding the price…</p>}
     </div>
   );
 }
