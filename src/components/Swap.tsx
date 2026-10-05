@@ -9,8 +9,9 @@ import useSWR from "swr";
 import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
 import { formatAmount, formatMultiple, formatPrice, formatUsd, tokenHref } from "@/lib/format";
 import { fetcher } from "@/lib/hooks";
-import { MAX_TRADES, holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
+import { MAX_TRADES, holdingsOf, pnlOf, remainingOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
 import { CONFIRM_IMPACT, WARN_IMPACT, atMultiple, autoSlippage, poolOf, quoteBuy, quoteSell } from "@/lib/sim";
+import type { PaperCard } from "@/lib/share";
 import { lookupPaste } from "@/lib/track";
 import type { MarketSnapshot, TokenResponse } from "@/lib/types";
 import { tokenId } from "@/lib/address";
@@ -19,7 +20,9 @@ import { DecryptText } from "./DecryptText";
 import { Flash } from "./MultipleBadge";
 import { PaperBalance } from "./PaperBalance";
 import { RateNote } from "./RateNote";
+import { SharePnl } from "./SharePnl";
 import { PoolCurve, PoolField, QuoteRing, Receipt, RollingNumber, RouteLine } from "./SwapCinema";
+import { WalletStrip } from "./WalletStrip";
 
 type Side = "buy" | "sell";
 
@@ -73,7 +76,8 @@ export function Swap() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<{ message: string; n: number } | null>(null);
-  const [done, setDone] = useState<{ title: string; rows: [string, ReactNode][]; note: string } | null>(null);
+  // The swap just filled, for its receipt; a sale's with its PnL card, the trades it sold from taken together.
+  const [done, setDone] = useState<{ title: string; rows: [string, ReactNode][]; note: string; pnl?: PaperCard } | null>(null);
   // Flips so far: the arrow turns half a turn each time, and the two sides come in from where the other was.
   const [turns, setTurns] = useState(0);
   // Said to screen readers when a swap fills: a live region that's there from the start, so it's heard.
@@ -167,7 +171,19 @@ export function Swap() {
         const out = swapSell(tokenId(m.chainId, m.address), sellTokens!, m);
         if (typeof out === "string") throw new Error(ERRORS[out]);
         setAnnounce(`Swapped ${formatAmount(out.tokens)} $${m.symbol} for about ${money.format(out.proceedsUsd)}.`);
+        const pnl = pnlOf(out.trades, m);
         setDone({
+          pnl:
+            pnl.backUsd === null || !(pnl.spentUsd > 0)
+              ? undefined
+              : {
+                  kind: "trade",
+                  symbol: m.symbol,
+                  chainId: m.chainId,
+                  open: out.trades.some((t) => remainingOf(t) > 0),
+                  multiple: pnl.backUsd / pnl.spentUsd,
+                  amounts: { inUsd: pnl.spentUsd, backUsd: pnl.backUsd, currency: money.shown, usdIdr: money.rate?.usdIdr ?? null },
+                },
           title: `Swapped ${formatAmount(out.tokens)} $${m.symbol} for ≈ ${money.format(out.proceedsUsd)}`,
           rows: [
             ["Sold", `${formatAmount(out.tokens)} $${m.symbol}`],
@@ -213,6 +229,21 @@ export function Swap() {
         <h1 className="text-xl font-semibold tracking-tight">Swap</h1>
       </div>
 
+      <WalletStrip
+        className="mt-4"
+        current={market ? tokenId(market.chainId, market.address) : null}
+        onSell={(h) => {
+          reset();
+          setDone(null);
+          // Into selling it, the arrow turning as a flip would.
+          if (side !== "sell") {
+            setSide("sell");
+            setTurns((t) => t + 1);
+          }
+          router.replace(`${pathname}?chain=${encodeURIComponent(h.chainId)}&ca=${encodeURIComponent(h.address)}`, { scroll: false });
+        }}
+      />
+
       <TokenPicker
         market={market}
         loading={isLoading}
@@ -235,6 +266,7 @@ export function Swap() {
             <Link href="/me?tab=paper" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg">
               Your trades
             </Link>
+            {done.pnl && market && <SharePnl variant="action" card={done.pnl} href={tokenHref(market)} />}
             <button type="button" onClick={() => setDone(null)} className="inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85">
               Swap again
             </button>
@@ -465,7 +497,6 @@ export function Swap() {
             {busy ? "Swapping…" : label}
           </button>
 
-          {wallet && <PaperBalance className="mt-4" />}
         </>
       )}
       {/* The rupiah rate's source, wherever its rates show (its terms ask for it): the receipt too. */}

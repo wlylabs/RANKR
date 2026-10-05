@@ -82,6 +82,41 @@ export function ShareCall({
 }
 
 function ShareDialog({ call, mine, title }: { call: ShareableCall; mine: boolean; title: string }) {
+  return (
+    <ShareSheet
+      title={title}
+      subtitle="The card shows the call as it is right now, from the caller's own entry."
+      image={cardUrl(call)}
+      fileName={callCardFile(call.username, call.token.symbol)}
+      text={callShareText({ ...call, symbol: call.token.symbol, mine })}
+      href={callHref(call.username, call.token)}
+    />
+  );
+}
+
+/**
+ * A share card's dialog: the card as it will look, then the ways out: the phone's share sheet (with the image
+ * itself), a post on X, the link (`href`, on this site), or the image saved. The card (`image`) is drawn when
+ * the dialog opens and again whenever it changes; the same image is shown, saved and shared. `children`: what
+ * changes the card, under it.
+ */
+export function ShareSheet({
+  title,
+  subtitle,
+  image,
+  fileName,
+  text,
+  href,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  image: string;
+  fileName: string;
+  text: string;
+  href: string;
+  children?: React.ReactNode;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -89,16 +124,21 @@ function ShareDialog({ call, mine, title }: { call: ShareableCall; mine: boolean
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const [url, setUrl] = useState("");
-  const text = callShareText({ ...call, symbol: call.token.symbol, mine });
 
-  // Opens as soon as it mounts (a click on the button), and draws the card for this opening.
+  // Opens as soon as it mounts (a click on the button).
   useEffect(() => {
     if (!ref.current?.open) ref.current?.showModal();
-    setUrl(`${window.location.origin}${callHref(call.username, call.token)}`);
+    setUrl(`${window.location.origin}${href}`);
     setCanShare(typeof navigator.share === "function");
+  }, [href]);
+
+  // The card, drawn for this opening and for each change to it.
+  useEffect(() => {
     let objectUrl: string | null = null;
     let live = true;
-    fetch(`${cardUrl(call)}?at=${Date.now()}`)
+    setFile(null);
+    setFailed(false);
+    fetch(`${image}${image.includes("?") ? "&" : "?"}at=${Date.now()}`)
       .then((res) => {
         if (!res.ok) throw new Error(String(res.status));
         return res.blob();
@@ -107,16 +147,14 @@ function ShareDialog({ call, mine, title }: { call: ShareableCall; mine: boolean
         if (!live) return;
         objectUrl = URL.createObjectURL(blob);
         setPreview(objectUrl);
-        setFile(new File([blob], callCardFile(call.username, call.token.symbol), { type: "image/png" }));
+        setFile(new File([blob], fileName, { type: "image/png" }));
       })
       .catch(() => live && setFailed(true));
     return () => {
       live = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-    // Drawn once per opening (the dialog is keyed by it).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [image, fileName]);
 
   async function shareNative() {
     const withImage = file && navigator.canShare?.({ files: [file] });
@@ -157,7 +195,7 @@ function ShareDialog({ call, mine, title }: { call: ShareableCall; mine: boolean
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-semibold tracking-tight">{title}</h2>
-            <p className="mt-0.5 text-sm text-muted">The card shows the call as it is right now, from the caller&apos;s own entry.</p>
+            <p className="mt-0.5 text-sm text-muted">{subtitle}</p>
           </div>
           <button
             type="button"
@@ -170,7 +208,7 @@ function ShareDialog({ call, mine, title }: { call: ShareableCall; mine: boolean
         </div>
 
         <div className="relative aspect-[1200/630] overflow-hidden rounded-lg border border-border bg-surface-2">
-          {preview ? (
+          {preview && file ? (
             <img src={preview} alt={text} className="animate-fade-in size-full object-cover" />
           ) : failed ? (
             <p className="flex size-full items-center justify-center gap-2 px-6 text-center text-sm text-down">
@@ -180,6 +218,8 @@ function ShareDialog({ call, mine, title }: { call: ShareableCall; mine: boolean
             <div aria-hidden className="skeleton size-full" />
           )}
         </div>
+
+        {children}
 
         <p className="mt-3 font-mono text-xs text-pretty text-muted">{text}</p>
 

@@ -347,7 +347,7 @@ export function sellFrom(
   tokens: number,
   m: MarketSnapshot,
   now = Date.now(),
-): { wallet: PaperWallet | null; trades: PaperTrade[]; proceedsUsd: number; tokens: number } | { error: SwapError } {
+): { wallet: PaperWallet | null; trades: PaperTrade[]; proceedsUsd: number; tokens: number; ids: string[] } | { error: SwapError } {
   const held = holdingsOf(trades, tokenId);
   if (!(tokens > 0) || !(held.tokens > 0) || tokens > held.tokens * (1 + 1e-9)) return { error: "holdings" };
   if (!(m.priceUsd > 0)) return { error: "price" };
@@ -370,15 +370,23 @@ export function sellFrom(
     trades: trades.map((t) => (sales.has(t.id) ? { ...t, sales: [...t.sales, sales.get(t.id)!] } : t)),
     proceedsUsd: proceeds,
     tokens: amount,
+    ids: [...sales.keys()],
   };
 }
 
-/** Sells `tokens` of a token from your paper trades, into the wallet. What it brought in, or why not. */
-export function swapSell(tokenId: string, tokens: number, m: MarketSnapshot): { proceedsUsd: number; tokens: number } | SwapError {
+/**
+ * Sells `tokens` of a token from your paper trades, into the wallet. What it brought in and the trades it sold
+ * from (as they are after it), or why not.
+ */
+export function swapSell(
+  tokenId: string,
+  tokens: number,
+  m: MarketSnapshot,
+): { proceedsUsd: number; tokens: number; trades: PaperTrade[] } | SwapError {
   const out = sellFrom(readWallet(), read(), tokenId, tokens, m);
   if ("error" in out) return out.error;
   commit(out.trades, out.wallet);
-  return { proceedsUsd: out.proceedsUsd, tokens: out.tokens };
+  return { proceedsUsd: out.proceedsUsd, tokens: out.tokens, trades: out.trades.filter((t) => out.ids.includes(t.id)) };
 }
 
 /**
@@ -460,6 +468,12 @@ export type PaperSummary = {
   unpriced: number;
 };
 
+/** What selling `tokens` at once would bring in now, all costs out; null without fresh live data. */
+function valueOf(m: MarketSnapshot | null, tokens: number, at: number): number | null {
+  if (!m || !isFresh(m, at) || !(m.priceUsd > 0)) return null;
+  return Math.max(0, grossSell(m, tokens) - poolOf(m).networkUsd);
+}
+
 /** Every trade together: a token held in several trades is valued as one sale of all of it, as it would sell. */
 export function summaryOf(
   trades: PaperTrade[],
@@ -479,14 +493,67 @@ export function summaryOf(
     }
   }
   for (const [id, h] of held) {
-    const m = marketOf(id);
-    if (!m || !isFresh(m, at) || !(m.priceUsd > 0)) {
+    const proceeds = valueOf(marketOf(id), h.tokens, at);
+    if (proceeds === null) {
       out.unpriced += h.trades;
       continue;
     }
-    const proceeds = Math.max(0, grossSell(m, h.tokens) - poolOf(m).networkUsd);
     out.openValueUsd += proceeds;
     out.unrealizedUsd += proceeds - h.costUsd;
   }
   return out;
+}
+
+/** A token still held, across its open trades, valued as one sale of all of it (as it would sell). */
+export type Holding = {
+  tokenId: string;
+  chainId: string;
+  address: string;
+  symbol: string;
+  name: string;
+  tokens: number;
+  /** What the tokens held cost (their share of what went in). */
+  costUsd: number;
+  /** What selling them all now would bring in; null without fresh live data. */
+  valueUsd: number | null;
+};
+
+/** The tokens held, most worth first (by what they cost, without live data). */
+export function holdingsList(
+  trades: PaperTrade[],
+  marketOf: (tokenId: string) => MarketSnapshot | null,
+  at = Date.now(),
+): Holding[] {
+  const ids = [...new Set(trades.filter((t) => remainingOf(t) > 0).map((t) => t.tokenId))];
+  return ids
+    .map((id) => {
+      const h = holdingsOf(trades, id);
+      const t = h.open[0];
+      return {
+        tokenId: id,
+        chainId: t.chainId,
+        address: t.address,
+        symbol: t.symbol,
+        name: t.name,
+        tokens: h.tokens,
+        costUsd: h.costUsd,
+        valueUsd: valueOf(marketOf(id), h.tokens, at),
+      };
+    })
+    .sort((a, b) => (b.valueUsd ?? b.costUsd) - (a.valueUsd ?? a.costUsd));
+}
+
+/**
+ * Trades taken together, for a PnL card: what went in, and everything back (sold, plus selling the rest now);
+ * back is null while some of it is held without fresh live data.
+ */
+export function pnlOf(trades: PaperTrade[], m: MarketSnapshot | null, at = Date.now()): { spentUsd: number; backUsd: number | null } {
+  let spentUsd = 0;
+  let backUsd: number | null = 0;
+  for (const t of trades) {
+    spentUsd += t.spentUsd;
+    const p = positionOf(t, m, at);
+    backUsd = backUsd === null || p.multiple === null ? null : backUsd + p.multiple * t.spentUsd;
+  }
+  return { spentUsd, backUsd };
 }

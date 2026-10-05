@@ -26,6 +26,7 @@ import { ChainTag } from "./Chain";
 import { PaperBalance } from "./PaperBalance";
 import { Cascade } from "./Cinema";
 import { RateNote } from "./RateNote";
+import { SharePnl } from "./SharePnl";
 import { TimeAgo } from "./TimeAgo";
 import { TokenName } from "./TokenList";
 
@@ -202,6 +203,21 @@ function TradeRow({ trade: t, market: m, loading }: { trade: PaperTrade; market:
             {gain !== null && <span className="text-subtle"> · {money.format(p.realizedUsd + (p.unrealizedUsd ?? 0), { signed: true })}</span>}
           </div>
         </div>
+        {p.multiple !== null && (
+          <SharePnl
+            variant="icon"
+            href={tokenHref(t)}
+            card={{
+              kind: "trade",
+              symbol: t.symbol,
+              chainId: t.chainId,
+              open,
+              multiple: p.multiple,
+              amounts: { inUsd: t.spentUsd, backUsd: p.multiple * t.spentUsd, currency: money.shown, usdIdr: money.rate?.usdIdr ?? null },
+            }}
+            className="-my-0.5"
+          />
+        )}
         {!open && (
           <button
             type="button"

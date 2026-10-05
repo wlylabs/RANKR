@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_TRADES,
   buyWith,
+  holdingsList,
   holdingsOf,
   paperBuy,
   paperSell,
+  pnlOf,
   positionOf,
   remainingOf,
   sellFrom,
@@ -176,6 +178,7 @@ describe("the paper wallet", () => {
     expect(out.wallet!.cashUsd).toBeCloseTo(out.proceedsUsd, 9);
     const split = after(a.id).sales[0].proceedsUsd + after(b.id).sales[0].proceedsUsd;
     expect(split).toBeCloseTo(out.proceedsUsd, 9);
+    expect(out.ids.sort()).toEqual([a.id, b.id].sort()); // the trades it sold from
     expect(sellFrom(null, trades, "solana:AAA", a.tokens, now, T0 + 2 + MAX_QUOTE_AGE_MS + 1)).toEqual({ error: "stale" });
   });
 
@@ -201,5 +204,30 @@ describe("the paper wallet", () => {
   it("refuses a buy when every kept trade is still open, rather than drop one", () => {
     const opens = Array.from({ length: MAX_TRADES }, (_, i) => paperBuy(pair(0.0001), 1, null, T0 + i)!);
     expect(buyWith({ cashUsd: 1000, depositedUsd: 1000 }, opens, pair(0.0001), 100, null, T0 + 999)).toEqual({ error: "full" });
+  });
+
+  it("lists what's held by token, valued as one sale of all of it, most worth first", () => {
+    const a = paperBuy(pair(0.0001), 100, null, T0)!;
+    const b = paperBuy(pair(0.0001), 50, null, T0)!;
+    const other = { ...paperBuy(pair(0.0001), 300, null, T0)!, tokenId: "solana:BBB", address: "BBB", symbol: "BETA" };
+    const closed = paperSell(paperBuy(pair(0.0001), 100, null, T0)!, 1, pair(0.0001), T0)!;
+    const now = pair(0.0002, 30_000, T0 + 1);
+    const list = holdingsList([a, b, other, closed], (id) => (id === "solana:AAA" ? now : null), T0 + 1);
+    expect(list.map((h) => h.symbol)).toEqual(["BETA", "ALPHA"]); // no live data: by what it cost
+    const alpha = list[1];
+    expect(alpha.tokens).toBeCloseTo(a.tokens + b.tokens, 6);
+    expect(alpha.costUsd).toBeCloseTo(150, 9);
+    expect(alpha.valueUsd).toBeCloseTo(summaryOf([a, b], () => now, T0 + 1).openValueUsd, 9);
+    expect(list[0].valueUsd).toBeNull();
+  });
+
+  it("takes trades together for a PnL card", () => {
+    const a = paperBuy(pair(0.0001), 100, null, T0)!;
+    const sold = paperSell(paperBuy(pair(0.0001), 100, null, T0)!, 1, pair(0.0002), T0)!;
+    const now = pair(0.0002, 30_000, T0 + 1);
+    const pnl = pnlOf([a, sold], now, T0 + 1);
+    expect(pnl.spentUsd).toBeCloseTo(200, 9);
+    expect(pnl.backUsd).toBeCloseTo(positionOf(a, now, T0 + 1).multiple! * 100 + positionOf(sold, null).multiple! * 100, 9);
+    expect(pnlOf([a, sold], null, T0 + 1).backUsd).toBeNull(); // the open one has no live data
   });
 });
