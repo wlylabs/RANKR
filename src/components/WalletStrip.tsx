@@ -11,6 +11,7 @@ import { marketOf, useWatchlistMarkets } from "@/lib/hooks";
 import { holdingsList, remainingOf, summaryOf, usePaperTrades, usePaperWallet, type Holding } from "@/lib/paper";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { OfficialBadge } from "./OfficialBadge";
 import { LiveDot } from "./PageHeader";
 import { SharePnl, TILE, TILE_ICON } from "./SharePnl";
 import { RollingNumber } from "./SwapCinema";
@@ -58,7 +59,7 @@ export function WalletStrip({
   const trades = usePaperTrades();
   const wallet = usePaperWallet();
   const money = useMoney();
-  const { userId, username } = useAuth();
+  const { userId, username, official } = useAuth();
   const [all, setAll] = useState(false);
   const ids = useMemo(() => [...new Set(trades.filter((t) => remainingOf(t) > 0).map((t) => t.tokenId))], [trades]);
   const { items, isLoading } = useWatchlistMarkets(ids);
@@ -90,6 +91,7 @@ export function WalletStrip({
               </span>
             )}
             <span className="truncate font-medium">{username ? `@${username}` : "Wallet"}</span>
+            {username && official && <OfficialBadge />}
           </span>
           {ids.length > 0 && (
             <span className="flex items-center gap-1.5 font-mono text-[10px] text-subtle">
