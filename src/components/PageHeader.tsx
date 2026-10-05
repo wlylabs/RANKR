@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { delay } from "@/lib/motion";
 
-/** The pulsing green dot on everything live: the feed, the tracked count, the landing's top runners. */
+/** The pulsing green dot on everything live: the feed's On air label and the tracked count. */
 export function LiveDot() {
   return (
     <span className="relative flex size-1.5 shrink-0">
