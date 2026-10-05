@@ -28,6 +28,19 @@ export function isFresh(m: MarketSnapshot, now = Date.now()): boolean {
 }
 
 /** Price impact worth a warning, and one big enough to ask again before a paper buy (Uniswap's thresholds). */
+/**
+ * Slippage set for you, as a wallet's "Auto" does: room for the price to move between the quote and the swap.
+ * Deep pools move least in those seconds and thin or roughly known ones most: 1% from $1M of liquidity, 5% under
+ * $50K or on a rough estimate, 3% between. A swap with a large price impact gets half of it on top (others
+ * trade into the same thin pool first), up to 15%.
+ */
+export function autoSlippage(m: MarketSnapshot, impact: number): number {
+  const liquidity = m.liquidityUsd ?? 0;
+  const base = poolOf(m).quality !== "good" || liquidity < 50_000 ? 0.05 : liquidity >= 1_000_000 ? 0.01 : 0.03;
+  const slippage = Math.min(0.15, base + (Number.isFinite(impact) && impact > 0 ? impact / 2 : 0));
+  return Math.round(slippage * 1000) / 1000;
+}
+
 export const WARN_IMPACT = 0.05;
 export const CONFIRM_IMPACT = 0.15;
 

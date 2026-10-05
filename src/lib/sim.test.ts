@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_QUOTE_AGE_MS, atMultiple, grossSell, isFresh, poolOf, quoteBuy, quoteSell } from "./sim";
+import { MAX_QUOTE_AGE_MS, atMultiple, autoSlippage, grossSell, isFresh, poolOf, quoteBuy, quoteSell } from "./sim";
 import type { MarketSnapshot } from "./types";
 
 const SOL_USD = 150;
@@ -210,5 +210,23 @@ describe("isFresh", () => {
     expect(isFresh(m, 1_000_000 + 30_000)).toBe(true);
     expect(isFresh(m, 1_000_000 + MAX_QUOTE_AGE_MS)).toBe(true);
     expect(isFresh(m, 1_000_000 + MAX_QUOTE_AGE_MS + 1)).toBe(false);
+  });
+});
+
+describe("autoSlippage", () => {
+  const at = (liquidityUsd: number | null, extra: Partial<MarketSnapshot> = {}) =>
+    ({ chainId: "solana", dexId: "raydium", quoteSymbol: "SOL", priceUsd: 1, priceNative: 1 / 150, liquidityUsd, liquidityQuote: liquidityUsd === null ? null : liquidityUsd / 2 / 150, ...extra }) as MarketSnapshot;
+
+  it("leaves less room on deep pools and more on thin or rough ones", () => {
+    expect(autoSlippage(at(2_000_000), 0)).toBe(0.01);
+    expect(autoSlippage(at(200_000), 0)).toBe(0.03);
+    expect(autoSlippage(at(20_000), 0)).toBe(0.05);
+    expect(autoSlippage(at(null), 0)).toBe(0.05); // no depth known
+  });
+
+  it("adds half the swap's own price impact, up to 15%", () => {
+    expect(autoSlippage(at(200_000), 0.04)).toBe(0.05);
+    expect(autoSlippage(at(20_000), 3)).toBe(0.15);
+    expect(autoSlippage(at(200_000), Number.NaN)).toBe(0.03);
   });
 });
