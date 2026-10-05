@@ -137,7 +137,9 @@ export function Swap() {
     setAnnounce("");
     try {
       // The price now, not the one on screen: a swap fills at the moment it's sent.
-      const fresh = await fetcher<TokenResponse>(key);
+      const fresh = await fetcher<TokenResponse>(key).catch(() => {
+        throw new Error("Couldn't get a fresh price. Nothing was swapped: try again.");
+      });
       const m = fresh.token?.market ?? fresh.preview;
       void mutate(fresh, { revalidate: false });
       if (!m) throw new Error(ERRORS.price);
@@ -478,9 +480,10 @@ export function Swap() {
           </button>
 
           {wallet && <PaperBalance className="mt-4" />}
-          <RateNote className="mt-3" />
         </>
       )}
+      {/* The rupiah rate's source, wherever its rates show (its terms ask for it): the receipt too. */}
+      <RateNote className="mt-3" />
     </div>
   );
 }

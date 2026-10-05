@@ -24,7 +24,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "Track a token", short_name: "Track", url: "/app#paste", icons: icon },
       { name: "Feed", url: "/feed", icons: icon },
-      { name: "Swap on paper", short_name: "Swap", url: "/swap", icons: icon },
+      { name: "Swap", url: "/swap", icons: icon },
     ],
   };
 }
