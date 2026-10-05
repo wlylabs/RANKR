@@ -20,11 +20,11 @@ function HitRate({ caller }: { caller: FeedItem["caller"] }) {
   );
 }
 
-function Caller({ item, tabIndex, possessive }: { item: FeedItem; tabIndex?: number; possessive?: boolean }) {
+function Caller({ item, possessive }: { item: FeedItem; possessive?: boolean }) {
   if (!item.username) return null;
   return (
     <>
-      <Link href={callerHref(item.username)} tabIndex={tabIndex} className="inline-flex items-center gap-1 text-fg hover:underline">
+      <Link href={callerHref(item.username)} className="inline-flex items-center gap-1 text-fg hover:underline">
         @{item.username}
         {item.official && <OfficialBadge className="size-3" />}
         {possessive && <span className="-ml-1">&apos;s</span>}
@@ -34,9 +34,9 @@ function Caller({ item, tabIndex, possessive }: { item: FeedItem; tabIndex?: num
   );
 }
 
-function Token({ item, tabIndex }: { item: FeedItem; tabIndex?: number }) {
+function Token({ item }: { item: FeedItem }) {
   return (
-    <Link href={tokenHref(item.token)} tabIndex={tabIndex} className="font-sans font-medium text-fg hover:underline">
+    <Link href={tokenHref(item.token)} className="font-sans font-medium text-fg hover:underline">
       ${item.token.symbol}
     </Link>
   );
@@ -47,19 +47,19 @@ function Token({ item, tabIndex }: { item: FeedItem; tabIndex?: number }) {
  * "@userx 64% hit called $SHIB at $1.2B mc", "$PEPE hit 10x from @userx's call at $80K mc",
  * and without accounts "$SHIB pasted at $1.2B mc" / "$PEPE hit 10x since paste".
  */
-export function FeedSentence({ item, tabIndex, className }: { item: FeedItem; tabIndex?: number; className?: string }) {
+export function FeedSentence({ item, className }: { item: FeedItem; className?: string }) {
   const mc = item.entryMarketCap ? <span>at {formatUsd(item.entryMarketCap)} mc</span> : null;
   if (item.kind === "milestone") {
     return (
       <span className={clsx("inline-flex flex-wrap items-center gap-x-1.5", className)}>
-        <Token item={item} tabIndex={tabIndex} />
+        <Token item={item} />
         hit
         <span className={clsx("font-semibold text-up", (item.tier ?? 0) >= 10 && "underline decoration-up/40 underline-offset-2")}>
           {item.tier}x
         </span>
         {item.username ? (
           <>
-            from <Caller item={item} tabIndex={tabIndex} possessive /> call
+            from <Caller item={item} possessive /> call
             {mc}
           </>
         ) : (
@@ -72,10 +72,10 @@ export function FeedSentence({ item, tabIndex, className }: { item: FeedItem; ta
     <span className={clsx("inline-flex flex-wrap items-center gap-x-1.5", className)}>
       {item.username && (
         <>
-          <Caller item={item} tabIndex={tabIndex} /> called
+          <Caller item={item} /> called
         </>
       )}
-      <Token item={item} tabIndex={tabIndex} />
+      <Token item={item} />
       {!item.username && "pasted"}
       {mc}
     </span>

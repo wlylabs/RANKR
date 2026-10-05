@@ -368,7 +368,7 @@ function ChoiceCard({
         </button>
         <Link
           href={`/swap?chain=${encodeURIComponent(p.chainId)}&ca=${encodeURIComponent(p.address)}`}
-          title="Swap it on paper: pick how much, no real money"
+          title="Swap it: pick how much"
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium whitespace-nowrap transition-colors hover:bg-surface-2"
         >
           <ArrowLeftRight className="size-3.5 shrink-0" />
@@ -376,7 +376,7 @@ function ChoiceCard({
         </Link>
         <p className="col-span-3 text-xs text-subtle">
           A call is public and sealed{as ? <> under <span className="font-mono text-muted">@{as}</span></> : null}, from the
-          price right now. The watchlist is private, on this device, and not a call. Swap is on paper: no real money.
+          price right now. The watchlist is private, on this device, and not a call.
         </p>
       </div>
     </div>

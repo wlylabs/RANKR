@@ -421,23 +421,6 @@ body {
   animation: flash-down 1.2s ease-out;
 }
 
-/* Live call ticker under the app header: two copies of the feed slide left by one copy's width, forever. */
-@keyframes ticker {
-  to {
-    transform: translateX(-50%);
-  }
-}
-.ticker {
-  animation: ticker 60s linear infinite;
-}
-.ticker-mask:hover .ticker,
-.ticker-mask:focus-within .ticker {
-  animation-play-state: paused;
-}
-.ticker-mask {
-  mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
-}
-
 /* ---- Trace (the Trace tab): the trail as one line of cards on a ledger of dots, the money running down the
    line between two of them, and a card followed resolving out of a blur ---- */
 .trace-grid {
@@ -903,7 +886,6 @@ body {
   }
   .hero-exit,
   .twinkle,
-  .ticker,
   .trace-flow,
   .trail-drip,
   .caret,
@@ -917,13 +899,6 @@ body {
   .shake,
   .skeleton {
     animation: none !important;
-  }
-  .ticker-mask {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .ticker-copy {
-    display: none;
   }
   .text-shimmer {
     color: var(--muted);

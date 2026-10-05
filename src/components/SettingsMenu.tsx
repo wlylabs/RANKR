@@ -204,7 +204,7 @@ function CurrencySwitch() {
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-muted">
           Currency
-          <span className="block text-xs text-subtle">for simulations</span>
+          <span className="block text-xs text-subtle">for amounts</span>
         </span>
         <div role="group" aria-label="Currency" className="grid grid-cols-2 rounded-md border border-border p-0.5">
           {options.map(([c, label]) => (
