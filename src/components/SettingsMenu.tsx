@@ -12,6 +12,7 @@ import { setCurrency, useCurrency, type Currency } from "@/lib/currency";
 import { promptInstall, useInstallState } from "@/lib/pwa";
 import { accountsAvailable } from "@/lib/supabase-browser";
 import { CopyButton } from "./CopyButton";
+import { PaperFunds } from "./PaperBalance";
 import { RateNote } from "./RateNote";
 
 const ITEM = "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg";
@@ -56,8 +57,9 @@ function useAppUrl() {
 }
 
 /**
- * Header gear: theme, and the app itself (open it, install it, copy its link). The one place for these,
- * so pages stay free of app buttons. `openApp` adds "Open app" (on the landing page).
+ * Header gear: theme, currency, the paper wallet's funds, alerts, and the app itself (open it, install it, copy
+ * its link). The one place for these, so pages stay free of app buttons. `openApp` adds "Open app" (on the
+ * landing page, which leaves the paper wallet to the app).
  */
 export function SettingsMenu({ openApp }: { openApp?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -142,6 +144,8 @@ export function SettingsMenu({ openApp }: { openApp?: boolean }) {
           </div>
 
           <CurrencySwitch />
+
+          {!openApp && <PaperFunds />}
 
           <AlertsSwitch />
 

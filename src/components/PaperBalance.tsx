@@ -11,13 +11,12 @@ const USD_STARTS = [100, 1_000, 10_000];
 const IDR_STARTS = [1_000_000, 10_000_000, 100_000_000];
 
 /**
- * The paper wallet's cash (`label`ed), with a way to add to it. Before there is one: picking the balance to
- * start with, any amount.
+ * The paper wallet's cash (`label`ed); funds are added from the settings menu (PaperFunds). Before there is a
+ * wallet: picking the balance to start with, any amount.
  */
 export function PaperBalance({ label = "Balance", className }: { label?: string; className?: string }) {
   const wallet = usePaperWallet();
   const money = useMoney();
-  const [open, setOpen] = useState(false);
 
   if (!wallet) {
     return (
@@ -32,22 +31,43 @@ export function PaperBalance({ label = "Balance", className }: { label?: string;
   }
 
   return (
-    <div className={clsx("text-xs", className)}>
+    <div className={clsx("flex items-center gap-1.5 text-xs text-muted", className)}>
+      <Wallet className="size-3.5" /> {label} <span className="tabular font-mono text-fg">{money.format(wallet.cashUsd)}</span>
+    </div>
+  );
+}
+
+/** The settings menu's paper wallet: the cash, and adding to it (or starting it, before there is one). */
+export function PaperFunds() {
+  const wallet = usePaperWallet();
+  const money = useMoney();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-t border-border px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-1.5 text-muted">
-          <Wallet className="size-3.5" /> {label}{" "}
-          <span className="tabular font-mono text-fg">{money.format(wallet.cashUsd)}</span>
+        <span className="text-sm text-muted">
+          Paper wallet
+          <span className="block text-xs text-subtle">
+            {wallet ? (
+              <>
+                cash <span className="tabular font-mono">{money.format(wallet.cashUsd)}</span>
+              </>
+            ) : (
+              "no balance yet"
+            )}
+          </span>
         </span>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
-          className="inline-flex items-center gap-1 text-muted hover:text-fg"
+          className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs text-muted transition-colors hover:bg-surface-2 hover:text-fg"
         >
-          <Plus className="size-3" /> Add funds
+          <Plus className="size-3" /> {wallet ? "Add funds" : "Start"}
         </button>
       </div>
-      {open && <FundsForm cta="Add" onDone={() => setOpen(false)} className="mt-2" />}
+      {open && <FundsForm cta={wallet ? "Add" : "Start"} onDone={() => setOpen(false)} className="mt-2" />}
     </div>
   );
 }
