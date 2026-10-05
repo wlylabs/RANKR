@@ -19,6 +19,7 @@ import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
 import { TokenReport } from "./TokenReport";
 import { TraceInput } from "./TraceInput";
+import { KeysLink, refreshFreeReads } from "./TraceKeys";
 import { useTrail } from "./useTrail";
 
 type ReadError = { message: string; code?: TraceErrorCode };
@@ -57,6 +58,7 @@ function useWallets(chain: string, target: string) {
         setErrors((m) => new Map(m).set(address, { message: "Couldn't reach Rankr. Check your connection." }));
       } finally {
         inflight.current.delete(address);
+        refreshFreeReads();
       }
     },
     [chain, target],
@@ -71,7 +73,9 @@ function RootError({ error, onRetry }: { error: ReadError; onRetry: () => void }
     <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
       <p className="text-sm">{error.message}</p>
       <div className="mt-4 flex justify-center gap-2">
+        {(error.code === "nokey" || error.code === "allowance") && <KeysLink />}
         {error.code === "nokey" ||
+          error.code === "allowance" ||
           error.code === "unsupported" ||
           error.code === "invalid" ||
           error.code === "program" ? null : (

@@ -10,6 +10,7 @@ const STATUS: Record<TraceErrorCode, number> = {
   busy: 503,
   limit: 429,
   quota: 429,
+  allowance: 429,
 };
 
 /** A wallet that can't be traced, and why; `status` is the API's answer. */

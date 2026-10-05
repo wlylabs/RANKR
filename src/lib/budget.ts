@@ -7,17 +7,25 @@
 //   credits a day, an RPC's credits a month). An instance leases a small block at a time, so most calls don't go
 //   to Postgres; a block left over when an instance stops is simply not used (the count errs on the safe side).
 // The defaults sit under the free plans' published limits; each can be set in the environment.
+//
+// An account tracing on its own keys (trace/keys.ts) has its own day's and month's budgets, at the free plans'
+// defaults (the environment's limits are for the site's keys, which may be on a paid plan). The per-minute ones
+// stay shared: they're per server IP, whoever's read it is. Reads on an account's free allowance (site keys) take
+// from the site's budgets and, first, from the free share of them (TRACE_FREE_SHARE, 60% by default): what's left
+// is always there for official accounts.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { peek, spend, type Quota } from "./rate-limit";
+import { blockscoutKey, freeRead, keyScope, ownKeys, solanaRpcUrls } from "./trace/keys";
 
 type Window = "minute" | "day" | "month";
 type Rule = { window: Window; max: number };
 
 const env = (name: string, fallback: number) => {
+  if (ownKeys()) return fallback;
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
-const ownSolanaRpc = () => !!process.env.SOLANA_RPC_URL?.trim();
+const ownSolanaRpc = () => solanaRpcUrls().length > 0;
 
 /**
  * What each upstream allows, in its own unit: Solana RPC credits (Helius: 1M a month free; archival calls 10),
@@ -81,8 +89,8 @@ function period(window: Exclude<Window, "minute">, now: number): { key: string; 
 const minutes = new Map<string, { start: number; used: number }>();
 // Leased blocks of a day's or month's budget, per instance: units this instance may still use.
 const leases = new Map<string, number>();
-// When each upstream's spent budget comes back, for messages.
-const resets = new Map<Upstream, number>();
+// When each upstream's spent budget comes back (per key, see keyScope), for messages.
+const resets = new Map<string, number>();
 
 function takeMinute(name: string, max: number, cost: number, now: number): boolean {
   const cur = minutes.get(name);
@@ -96,9 +104,21 @@ function takeMinute(name: string, max: number, cost: number, now: number): boole
   return true;
 }
 
-async function takeShared(name: string, rule: Rule & { window: "day" | "month" }, cost: number, now: number) {
+/** The share of the site's day's and month's budgets that free reads may take together. */
+export const freeShare = () => {
+  const n = Number(process.env.TRACE_FREE_SHARE);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.6;
+};
+
+async function takeShared(
+  name: string,
+  rule: Rule & { window: "day" | "month" },
+  cost: number,
+  now: number,
+  prefix = keyScope(),
+) {
   const { key, ends } = period(rule.window, now);
-  const bucket = `budget:${name}:${rule.window}:${key}`;
+  const bucket = `budget:${prefix}${name}:${rule.window}:${key}`;
   const left = leases.get(bucket) ?? 0;
   if (left >= cost) {
     leases.set(bucket, left - cost);
@@ -130,10 +150,19 @@ export async function take(name: Upstream, cost = 1, now = Date.now()): Promise<
     const ok =
       rule.window === "minute"
         ? takeMinute(name, rule.max, cost, now)
-        : await takeShared(name, rule as Rule & { window: "day" | "month" }, cost, now);
+        : (!freeRead() ||
+            (await takeShared(
+              name,
+              { window: rule.window, max: Math.floor(rule.max * freeShare()) },
+              cost,
+              now,
+              "free:",
+            ))) &&
+          (await takeShared(name, rule as Rule & { window: "day" | "month" }, cost, now));
     if (!ok) {
+      if (resets.size > 1_000) resets.clear();
       resets.set(
-        name,
+        keyScope() + name,
         rule.window === "minute" ? (minutes.get(name)?.start ?? now) + MINUTE : period(rule.window, now).ends,
       );
       refused.getStore()?.add(name);
@@ -145,7 +174,7 @@ export async function take(name: Upstream, cost = 1, now = Date.now()): Promise<
 
 /** When `name`'s spent budget comes back (after a refusal), ms. */
 export function resetOf(name: Upstream, now = Date.now()): number {
-  return resets.get(name) ?? now + MINUTE;
+  return resets.get(keyScope() + name) ?? now + MINUTE;
 }
 
 /** Runs `fn`, and says which upstreams turned a call down while it ran. */
@@ -185,6 +214,8 @@ export type UsageRow = {
   scope: "shared" | "instance";
   /** Why it isn't budgeted: not set up, or paced instead. */
   off?: string;
+  /** "free": the share of the site's budget free reads may take, all accounts together (TRACE_FREE_SHARE). */
+  pool?: "free";
 };
 
 const UNITS: Partial<Record<Upstream, "credits">> = {
@@ -210,7 +241,9 @@ export async function usage(now = Date.now()): Promise<UsageRow[]> {
         remaining: 0,
         reset: now,
         scope: "instance",
-        off: "Public RPCs: paced at 3.5 calls a second, no quota to spend. Set SOLANA_RPC_URL (a Helius key) for more.",
+        off: ownKeys()
+          ? "Not set up: add your Helius API key."
+          : "Public RPCs: paced at 3.5 calls a second, no quota to spend. Set SOLANA_RPC_URL (a Helius key) for more.",
       });
       continue;
     }
@@ -240,14 +273,24 @@ export async function usage(now = Date.now()): Promise<UsageRow[]> {
         reset: ends,
         scope: "shared",
         ...(id.startsWith("blockscout") &&
-          !process.env.BLOCKSCOUT_API_KEY && { off: "Not set up: no BLOCKSCOUT_API_KEY." }),
+          !blockscoutKey() && {
+            off: ownKeys() ? "Not set up: add your Blockscout API key." : "Not set up: no BLOCKSCOUT_API_KEY.",
+          }),
       };
-      shared.push({ row, bucket: `budget:${id}:${rule.window}:${key}` });
+      shared.push({ row, bucket: `budget:${keyScope()}${id}:${rule.window}:${key}` });
       rows.push(row);
+      // On the site's keys: how much of it accounts' free reads have taken, out of their share.
+      if (!ownKeys() && !row.off) {
+        const max = Math.floor(rule.max * freeShare());
+        const pool: UsageRow = { ...row, name: `${row.name} (free reads)`, limit: max, remaining: max, pool: "free" };
+        shared.push({ row: pool, bucket: `budget:free:${id}:${rule.window}:${key}` });
+        rows.push(pool);
+      }
     }
   }
   const counts = await peek(shared.map((s) => s.bucket));
   for (const { row, bucket } of shared) {
+    if (row.limit <= 0) continue;
     row.used = Math.min(row.limit, counts.get(bucket) ?? 0);
     row.remaining = Math.max(0, row.limit - row.used);
   }

@@ -211,5 +211,26 @@ export type MeResponse = {
   account: { id: string; username: string | null; hasKey: boolean; official: boolean; about: CallerAbout };
 };
 
+/**
+ * The account's own Trace keys, by their last characters ("…a1b2"; null: not added). Official accounts trace on
+ * the site's keys; `storable`: keys can be saved on this site.
+ */
+export type TraceKeysResponse = {
+  official: boolean;
+  storable: boolean;
+  blockscout: string | null;
+  helius: string | null;
+  /** Today's free reads on the site's keys, for a chain without a key of its own (null for official accounts). */
+  free: TraceAllowance | null;
+};
+
+/** An account's free Trace reads today (UTC): wallets of a trail and token reports; `reset` in ms. */
+export type TraceAllowance = {
+  wallets: { used: number; limit: number };
+  reports: { used: number; limit: number };
+  reset: number;
+  guest: boolean;
+};
+
 /** A new sign-in key, returned once. */
 export type KeyResponse = MeResponse & { key: string };

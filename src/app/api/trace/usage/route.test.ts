@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ open: true }));
+const state = vi.hoisted(() => ({
+  signedIn: true,
+  keys: null as { userId: string; blockscout: string | null; helius: string | null } | null,
+}));
 vi.mock("@/lib/api-auth", async () => {
   const { NextResponse } = await import("next/server");
   return {
-    requireTraceAccess: async () =>
-      state.open ? null : NextResponse.json({ error: "Trace is private for now.", code: "private" }, { status: 403 }),
+    traceCaller: async () =>
+      state.signedIn ? { keys: state.keys } : NextResponse.json({ error: "Sign in first.", code: "signin" }, { status: 401 }),
   };
 });
 
@@ -24,9 +27,18 @@ describe("GET /api/trace/usage", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("is for official accounts only", async () => {
-    state.open = false;
-    expect((await get()).status).toBe(403);
-    state.open = true;
+  it("shows an account on its own keys its own budgets, and says which keys it hasn't added", async () => {
+    state.keys = { userId: "u1", blockscout: null, helius: null };
+    const body = await (await get()).json();
+    const row = (id: string) => body.resources.find((r: { id: string }) => r.id === id);
+    expect(row("blockscout").off).toBe("Not set up: add your Blockscout API key.");
+    expect(row("solana").off).toBe("Not set up: add your Helius API key.");
+    state.keys = null;
+  });
+
+  it("is for signed-in accounts", async () => {
+    state.signedIn = false;
+    expect((await get()).status).toBe(401);
+    state.signedIn = true;
   });
 });

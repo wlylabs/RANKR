@@ -13,8 +13,10 @@ const PUBLIC: Record<string, string> = {
 };
 
 import { take } from "../budget";
+import { evmRpcUrl } from "./keys";
 
-const endpoint = (chain: string) => process.env[`${chain.toUpperCase()}_RPC_URL`]?.trim() || PUBLIC[chain];
+// An account on its own keys reads the public ones: the site's own RPCs are the site's.
+const endpoint = (chain: string) => evmRpcUrl(chain) || PUBLIC[chain];
 
 /** owner(), totalSupply() */
 const OWNER = "0x8da5cb5b";
