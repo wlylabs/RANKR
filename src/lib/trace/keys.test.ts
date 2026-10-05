@@ -127,3 +127,19 @@ describe("trace keys", () => {
     await expect(withKeys(user(null, null), () => shareRead(broken, async () => "mine"))).rejects.toThrow("down");
   });
 });
+
+describe("usage, free reads", () => {
+  it("shows the site how much of the free share accounts have taken", async () => {
+    process.env.BLOCKSCOUT_API_KEY = "site-key";
+    process.env.BLOCKSCOUT_DAILY_CREDITS = "1000";
+    process.env.TRACE_FREE_SHARE = "0.5";
+    const day = Date.UTC(2031, 0, 1);
+    await withKeys(user(null, null, async () => true), () => onKeysFor(base, "wallet", () => take("blockscout", 20, day)));
+    const rows = await usage(day);
+    const pool = rows.find((r) => r.id === "blockscout" && r.pool === "free")!;
+    expect(pool).toMatchObject({ name: "Blockscout (free reads)", limit: 500, used: 20 });
+    // An account on its own keys sees only its own budgets.
+    const own = await withKeys(user("own", null), () => usage(day));
+    expect(own.some((r) => r.pool)).toBe(false);
+  });
+});

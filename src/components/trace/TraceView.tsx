@@ -19,7 +19,7 @@ import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
 import { TokenReport } from "./TokenReport";
 import { TraceInput } from "./TraceInput";
-import { KeysLink } from "./TraceKeys";
+import { KeysLink, refreshFreeReads } from "./TraceKeys";
 import { useTrail } from "./useTrail";
 
 type ReadError = { message: string; code?: TraceErrorCode };
@@ -58,6 +58,7 @@ function useWallets(chain: string, target: string) {
         setErrors((m) => new Map(m).set(address, { message: "Couldn't reach Rankr. Check your connection." }));
       } finally {
         inflight.current.delete(address);
+        refreshFreeReads();
       }
     },
     [chain, target],

@@ -214,6 +214,8 @@ export type UsageRow = {
   scope: "shared" | "instance";
   /** Why it isn't budgeted: not set up, or paced instead. */
   off?: string;
+  /** "free": the share of the site's budget free reads may take, all accounts together (TRACE_FREE_SHARE). */
+  pool?: "free";
 };
 
 const UNITS: Partial<Record<Upstream, "credits">> = {
@@ -277,10 +279,18 @@ export async function usage(now = Date.now()): Promise<UsageRow[]> {
       };
       shared.push({ row, bucket: `budget:${keyScope()}${id}:${rule.window}:${key}` });
       rows.push(row);
+      // On the site's keys: how much of it accounts' free reads have taken, out of their share.
+      if (!ownKeys() && !row.off) {
+        const max = Math.floor(rule.max * freeShare());
+        const pool: UsageRow = { ...row, name: `${row.name} (free reads)`, limit: max, remaining: max, pool: "free" };
+        shared.push({ row: pool, bucket: `budget:free:${id}:${rule.window}:${key}` });
+        rows.push(pool);
+      }
     }
   }
   const counts = await peek(shared.map((s) => s.bucket));
   for (const { row, bucket } of shared) {
+    if (row.limit <= 0) continue;
     row.used = Math.min(row.limit, counts.get(bucket) ?? 0);
     row.remaining = Math.max(0, row.limit - row.used);
   }

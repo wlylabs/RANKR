@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { ArrowLeft, ArrowUpRight, Check, KeyRound, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { apiFetch, authedFetcher } from "@/lib/supabase-browser";
 import type { TraceAllowance, TraceKeysResponse } from "@/lib/types";
 import { PageHeader } from "../PageHeader";
@@ -14,6 +14,13 @@ export const KEYS_URL = "/api/me/trace-keys";
 /** The account's own Trace keys (null while they're read). */
 export function useTraceKeys() {
   return useSWR<TraceKeysResponse>(KEYS_URL, authedFetcher, { revalidateOnFocus: false });
+}
+
+let refreshAt: ReturnType<typeof setTimeout> | undefined;
+/** Reads the free reads left again, once a burst of reads (a trail's cards) has settled. */
+export function refreshFreeReads() {
+  clearTimeout(refreshAt);
+  refreshAt = setTimeout(() => void mutate(KEYS_URL), 1_500);
 }
 
 const FIELD =

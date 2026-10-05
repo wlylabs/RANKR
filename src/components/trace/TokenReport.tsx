@@ -38,7 +38,7 @@ import { Segmented } from "../Tabs";
 import { TimeAgo } from "../TimeAgo";
 import { FullAddress, LabelTag, Scramble } from "./TraceCard";
 import { TraceInput } from "./TraceInput";
-import { KeysLink } from "./TraceKeys";
+import { KeysLink, refreshFreeReads } from "./TraceKeys";
 
 type ReadError = { message: string; code?: string };
 
@@ -59,6 +59,7 @@ function useReport(chain: string, address: string) {
       setError({ message: "Couldn't reach Rankr. Check your connection." });
     } finally {
       setLoading(false);
+      refreshFreeReads();
     }
   }, [chain, address]);
   useEffect(() => void load(), [load]);

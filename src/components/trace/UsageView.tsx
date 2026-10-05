@@ -43,7 +43,7 @@ function countdown(at: number, now: number): string {
 
 function Row({ r, now }: { r: UsageRow; now: number }) {
   const l = LEVEL[level(r)];
-  const share = Math.min(100, (r.used / r.limit) * 100);
+  const share = r.limit > 0 ? Math.min(100, (r.used / r.limit) * 100) : 100;
   return (
     <li className="py-3.5">
       <div className="flex items-baseline justify-between gap-3">
@@ -86,7 +86,7 @@ function Section({ title, note, rows, now }: { title: string; note: string; rows
       </div>
       <ul className="divide-y divide-border">
         {rows.map((r) => (
-          <Row key={`${r.id}:${r.window}`} r={r} now={now} />
+          <Row key={`${r.id}:${r.window}:${r.pool ?? ""}`} r={r} now={now} />
         ))}
       </ul>
     </section>
@@ -148,7 +148,13 @@ export function UsageView() {
           <Section
             title="Today and this month"
             note="Every server together"
-            rows={live.filter((r) => r.scope === "shared")}
+            rows={live.filter((r) => r.scope === "shared" && !r.pool)}
+            now={now}
+          />
+          <Section
+            title="Free reads"
+            note="Every account without a key of its own, together: their share of the above"
+            rows={live.filter((r) => r.pool === "free")}
             now={now}
           />
           <Section
