@@ -38,25 +38,11 @@ function ChangePill({ multiple }: { multiple: number }) {
   );
 }
 
-/** A token's logo, or its first letter on a tile when it has none (or it won't load). */
-function TokenIcon({ symbol, src }: { symbol: string; src: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (src && !failed) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" onError={() => setFailed(true)} className="size-9 shrink-0 rounded-full bg-surface-2 object-cover" />;
-  }
-  return (
-    <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-sm font-semibold text-muted">
-      {symbol.replace(/^\W+/, "").charAt(0).toUpperCase() || "?"}
-    </span>
-  );
-}
-
 /**
  * The top of Swap, as a wallet's home screen opens (Phantom, Rainbow, Backpack): who it is, what it's worth now
  * (cash, plus selling what's held at the live price) and how far that is from what was put in, the actions, then
- * the cash and the tokens held, with what each is worth and has done (one tap to sell one: `onSell`). Funds are
- * added from the settings menu. Nothing before there's a wallet: Swap asks for a balance itself.
+ * the cash and the tokens held by ticker and name, with what each is worth and has done (one tap to sell one:
+ * `onSell`). Funds are added from the settings menu. Nothing before there's a wallet: Swap asks for a balance.
  */
 export function WalletStrip({
   current,
@@ -176,9 +162,6 @@ export function WalletStrip({
         <div className="label px-4 pt-3 pb-1 text-subtle">Tokens</div>
         <ul>
           <li className="flex items-center gap-3 px-4 py-2.5">
-            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-fg font-mono text-xs font-semibold text-bg">
-              {money.shown === "idr" ? "Rp" : "$"}
-            </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium">Cash</span>
               <span className="block font-mono text-[11px] text-subtle">{money.shown === "idr" ? "IDR" : "USD"}</span>
@@ -197,9 +180,11 @@ export function WalletStrip({
                   title={`Sell $${h.symbol}`}
                   className={clsx("flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2", active && "bg-surface-2")}
                 >
-                  <TokenIcon symbol={h.symbol} src={market(h.tokenId)?.imageUrl ?? null} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">${h.symbol}</span>
+                    <span className="flex min-w-0 items-baseline gap-2">
+                      <span className="shrink-0 text-sm font-medium">${h.symbol}</span>
+                      <span className="truncate text-xs text-muted">{h.name}</span>
+                    </span>
                     <span className="tabular block truncate font-mono text-[11px] text-subtle">
                       {formatAmount(h.tokens)} · {chainMeta(h.chainId).short}
                     </span>
