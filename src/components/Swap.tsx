@@ -9,7 +9,7 @@ import useSWR from "swr";
 import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
 import { formatAmount, formatMultiple, formatPrice, formatUsd, tokenHref } from "@/lib/format";
 import { fetcher } from "@/lib/hooks";
-import { PAPER_NOTE, holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
+import { MAX_TRADES, PAPER_NOTE, holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
 import { CONFIRM_IMPACT, WARN_IMPACT, atMultiple, poolOf, quoteBuy, quoteSell } from "@/lib/sim";
 import { lookupPaste } from "@/lib/track";
 import type { MarketSnapshot, TokenResponse } from "@/lib/types";
@@ -39,6 +39,9 @@ const ERRORS: Record<SwapError, string> = {
   balance: "Not enough paper balance for that.",
   holdings: "You don't hold that much of it.",
   price: "This token has no live price right now.",
+  stale: "No fresh price right now: try again in a moment.",
+  drained: "This pool is drained: there's nothing to trade against.",
+  full: `You have ${MAX_TRADES} open paper trades: sell or clear some first.`,
 };
 
 /** A typed token amount: "1,250,000" or "1250000.5". */
@@ -75,6 +78,14 @@ export function Swap() {
   const [done, setDone] = useState<{ paid: string; got: string } | null>(null);
   const amountId = useId();
 
+  // An amount typed in one currency means nothing in the other: switching clears it.
+  const [typedIn, setTypedIn] = useState(money.shown);
+  if (typedIn !== money.shown) {
+    setTypedIn(money.shown);
+    if (side === "buy") setTyped("");
+    setConfirming(false);
+  }
+
   // A link with an amount (?usd=) starts with it, once the currency it's shown in is known.
   const preset = Number(params.get("usd"));
   const presetDone = useRef(false);
@@ -107,7 +118,9 @@ export function Swap() {
   const tooSmall = side === "buy" && !!spendUsd && !!market && market.priceUsd > 0 && !buy;
   const canSwap = !!market && receive !== null && receive > 0 && !short && (side === "sell" || !!wallet);
 
-  async function swap() {
+  async function swap(e: React.MouseEvent) {
+    // The second click of a double-click isn't a "yes" to the large-impact warning the first one raised.
+    if (e.detail > 1) return;
     if (!market || !key || receive === null || minReceive === null) return;
     if (impact >= CONFIRM_IMPACT && !confirming) return setConfirming(true);
     setBusy(true);
@@ -181,7 +194,7 @@ export function Swap() {
       />
 
       {done ? (
-        <div className="mt-4 card p-5 text-center">
+        <div role="status" className="mt-4 card p-5 text-center">
           <Check className="mx-auto size-6 text-up" />
           <p className="mt-2 font-medium">
             Swapped {done.paid} for ≈ {done.got}

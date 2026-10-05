@@ -16,6 +16,17 @@
 import type { MarketSnapshot } from "./types";
 
 export const SIM_MODEL = "fill-v1";
+/**
+ * A quote older than this isn't a price to fill at (DexScreener down, or a budget used up, serves the last one):
+ * a few refreshes' worth, with room for a client clock a little off the server's.
+ */
+export const MAX_QUOTE_AGE_MS = 120_000;
+
+/** Whether the pair's data is recent enough to fill a paper trade at. */
+export function isFresh(m: MarketSnapshot, now = Date.now()): boolean {
+  return now - m.fetchedAt <= MAX_QUOTE_AGE_MS;
+}
+
 /** Price impact worth a warning, and one big enough to ask again before a paper buy (Uniswap's thresholds). */
 export const WARN_IMPACT = 0.05;
 export const CONFIRM_IMPACT = 0.15;
@@ -26,13 +37,15 @@ export type Quality = "good" | "rough" | "none";
 export type Pool = {
   /** Swap fee, as a fraction (0.0125 = 1.25%), each way. */
   fee: number;
-  /** USD on the quote side, or null when unknown. */
+  /** USD on the quote side, or null when unknown; 0 when the pool reports nothing left (drained, rugged). */
   depthUsd: number | null;
   /** Network costs per trade, in USD. */
   networkUsd: number;
   quality: Quality;
   /** pump.fun's bonding curve: the token hasn't graduated to a pool yet. */
   curve: boolean;
+  /** Nothing on the quote side: no buy fills, and a sale brings in nothing. */
+  drained: boolean;
 };
 
 const SOL = new Set(["SOL", "WSOL"]);
@@ -85,7 +98,8 @@ function feeOf(m: MarketSnapshot, concentrated: boolean, mcapSol: number | null)
         ? { fee: 0.0125, known: false }
         : { fee: PUMPSWAP_TIERS.find(([min]) => mcapSol >= min)![1], known: true };
     case "raydium":
-      return concentrated ? { fee: 0.01, known: false } : { fee: 0.0025, known: true };
+      // AMM v4 is 0.25%; CPMM pools pick their own tier (0.25% by default, up to 4%).
+      return concentrated ? { fee: 0.01, known: false } : { fee: 0.0025, known: !(m.labels ?? []).some((l) => /^cpmm$/i.test(l)) };
     case "uniswap":
     case "sushiswap":
       return v2 ? { fee: 0.003, known: true } : { fee: 0.01, known: false };
@@ -109,15 +123,21 @@ export function poolOf(m: MarketSnapshot): Pool {
   const networkUsd = m.chainId === "solana" ? (solQuote && quoteUsd ? 0.002 * quoteUsd : 0.3) : (NETWORK_USD[m.chainId] ?? 0.3);
 
   // pump.fun's curve: its depth follows from the market cap, exactly, for a standard 1B-supply coin.
-  if (m.dexId === "pumpfun" && mcapSol !== null && quoteUsd) {
-    return { fee, depthUsd: Math.sqrt(CURVE_K * mcapSol) * quoteUsd, networkUsd, quality: "good", curve: true };
+  if (m.dexId === "pumpfun" && mcapSol !== null && mcapSol > 0 && quoteUsd) {
+    return { fee, depthUsd: Math.sqrt(CURVE_K * mcapSol) * quoteUsd, networkUsd, quality: "good", curve: true, drained: false };
   }
-  // A pool: half its TVL, or less if its quote side holds less (only that side pays a sell out).
-  const half = m.liquidityUsd && m.liquidityUsd > 0 ? m.liquidityUsd / 2 : null;
-  const quoteSide = m.liquidityQuote && quoteUsd ? m.liquidityQuote * quoteUsd : null;
-  const depthUsd = half !== null && quoteSide !== null && quoteSide > 0 ? Math.min(half, quoteSide) : half;
-  const quality: Quality = depthUsd === null ? "none" : concentrated || !known ? "rough" : "good";
-  return { fee, depthUsd, networkUsd, quality, curve: m.dexId === "pumpfun" };
+  // A pool: half its TVL, or less if its quote side holds less (only that side pays a sell out). A side that
+  // reports 0 is drained, not unknown: a rug leaves the price behind and nothing to sell into.
+  const num = (v: number | null | undefined) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+  const tvl = num(m.liquidityUsd);
+  const quoteLeft = num(m.liquidityQuote);
+  const half = tvl === null ? null : tvl / 2;
+  const quoteSide = quoteLeft !== null && quoteUsd ? quoteLeft * quoteUsd : null;
+  const depthUsd = half !== null && quoteSide !== null ? Math.min(half, quoteSide) : (half ?? quoteSide);
+  const drained = depthUsd !== null && !(depthUsd > 1e-9);
+  const quality: Quality =
+    depthUsd === null ? "none" : concentrated || !known || m.dexId === "pumpfun" ? "rough" : "good";
+  return { fee, depthUsd: drained ? 0 : depthUsd, networkUsd, quality, curve: m.dexId === "pumpfun", drained };
 }
 
 export type BuyFill = {
@@ -136,15 +156,19 @@ export type BuyFill = {
   completesCurve: boolean;
 };
 
-/** A paper buy of `spendUsd` at the pair's price now; null without a price, or with nothing left after costs. */
+/**
+ * A paper buy of `spendUsd` at the pair's price now; null without a price, into a drained pool, or with nothing
+ * left after costs.
+ */
 export function quoteBuy(m: MarketSnapshot, spendUsd: number): BuyFill | null {
   const p = m.priceUsd;
   if (!(p > 0) || !(spendUsd > 0)) return null;
   const pool = poolOf(m);
+  if (pool.drained) return null;
   const networkUsd = Math.min(pool.networkUsd, spendUsd);
   const a = (spendUsd - networkUsd) * (1 - pool.fee);
   if (!(a > 0)) return null;
-  const impact = pool.depthUsd ? a / pool.depthUsd : 0;
+  const impact = pool.depthUsd !== null ? a / pool.depthUsd : 0;
   const tokens = a / p / (1 + impact);
   const quoteUsd = quoteUsdOf(m);
   const completesCurve =
@@ -174,20 +198,34 @@ export type SellFill = {
   quality: Quality;
 };
 
+/**
+ * What selling `tokens` into the pool brings in before network costs: V(1 - fee) / (1 + V / D). Nothing from a
+ * drained pool. Selling more in one go always brings in less per token, so part sales on the same pool are
+ * priced as what they add to the whole (see src/lib/paper.ts).
+ */
+export function grossSell(m: MarketSnapshot, tokens: number): number {
+  const p = m.priceUsd;
+  if (!(p > 0) || !(tokens > 0)) return 0;
+  const pool = poolOf(m);
+  if (pool.drained) return 0;
+  const valueUsd = tokens * p;
+  return (valueUsd * (1 - pool.fee)) / (1 + (pool.depthUsd !== null ? valueUsd / pool.depthUsd : 0));
+}
+
 /** Selling `tokens` now; null without a price. */
 export function quoteSell(m: MarketSnapshot, tokens: number): SellFill | null {
   const p = m.priceUsd;
   if (!(p > 0) || !(tokens > 0)) return null;
   const pool = poolOf(m);
   const valueUsd = tokens * p;
-  const ratio = pool.depthUsd ? valueUsd / pool.depthUsd : 0;
-  const gross = (valueUsd * (1 - pool.fee)) / (1 + ratio);
+  const gross = grossSell(m, tokens);
+  const ratio = pool.drained ? Infinity : pool.depthUsd !== null ? valueUsd / pool.depthUsd : 0;
   return {
     valueUsd,
     proceedsUsd: Math.max(0, gross - pool.networkUsd),
-    feeUsd: valueUsd * pool.fee,
+    feeUsd: pool.drained ? 0 : valueUsd * pool.fee,
     networkUsd: Math.min(pool.networkUsd, gross),
-    impact: ratio / (1 + ratio),
+    impact: pool.drained ? 1 : ratio / (1 + ratio),
     quality: pool.quality,
   };
 }

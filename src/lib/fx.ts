@@ -45,11 +45,14 @@ const SOURCES: Source[] = [
       return { rate: er.result === "success" ? er.rates?.IDR : undefined, date: day(er.time_last_update_unix) };
     },
     credit: { text: "Rates By Exchange Rate API", url: "https://www.exchangerate-api.com" },
+    maxAgeDays: 3,
   },
   {
     name: "Frankfurter",
     url: "https://api.frankfurter.dev/v2/rate/USD/IDR",
     read: (b) => ({ rate: (b as Frankfurter).rate, date: (b as Frankfurter).date }),
+    // Central banks publish on working days: a long weekend can leave the last rate four days old.
+    maxAgeDays: 5,
   },
   {
     name: "fawazahmed0/exchange-api",
@@ -98,14 +101,29 @@ async function fetchRate(now: number): Promise<FxRate | null> {
   return null;
 }
 
-/** Rupiah per dollar: fresh within hours, an older one while no source answers, null when there's none. */
+function refreshRate(now: number): Promise<FxRate | null> {
+  inflight ??= fetchRate(now)
+    .then((fresh) => {
+      if (fresh) cached = fresh;
+      return fresh;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
+}
+
+/**
+ * Rupiah per dollar: fresh within hours, an older one while no source answers, null when there's none. Past
+ * TTL the one kept is answered at once while a newer one is fetched behind it.
+ */
 export async function usdIdr(now = Date.now()): Promise<FxRate | null> {
   if (MOCK) return { usdIdr: 17_900, date: new Date(now).toISOString().slice(0, 10), source: "mock", fetchedAt: now };
   if (cached && now - cached.fetchedAt < TTL) return cached;
-  inflight ??= fetchRate(now).finally(() => {
-    inflight = null;
-  });
-  const fresh = await inflight;
-  if (fresh) cached = fresh;
+  if (cached && now - cached.fetchedAt < STALE) {
+    void refreshRate(now);
+    return cached;
+  }
+  await refreshRate(now);
   return cached && now - cached.fetchedAt < STALE ? cached : null;
 }

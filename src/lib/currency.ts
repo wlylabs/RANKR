@@ -49,13 +49,13 @@ export function setCurrency(currency: Currency) {
   listeners.forEach((l) => l());
 }
 
-/** Rupiah per dollar, once an hour at most; null until known, or when no source answers. */
-export function useUsdIdr(enabled = true): FxRate | null {
-  const { data } = useSWR<FxResponse>(enabled ? "/api/fx" : null, fetcher, {
+/** Rupiah per dollar, once an hour at most: null until known, or when no source answers (`loading` tells which). */
+export function useUsdIdr(enabled = true): { rate: FxRate | null; loading: boolean } {
+  const { data, error, isLoading } = useSWR<FxResponse>(enabled ? "/api/fx" : null, fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 3_600_000,
   });
-  return data?.rate ?? null;
+  return { rate: data?.rate ?? null, loading: enabled && isLoading && !data && !error };
 }
 
 const IDR = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
@@ -77,12 +77,15 @@ export function formatMoney(
   { signed = false, short = false } = {},
 ): string {
   if (!Number.isFinite(usd)) return "—";
-  const sign = signed && usd > 0 ? "+" : usd < 0 ? "-" : "";
   const abs = Math.abs(usd);
-  if (currency === "idr" && usdIdr) {
-    const idr = abs * usdIdr;
-    if (short && idr < 1e9) return `${sign}Rp${IDR_SHORT.format(idr).replace(/\u00a0/g, " ")}`;
-    return `${sign}Rp${(idr >= 1e9 ? IDR_LONG : IDR).format(idr).replace(/\u00a0/g, " ")}`;
+  const idr = currency === "idr" && usdIdr ? abs * usdIdr : null;
+  // No sign on what shows as nothing ("$0.00", not "-$0.00").
+  const zero = idr !== null ? idr < 0.5 : abs < 0.005;
+  const sign = zero ? "" : signed && usd > 0 ? "+" : usd < 0 ? "-" : "";
+  if (idr !== null) {
+    // Short only below what would round up to "1 M" (a miliar, which reads as a million in English).
+    if (short && idr < 999_950_000) return `${sign}Rp${IDR_SHORT.format(idr).replace(/\u00a0/g, " ")}`;
+    return `${sign}Rp${(idr >= (short ? 999_950_000 : 1e9) ? IDR_LONG : IDR).format(idr).replace(/\u00a0/g, " ")}`;
   }
   return abs >= 100_000 || (short && abs >= 1) ? `${sign}${formatUsd(abs)}` : `${sign}$${USD.format(abs)}`;
 }
@@ -90,7 +93,7 @@ export function formatMoney(
 /** What to show amounts in, with what: rupiah only once its rate is known. */
 export function useMoney() {
   const currency = useCurrency();
-  const rate = useUsdIdr(currency === "idr");
+  const { rate, loading } = useUsdIdr(currency === "idr");
   const shown: Currency = currency === "idr" && rate ? "idr" : "usd";
   return {
     /** Picked in the settings. */
@@ -98,6 +101,8 @@ export function useMoney() {
     /** Actually shown (dollars while the rupiah rate isn't known). */
     shown,
     rate,
+    /** Rupiah picked, but no rate to show them at: none of the sources answered. */
+    rateMissing: currency === "idr" && !rate && !loading,
     format: (usd: number, opts?: { signed?: boolean; short?: boolean }) => formatMoney(usd, shown, rate?.usdIdr ?? null, opts),
   };
 }
@@ -114,12 +119,45 @@ export function spendPresets(shown: Currency, usdIdr: number | null): { usd: num
   return USD_PRESETS.map((usd) => ({ usd, label: `$${usd.toLocaleString("en-US")}` }));
 }
 
-/** An amount typed in the currency shown ("1.500.000", "250", "2,5"), in USD; null when it isn't a number. */
+// What a typed amount can end in: "2,5 jt", "500rb", "10k", "1.5m". In rupiah "m" is a miliar, as Indonesians
+// write it; in dollars, a million.
+const IDR_SUFFIXES: Record<string, number> = { k: 1e3, rb: 1e3, ribu: 1e3, jt: 1e6, juta: 1e6, m: 1e9, miliar: 1e9, b: 1e9, t: 1e12, triliun: 1e12 };
+const USD_SUFFIXES: Record<string, number> = { k: 1e3, m: 1e6, mm: 1e6, b: 1e9, bn: 1e9, t: 1e12 };
+
+/**
+ * A number typed with separators either way. Both kinds: the last one marks decimals. One kind, more than once:
+ * thousands. Once: the currency's own decimal mark ("." in dollars, "," in rupiah) is decimals; the other is
+ * thousands when three digits follow ("1.500" rupiah, "1,500" dollars), else decimals ("1.5 jt", "2,5").
+ */
+function toNumber(s: string, decimal: "." | ","): number {
+  const dot = s.split(".").length - 1;
+  const comma = s.split(",").length - 1;
+  let mark: "." | "," | null = null;
+  if (dot && comma) mark = s.lastIndexOf(".") > s.lastIndexOf(",") ? "." : ",";
+  else if (dot + comma === 1) {
+    const sep = dot ? "." : ",";
+    mark = sep === decimal || !/^\d{3}$/.test(s.slice(s.indexOf(sep) + 1)) ? sep : null;
+  }
+  const whole = mark ? s.slice(0, s.lastIndexOf(mark)) : s;
+  const frac = mark ? s.slice(s.lastIndexOf(mark) + 1) : "";
+  return Number(`${whole.replace(/[.,]/g, "")}.${frac || "0"}`);
+}
+
+/**
+ * An amount typed in the currency shown ("1.500.000", "Rp 2,5 jt", "250", "$1.2k"), in USD; null when it isn't
+ * an amount.
+ */
 export function parseAmount(input: string, shown: Currency, usdIdr: number | null): number | null {
-  const s = input.replace(/[^\d.,]/g, "");
-  if (!s) return null;
-  // Rupiah: dots group thousands and a comma marks decimals. Dollars: the other way round.
-  const n = shown === "idr" ? Number(s.replace(/\./g, "").replace(",", ".")) : Number(s.replace(/,/g, ""));
+  const s = input
+    .toLowerCase()
+    .replace(/\b(rp|idr|usd)\b|rp(?=\d)|\$/g, "")
+    .replace(/\s+/g, "");
+  const m = /^(\d[\d.,]*)([a-z]*)$/.exec(s);
+  if (!m) return null;
+  const idr = shown === "idr";
+  const unit = m[2] ? (idr ? IDR_SUFFIXES : USD_SUFFIXES)[m[2]] : 1;
+  if (!unit) return null;
+  const n = toNumber(m[1], idr ? "," : ".") * unit;
   if (!Number.isFinite(n) || n <= 0) return null;
-  return shown === "idr" && usdIdr ? n / usdIdr : n;
+  return idr && usdIdr ? n / usdIdr : n;
 }

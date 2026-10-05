@@ -8,7 +8,7 @@
 
 import { useSyncExternalStore } from "react";
 import { tokenId } from "./address";
-import { SIM_MODEL, quoteBuy, quoteSell, type Quality, type SellFill } from "./sim";
+import { SIM_MODEL, grossSell, isFresh, poolOf, quoteBuy, quoteSell, type Quality, type SellFill } from "./sim";
 import type { MarketSnapshot } from "./types";
 
 export type Sale = {
@@ -18,6 +18,8 @@ export type Sale = {
   proceedsUsd: number;
   /** The market price it was priced on. */
   priceUsd: number;
+  /** The quote it was priced on ("<pair>:<fetchedAt>"), or "write-off" for one written off at nothing. */
+  quote?: string;
 };
 
 export type PaperTrade = {
@@ -192,8 +194,15 @@ function newId(): string {
   }
 }
 
-/** A paper buy of `spendUsd` at the pair's price now, or null when it can't be priced. Pure: nothing is saved. */
+/** Which quote a fill is on: the pair, and when its data was read. */
+const quoteOf = (m: MarketSnapshot) => `${m.pairAddress}:${m.fetchedAt}`;
+
+/**
+ * A paper buy of `spendUsd` at the pair's price now, or null when it can't be filled (no price, a drained pool,
+ * or a quote too old to fill at). Pure: nothing is saved.
+ */
 export function paperBuy(m: MarketSnapshot, spendUsd: number, usdIdr: number | null, now = Date.now()): PaperTrade | null {
+  if (!isFresh(m, now)) return null;
   const fill = quoteBuy(m, spendUsd);
   if (!fill) return null;
   return {
@@ -219,19 +228,34 @@ export function paperBuy(m: MarketSnapshot, spendUsd: number, usdIdr: number | n
   };
 }
 
-/** The list with `trade` first, keeping MAX_TRADES: the oldest closed trades go first, open ones last. */
-function withTrade(trades: PaperTrade[], trade: PaperTrade): PaperTrade[] {
+/**
+ * The list with `trade` first, keeping MAX_TRADES: the oldest closed trades make room. Null when every one is
+ * still open: an open trade is never dropped.
+ */
+function withTrade(trades: PaperTrade[], trade: PaperTrade): PaperTrade[] | null {
   const list = [trade, ...trades];
   while (list.length > MAX_TRADES) {
     let drop = -1;
     for (let i = list.length - 1; i > 0 && drop < 0; i--) if (remainingOf(list[i]) === 0) drop = i;
-    list.splice(drop < 0 ? list.length - 1 : drop, 1);
+    if (drop < 0) return null;
+    list.splice(drop, 1);
   }
   return list;
 }
 
-/** Why a paper swap didn't go through. */
-export type SwapError = "balance" | "holdings" | "price";
+/**
+ * Why a paper swap didn't go through: not enough balance or tokens, no price, a quote too old to fill at, a
+ * drained pool, or MAX_TRADES trades all still open.
+ */
+export type SwapError = "balance" | "holdings" | "price" | "stale" | "drained" | "full";
+
+/** Why `m` can't be filled at right now, if it can't. */
+function unfillable(m: MarketSnapshot, now: number): SwapError | null {
+  if (!(m.priceUsd > 0)) return "price";
+  if (!isFresh(m, now)) return "stale";
+  if (poolOf(m).drained) return "drained";
+  return null;
+}
 
 /** A paper buy paid from the wallet. Pure: the wallet and trades after it, or why not. */
 export function buyWith(
@@ -243,9 +267,13 @@ export function buyWith(
   now = Date.now(),
 ): { wallet: PaperWallet; trades: PaperTrade[]; trade: PaperTrade } | { error: SwapError } {
   if (spendUsd > wallet.cashUsd * (1 + 1e-9)) return { error: "balance" };
+  const why = unfillable(m, now);
+  if (why) return { error: why };
   const trade = paperBuy(m, Math.min(spendUsd, wallet.cashUsd), usdIdr, now);
   if (!trade) return { error: "price" };
-  return { wallet: { ...wallet, cashUsd: Math.max(0, wallet.cashUsd - trade.spentUsd) }, trades: withTrade(trades, trade), trade };
+  const list = withTrade(trades, trade);
+  if (!list) return { error: "full" };
+  return { wallet: { ...wallet, cashUsd: Math.max(0, wallet.cashUsd - trade.spentUsd) }, trades: list, trade };
 }
 
 /** A paper buy from the wallet, saved. The trade, or why not. */
@@ -264,14 +292,34 @@ export function remainingOf(t: PaperTrade): number {
   return left > t.tokens * 1e-9 ? left : 0;
 }
 
-/** `fraction` (0.25, 0.5, 1) of what's left sold at the pair's price now. Pure: the trade with the sale, or null. */
-export function paperSell(t: PaperTrade, fraction: number, m: MarketSnapshot, now = Date.now()): PaperTrade | null {
+/** Tokens of a token already sold on this very quote, across its trades. */
+function soldOnQuote(trades: PaperTrade[], id: string, quote: string): number {
+  let n = 0;
+  for (const t of trades) if (t.tokenId === id) for (const s of t.sales) if (s.quote === quote) n += s.tokens;
+  return n;
+}
+
+/**
+ * What selling `tokens` brings in on top of `prior` already sold on the same quote, all costs out. A paper sale
+ * doesn't move the real pool, so pieces sold on one quote are priced as what each adds to the whole: selling in
+ * pieces never beats selling at once.
+ */
+function proceedsAfter(m: MarketSnapshot, prior: number, tokens: number): number {
+  return Math.max(0, grossSell(m, prior + tokens) - grossSell(m, prior) - poolOf(m).networkUsd);
+}
+
+/**
+ * `fraction` (0.25, 0.5, 1) of what's left sold at the pair's price now, `prior` tokens of it already sold on
+ * this quote. Pure: the trade with the sale, or null when it can't be filled.
+ */
+export function paperSell(t: PaperTrade, fraction: number, m: MarketSnapshot, now = Date.now(), prior = 0): PaperTrade | null {
   const left = remainingOf(t);
-  if (!(left > 0) || !(fraction > 0)) return null;
+  if (!(left > 0) || !(fraction > 0) || !(m.priceUsd > 0) || !isFresh(m, now)) return null;
   const tokens = fraction >= 1 ? left : left * fraction;
-  const fill = quoteSell(m, tokens);
-  if (!fill) return null;
-  return { ...t, sales: [...t.sales, { at: now, tokens, proceedsUsd: fill.proceedsUsd, priceUsd: m.priceUsd }] };
+  return {
+    ...t,
+    sales: [...t.sales, { at: now, tokens, proceedsUsd: proceedsAfter(m, prior, tokens), priceUsd: m.priceUsd, quote: quoteOf(m) }],
+  };
 }
 
 /** A token's open paper trades, oldest first, with what they hold together and what it cost. */
@@ -302,9 +350,11 @@ export function sellFrom(
 ): { wallet: PaperWallet | null; trades: PaperTrade[]; proceedsUsd: number; tokens: number } | { error: SwapError } {
   const held = holdingsOf(trades, tokenId);
   if (!(tokens > 0) || !(held.tokens > 0) || tokens > held.tokens * (1 + 1e-9)) return { error: "holdings" };
+  if (!(m.priceUsd > 0)) return { error: "price" };
+  if (!isFresh(m, now)) return { error: "stale" };
   const amount = Math.min(tokens, held.tokens);
-  const fill = quoteSell(m, amount);
-  if (!fill) return { error: "price" };
+  const quote = quoteOf(m);
+  const proceeds = proceedsAfter(m, soldOnQuote(trades, tokenId, quote), amount);
   const sales = new Map<string, Sale>();
   let left = amount;
   for (const t of held.open) {
@@ -312,13 +362,13 @@ export function sellFrom(
     const take = Math.min(remainingOf(t), left);
     // The last one takes what's left of the trade outright, so no dust stays behind.
     const all = take >= remainingOf(t) * (1 - 1e-9);
-    sales.set(t.id, { at: now, tokens: all ? remainingOf(t) : take, proceedsUsd: (fill.proceedsUsd * take) / amount, priceUsd: m.priceUsd });
+    sales.set(t.id, { at: now, tokens: all ? remainingOf(t) : take, proceedsUsd: (proceeds * take) / amount, priceUsd: m.priceUsd, quote });
     left -= take;
   }
   return {
-    wallet: wallet && { ...wallet, cashUsd: wallet.cashUsd + fill.proceedsUsd },
+    wallet: wallet && { ...wallet, cashUsd: wallet.cashUsd + proceeds },
     trades: trades.map((t) => (sales.has(t.id) ? { ...t, sales: [...t.sales, sales.get(t.id)!] } : t)),
-    proceedsUsd: fill.proceedsUsd,
+    proceedsUsd: proceeds,
     tokens: amount,
   };
 }
@@ -331,12 +381,16 @@ export function swapSell(tokenId: string, tokens: number, m: MarketSnapshot): { 
   return { proceedsUsd: out.proceedsUsd, tokens: out.tokens };
 }
 
-/** Sells part or all of one paper trade, into the wallet. Returns the updated trade, or null when it can't be priced. */
-export function sellPaperTrade(id: string, fraction: number, m: MarketSnapshot): PaperTrade | null {
+/**
+ * Sells part or all of one paper trade, into the wallet. `sales`: how many sales the trade had when the button
+ * was pressed, so a second click (a double-click, or a click on a row that moved) sells nothing. Returns the
+ * updated trade, or null when nothing was sold.
+ */
+export function sellPaperTrade(id: string, fraction: number, m: MarketSnapshot, sales?: number): PaperTrade | null {
   const list = read();
   const i = list.findIndex((t) => t.id === id);
-  if (i < 0) return null;
-  const next = paperSell(list[i], fraction, m);
+  if (i < 0 || (sales !== undefined && list[i].sales.length !== sales)) return null;
+  const next = paperSell(list[i], fraction, m, Date.now(), soldOnQuote(list, list[i].tokenId, quoteOf(m)));
   if (!next) return null;
   const wallet = readWallet();
   const proceeds = next.sales[next.sales.length - 1].proceedsUsd;
@@ -345,6 +399,16 @@ export function sellPaperTrade(id: string, fraction: number, m: MarketSnapshot):
     wallet && { ...wallet, cashUsd: wallet.cashUsd + proceeds },
   );
   return next;
+}
+
+/** What's left of a trade written off at nothing (a token with no market left): it closes, at a loss. */
+export function writeOff(t: PaperTrade, now = Date.now()): PaperTrade {
+  const left = remainingOf(t);
+  return left > 0 ? { ...t, sales: [...t.sales, { at: now, tokens: left, proceedsUsd: 0, priceUsd: 0, quote: "write-off" }] } : t;
+}
+
+export function writeOffPaperTrade(id: string) {
+  write(read().map((t) => (t.id === id ? writeOff(t) : t)));
 }
 
 export function removePaperTrade(id: string) {
@@ -360,24 +424,24 @@ export type Position = {
   /** Tokens left, and what they cost (their share of what went in). */
   remaining: number;
   costUsd: number;
-  /** Selling what's left now, when there's live data: its value at the market price and what it would bring in. */
+  /** Selling what's left now, when there's fresh live data: its value at the market price and what it would bring in. */
   now: SellFill | null;
   /** What the sales brought in, less what the sold tokens cost. */
   realizedUsd: number;
-  /** What selling the rest now would bring in, less what it cost; null without live data. */
+  /** What selling the rest now would bring in, less what it cost; null without fresh live data. */
   unrealizedUsd: number | null;
-  /** Everything back (sold, plus selling the rest now) over what went in; null without live data while open. */
+  /** Everything back (sold, plus selling the rest now) over what went in; null without fresh live data while open. */
   multiple: number | null;
 };
 
-/** Where a paper trade stands, given the pair's live data (null when there is none). */
-export function positionOf(t: PaperTrade, m: MarketSnapshot | null): Position {
+/** Where a paper trade stands, sold on its own, given the pair's live data (null, or too old, counts as none). */
+export function positionOf(t: PaperTrade, m: MarketSnapshot | null, at = Date.now()): Position {
   const remaining = remainingOf(t);
   const sold = t.tokens - remaining;
   const proceeds = t.sales.reduce((n, s) => n + s.proceedsUsd, 0);
   const realizedUsd = proceeds - (t.spentUsd * sold) / t.tokens;
   const costUsd = (t.spentUsd * remaining) / t.tokens;
-  const now = remaining > 0 && m ? quoteSell(m, remaining) : null;
+  const now = remaining > 0 && m && isFresh(m, at) ? quoteSell(m, remaining) : null;
   const unrealizedUsd = remaining > 0 ? (now ? now.proceedsUsd - costUsd : null) : 0;
   const back = remaining > 0 ? (now ? proceeds + now.proceedsUsd : null) : proceeds;
   return { remaining, costUsd, now, realizedUsd, unrealizedUsd, multiple: back === null ? null : back / t.spentUsd };
@@ -388,27 +452,41 @@ export type PaperSummary = {
   open: number;
   /** Everything that went in. */
   investedUsd: number;
-  /** What the open trades' tokens would bring in now (those with live data). */
+  /** What the open trades' tokens would bring in now, each token's sold together (those with fresh live data). */
   openValueUsd: number;
   realizedUsd: number;
   unrealizedUsd: number;
-  /** Open trades without live data right now: left out of the open value and unrealized. */
+  /** Open trades without fresh live data right now: left out of the open value and unrealized. */
   unpriced: number;
 };
 
-export function summaryOf(trades: PaperTrade[], marketOf: (tokenId: string) => MarketSnapshot | null): PaperSummary {
+/** Every trade together: a token held in several trades is valued as one sale of all of it, as it would sell. */
+export function summaryOf(
+  trades: PaperTrade[],
+  marketOf: (tokenId: string) => MarketSnapshot | null,
+  at = Date.now(),
+): PaperSummary {
   const out: PaperSummary = { trades: trades.length, open: 0, investedUsd: 0, openValueUsd: 0, realizedUsd: 0, unrealizedUsd: 0, unpriced: 0 };
+  const held = new Map<string, { tokens: number; costUsd: number; trades: number }>();
   for (const t of trades) {
-    const p = positionOf(t, marketOf(t.tokenId));
+    const p = positionOf(t, null, at);
     out.investedUsd += t.spentUsd;
     out.realizedUsd += p.realizedUsd;
     if (p.remaining > 0) {
       out.open++;
-      if (p.now && p.unrealizedUsd !== null) {
-        out.openValueUsd += p.now.proceedsUsd;
-        out.unrealizedUsd += p.unrealizedUsd;
-      } else out.unpriced++;
+      const h = held.get(t.tokenId) ?? { tokens: 0, costUsd: 0, trades: 0 };
+      held.set(t.tokenId, { tokens: h.tokens + p.remaining, costUsd: h.costUsd + p.costUsd, trades: h.trades + 1 });
     }
+  }
+  for (const [id, h] of held) {
+    const m = marketOf(id);
+    if (!m || !isFresh(m, at) || !(m.priceUsd > 0)) {
+      out.unpriced += h.trades;
+      continue;
+    }
+    const proceeds = Math.max(0, grossSell(m, h.tokens) - poolOf(m).networkUsd);
+    out.openValueUsd += proceeds;
+    out.unrealizedUsd += proceeds - h.costUsd;
   }
   return out;
 }

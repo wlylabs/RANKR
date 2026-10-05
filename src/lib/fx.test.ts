@@ -75,4 +75,31 @@ describe("usdIdr", () => {
     expect((await usdIdr(NOW + 7 * 3_600_000))?.usdIdr).toBe(17_850);
     expect(await usdIdr(NOW + 8 * 86_400_000)).toBeNull();
   });
+
+  it("answers with the rate it has while it fetches a newer one", async () => {
+    let rate = 17_800;
+    let release = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        if (rate !== 17_800) await gate;
+        return Response.json({ result: "success", time_last_update_unix: Math.floor(NOW / 1000), rates: { IDR: rate } });
+      }),
+    );
+    const { usdIdr } = await import("./fx");
+    expect((await usdIdr(NOW))?.usdIdr).toBe(17_800);
+    rate = 17_950;
+    // Past the TTL: the old one, at once, not after the fetch.
+    expect((await usdIdr(NOW + 7 * 3_600_000))?.usdIdr).toBe(17_800);
+    release();
+    await new Promise((r) => setTimeout(r, 0));
+    expect((await usdIdr(NOW + 7 * 3_600_000 + 1))?.usdIdr).toBe(17_950);
+  });
+
+  it("refuses ExchangeRate-API's rate when it's days old", () => {
+    const er = { name: "ExchangeRate-API", read: (b: unknown) => ({ rate: (b as { r: number }).r, date: (b as { d: string }).d }), maxAgeDays: 3 };
+    expect(parseRate(er, { r: 17_800, d: "2026-10-03" }, NOW)).not.toBeNull();
+    expect(parseRate(er, { r: 17_800, d: "2026-09-28" }, NOW)).toBeNull();
+  });
 });

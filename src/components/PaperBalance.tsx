@@ -96,7 +96,7 @@ function FundsForm({ cta, onDone, className }: { cta: string; onDone: () => void
           inputMode="decimal"
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
-          placeholder={idr ? "Other amount, e.g. 2.500.000" : "Other amount, e.g. 2,500"}
+          placeholder={idr ? "Other amount, e.g. 2,5 jt" : "Other amount, e.g. 2,500"}
           className="h-8 min-w-0 flex-1 rounded-md border border-border bg-transparent px-2.5 font-mono text-xs outline-none placeholder:text-subtle focus:border-border-strong"
         />
         <button
