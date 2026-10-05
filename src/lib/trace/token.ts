@@ -8,6 +8,7 @@ import { MOCK, searchPairs, tokenPairs, type Pair } from "../dexscreener";
 import { traceChain, validWallet, type TraceChain } from "./chains";
 import { TraceError } from "./errors";
 import { poolTrades, poolWindows } from "./gecko";
+import { keyScope, needKeyFor } from "./keys";
 import { labelOf, solanaDeposits } from "./labels";
 import { assessToken, copycatOf, type TokenFacts } from "./token-assess";
 import { evmTokenFacts, liteTokenFacts } from "./token-evm";
@@ -68,8 +69,10 @@ export async function traceToken(chainId: string, address: string, now = Date.no
   if (!validWallet(chain, address))
     throw new TraceError("invalid", `That isn't a ${chain.id === "solana" ? "Solana" : "EVM"} address.`);
   if (MOCK) return assessToken(mockTokenFacts(chain, address, now));
+  needKeyFor(chain);
 
-  const key = `${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
+  // Per key, like trails: a report read on one account's keys stays its own.
+  const key = `${keyScope()}${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
   const hit = cache.get(key);
   if (hit && now - hit.at < TTL) return hit.value;
   const value = tracked(() => readToken(chain, address, now)).then(({ value: report, refused }) => ({

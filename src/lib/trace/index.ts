@@ -5,6 +5,7 @@ import { traceChain, validWallet } from "./chains";
 import { isToken } from "./evm-rpc";
 import { TraceError } from "./errors";
 import { evmHoldings, traceEvm } from "./evm";
+import { keyScope, needKeyFor } from "./keys";
 import { mockTrace } from "./mock";
 import { traceSolana } from "./solana";
 import type { TraceHoldings, TraceResponse } from "./types";
@@ -38,8 +39,10 @@ export async function traceWallet(chainId: string, address: string, now = Date.n
     if (chain.kind === "solana" && address.endsWith("pump")) throw new TraceError("token", "That's a token, not a wallet.");
     return mockTrace(chain, address, now);
   }
+  needKeyFor(chain);
 
-  const key = `${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
+  // Per key: what one account's keys read stays its own (a read cut short by its budget isn't the site's).
+  const key = `${keyScope()}${chain.id}:${chain.kind === "evm" ? address.toLowerCase() : address}`;
   const hit = cache.get(key);
   if (hit && now - hit.at < TTL) return hit.value;
 
@@ -68,7 +71,7 @@ export async function walletHoldings(
 ): Promise<TraceHoldings | "budget" | null | undefined> {
   const chain = traceChain(chainId);
   if (!chain || chain.kind !== "evm" || chain.tokensOnly || MOCK || !validWallet(chain, address)) return undefined;
-  const key = `${chain.id}:${address.toLowerCase()}`;
+  const key = `${keyScope()}${chain.id}:${address.toLowerCase()}`;
   const hit = held.get(key);
   if (hit && now - hit.at < TTL) return hit.value;
   const value = evmHoldings(chain, address);

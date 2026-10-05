@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireTraceAccess } from "@/lib/api-auth";
+import { traceCaller } from "@/lib/api-auth";
 import { hit, untilReset } from "@/lib/rate-limit";
 import { TraceError, traceToken } from "@/lib/trace";
+import { withKeys } from "@/lib/trace/keys";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,11 +21,11 @@ function decode(value: string) {
 
 /**
  * GET /api/trace/token/:chain/:address -> a token's report for the trace page: where its buys and sells come
- * from, who holds it, what its contract allows, and the checks that make its verdict. Official accounts only.
+ * from, who holds it, what its contract allows, and the checks that make its verdict. On the caller's own keys.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ chain: string; address: string }> }) {
-  const denied = await requireTraceAccess(req);
-  if (denied) return denied;
+  const caller = await traceCaller(req);
+  if (caller instanceof NextResponse) return caller;
   const { chain, address } = await params;
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ chai
   }
 
   try {
-    const report = await traceToken(chain, decode(address).trim());
+    const report = await withKeys(caller.keys, () => traceToken(chain, decode(address).trim()));
     return NextResponse.json(report, { headers: { "Cache-Control": "private, max-age=30" } });
   } catch (err) {
     if (err instanceof TraceError)

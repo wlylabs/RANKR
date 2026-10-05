@@ -7,17 +7,23 @@
 //   credits a day, an RPC's credits a month). An instance leases a small block at a time, so most calls don't go
 //   to Postgres; a block left over when an instance stops is simply not used (the count errs on the safe side).
 // The defaults sit under the free plans' published limits; each can be set in the environment.
+//
+// An account tracing on its own keys (trace/keys.ts) has its own day's and month's budgets, at the free plans'
+// defaults (the environment's limits are for the site's keys, which may be on a paid plan). The per-minute ones
+// stay shared: they're per server IP, whoever's read it is.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { peek, spend, type Quota } from "./rate-limit";
+import { blockscoutKey, keyScope, ownKeys, solanaRpcUrls } from "./trace/keys";
 
 type Window = "minute" | "day" | "month";
 type Rule = { window: Window; max: number };
 
 const env = (name: string, fallback: number) => {
+  if (ownKeys()) return fallback;
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
-const ownSolanaRpc = () => !!process.env.SOLANA_RPC_URL?.trim();
+const ownSolanaRpc = () => solanaRpcUrls().length > 0;
 
 /**
  * What each upstream allows, in its own unit: Solana RPC credits (Helius: 1M a month free; archival calls 10),
@@ -81,8 +87,8 @@ function period(window: Exclude<Window, "minute">, now: number): { key: string; 
 const minutes = new Map<string, { start: number; used: number }>();
 // Leased blocks of a day's or month's budget, per instance: units this instance may still use.
 const leases = new Map<string, number>();
-// When each upstream's spent budget comes back, for messages.
-const resets = new Map<Upstream, number>();
+// When each upstream's spent budget comes back (per key, see keyScope), for messages.
+const resets = new Map<string, number>();
 
 function takeMinute(name: string, max: number, cost: number, now: number): boolean {
   const cur = minutes.get(name);
@@ -98,7 +104,7 @@ function takeMinute(name: string, max: number, cost: number, now: number): boole
 
 async function takeShared(name: string, rule: Rule & { window: "day" | "month" }, cost: number, now: number) {
   const { key, ends } = period(rule.window, now);
-  const bucket = `budget:${name}:${rule.window}:${key}`;
+  const bucket = `budget:${keyScope()}${name}:${rule.window}:${key}`;
   const left = leases.get(bucket) ?? 0;
   if (left >= cost) {
     leases.set(bucket, left - cost);
@@ -132,8 +138,9 @@ export async function take(name: Upstream, cost = 1, now = Date.now()): Promise<
         ? takeMinute(name, rule.max, cost, now)
         : await takeShared(name, rule as Rule & { window: "day" | "month" }, cost, now);
     if (!ok) {
+      if (resets.size > 1_000) resets.clear();
       resets.set(
-        name,
+        keyScope() + name,
         rule.window === "minute" ? (minutes.get(name)?.start ?? now) + MINUTE : period(rule.window, now).ends,
       );
       refused.getStore()?.add(name);
@@ -145,7 +152,7 @@ export async function take(name: Upstream, cost = 1, now = Date.now()): Promise<
 
 /** When `name`'s spent budget comes back (after a refusal), ms. */
 export function resetOf(name: Upstream, now = Date.now()): number {
-  return resets.get(name) ?? now + MINUTE;
+  return resets.get(keyScope() + name) ?? now + MINUTE;
 }
 
 /** Runs `fn`, and says which upstreams turned a call down while it ran. */
@@ -210,7 +217,9 @@ export async function usage(now = Date.now()): Promise<UsageRow[]> {
         remaining: 0,
         reset: now,
         scope: "instance",
-        off: "Public RPCs: paced at 3.5 calls a second, no quota to spend. Set SOLANA_RPC_URL (a Helius key) for more.",
+        off: ownKeys()
+          ? "Not set up: add your Helius API key."
+          : "Public RPCs: paced at 3.5 calls a second, no quota to spend. Set SOLANA_RPC_URL (a Helius key) for more.",
       });
       continue;
     }
@@ -240,9 +249,11 @@ export async function usage(now = Date.now()): Promise<UsageRow[]> {
         reset: ends,
         scope: "shared",
         ...(id.startsWith("blockscout") &&
-          !process.env.BLOCKSCOUT_API_KEY && { off: "Not set up: no BLOCKSCOUT_API_KEY." }),
+          !blockscoutKey() && {
+            off: ownKeys() ? "Not set up: add your Blockscout API key." : "Not set up: no BLOCKSCOUT_API_KEY.",
+          }),
       };
-      shared.push({ row, bucket: `budget:${id}:${rule.window}:${key}` });
+      shared.push({ row, bucket: `budget:${keyScope()}${id}:${rule.window}:${key}` });
       rows.push(row);
     }
   }

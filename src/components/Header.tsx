@@ -10,21 +10,14 @@ import { AccountMenu } from "./AccountMenu";
 import { Logo } from "./Logo";
 import { PasteBox } from "./PasteBox";
 import { SettingsMenu } from "./SettingsMenu";
-import { useTraceAccess } from "./trace/TraceGate";
 
 export const NAV = [
   { href: APP_HOME, label: "Home", icon: House },
   { href: "/feed", label: "Feed", icon: Radio },
   { href: "/swap", label: "Swap", icon: ArrowLeftRight },
-  { href: "/trace", label: "Trace", icon: GitCommitVertical, private: true },
+  { href: "/trace", label: "Trace", icon: GitCommitVertical },
   { href: "/me", label: "You", icon: UserRound },
 ];
-
-/** The nav as this account sees it: Trace only for those who may open it (official accounts). */
-function useNav() {
-  const trace = useTraceAccess() === "open";
-  return NAV.filter((n) => !n.private || trace);
-}
 
 function isActive(pathname: string, href: string) {
   return href === APP_HOME ? pathname === APP_HOME : pathname.startsWith(href);
@@ -35,10 +28,9 @@ function isActive(pathname: string, href: string) {
  * moves, like any other app's: no hover pill, no line gliding from page to page.
  */
 function NavLinks({ pathname }: { pathname: string }) {
-  const nav = useNav();
   return (
     <nav aria-label="Main" className="hidden items-stretch self-stretch md:flex">
-      {nav.map(({ href, label }) => {
+      {NAV.map(({ href, label }) => {
         const active = isActive(pathname, href);
         return (
           <Link
@@ -161,14 +153,13 @@ export function Header() {
 
 export function BottomNav() {
   const pathname = usePathname();
-  const nav = useNav();
   return (
     <nav
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
     >
-      <div className={clsx("mx-auto grid h-14 max-w-md", nav.length === 5 ? "grid-cols-5" : "grid-cols-4")}>
-        {nav.map(({ href, label, icon: Icon }) => {
+      <div className="mx-auto grid h-14 max-w-md grid-cols-5">
+        {NAV.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
             <Link

@@ -38,6 +38,7 @@ import { Segmented } from "../Tabs";
 import { TimeAgo } from "../TimeAgo";
 import { FullAddress, LabelTag, Scramble } from "./TraceCard";
 import { TraceInput } from "./TraceInput";
+import { KeysLink } from "./TraceKeys";
 
 type ReadError = { message: string; code?: string };
 
@@ -518,7 +519,12 @@ export function TokenReport({ chain: chainId, address }: { chain: string; addres
       {error && !report ? (
         <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
           <p className="text-sm">{error.message}</p>
-          {error.code !== "invalid" && error.code !== "unsupported" && error.code !== "private" && (
+          {error.code === "nokey" && (
+            <div className="mt-4">
+              <KeysLink />
+            </div>
+          )}
+          {error.code !== "invalid" && error.code !== "unsupported" && error.code !== "nokey" && (
             <button
               type="button"
               onClick={() => void reload()}

@@ -8,6 +8,7 @@ import { untilReset } from "../rate-limit";
 import { firstFunding, labelFlows, summarize, type Leg } from "./flows";
 import { labelOf } from "./labels";
 import { TraceError } from "./errors";
+import { blockscoutKey, keyScope } from "./keys";
 import type { TraceChain } from "./chains";
 import type { TraceHoldings, TraceLabel, TraceResponse } from "./types";
 
@@ -84,12 +85,14 @@ export type AddressInfo = AddressParam & {
   token?: unknown | null;
 };
 
-/** Blockscout's free plan allows 5 requests a second: calls queue up at 4. */
-let nextAt = 0;
+/** Blockscout's free plan allows 5 requests a second (per key): calls queue up at 4, each key's on its own. */
+const nextAt = new Map<string, number>();
 async function pace() {
   const now = Date.now();
-  const at = Math.max(now, nextAt);
-  nextAt = at + 250;
+  const who = keyScope();
+  const at = Math.max(now, nextAt.get(who) ?? 0);
+  if (nextAt.size > 1_000) nextAt.clear();
+  nextAt.set(who, at + 250);
   if (at > now) await new Promise((r) => setTimeout(r, at - now));
 }
 
@@ -104,7 +107,7 @@ async function budget() {
 
 /** One Blockscout API v2 request on `chain`; null for an address it has never seen (404). */
 export async function blockscout<T>(chain: TraceChain, path: string): Promise<T | null> {
-  const key = process.env.BLOCKSCOUT_API_KEY;
+  const key = blockscoutKey();
   if (!key)
     throw new TraceError(
       "nokey",
@@ -139,7 +142,7 @@ export async function blockscout<T>(chain: TraceChain, path: string): Promise<T 
  * like a token's transfers oldest first. Null when it answers with an error or nothing.
  */
 export async function blockscoutRpc<T>(chain: TraceChain, params: Record<string, string>): Promise<T[] | null> {
-  const key = process.env.BLOCKSCOUT_API_KEY;
+  const key = blockscoutKey();
   if (!key || !(await take("blockscout", BLOCKSCOUT_CREDITS))) return null;
   await pace();
   const q = new URLSearchParams({ chain_id: String(chain.chainId), ...params, apikey: key });
@@ -318,7 +321,7 @@ export function summarizeHoldings(items: TokenBalance[], partial: boolean): Trac
  * either is spent; null when Blockscout couldn't say.
  */
 export async function evmHoldings(chain: TraceChain, address: string): Promise<TraceHoldings | "budget" | null> {
-  if (!process.env.BLOCKSCOUT_API_KEY) return null;
+  if (!blockscoutKey()) return null;
   if (!(await take("blockscout-holdings", BLOCKSCOUT_CREDITS))) return "budget";
   try {
     const page = await blockscout<Page<TokenBalance>>(chain, `/addresses/${address}/tokens?type=ERC-20`);

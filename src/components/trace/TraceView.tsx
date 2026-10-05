@@ -19,6 +19,7 @@ import { TracePath } from "./TracePath";
 import { ShareTrace } from "./ShareTrace";
 import { TokenReport } from "./TokenReport";
 import { TraceInput } from "./TraceInput";
+import { KeysLink } from "./TraceKeys";
 import { useTrail } from "./useTrail";
 
 type ReadError = { message: string; code?: TraceErrorCode };
@@ -71,6 +72,7 @@ function RootError({ error, onRetry }: { error: ReadError; onRetry: () => void }
     <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
       <p className="text-sm">{error.message}</p>
       <div className="mt-4 flex justify-center gap-2">
+        {error.code === "nokey" && <KeysLink />}
         {error.code === "nokey" ||
           error.code === "unsupported" ||
           error.code === "invalid" ||

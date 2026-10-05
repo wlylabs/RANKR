@@ -177,7 +177,11 @@ export function UsageView() {
             <a href="https://dev.blockscout.com" target="_blank" rel="noreferrer" className="inline-flex items-center underline">
               Blockscout <ArrowUpRight className="size-3" />
             </a>
-            . The limits are set in the environment (.env.example, Usage limits).
+            . On your own keys (
+            <Link href="/trace/keys" className="underline">
+              Your API keys
+            </Link>
+            ), the day&apos;s and month&apos;s budgets are yours alone, at the free plans&apos; limits.
           </p>
         </>
       )}

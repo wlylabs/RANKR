@@ -211,5 +211,11 @@ export type MeResponse = {
   account: { id: string; username: string | null; hasKey: boolean; official: boolean; about: CallerAbout };
 };
 
+/**
+ * The account's own Trace keys, by their last characters ("…a1b2"; null: not added). Official accounts trace on
+ * the site's keys; `storable`: keys can be saved on this site.
+ */
+export type TraceKeysResponse = { official: boolean; storable: boolean; blockscout: string | null; helius: string | null };
+
 /** A new sign-in key, returned once. */
 export type KeyResponse = MeResponse & { key: string };

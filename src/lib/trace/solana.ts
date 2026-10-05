@@ -12,20 +12,23 @@ import { labelOf, solanaBridge, solanaDeposits, solanaDex } from "./labels";
 import { resetOf, solanaCredits, take } from "../budget";
 import { untilReset } from "../rate-limit";
 import { TraceError } from "./errors";
+import { ownKeys, solanaRpcUrls } from "./keys";
 import type { TraceResponse } from "./types";
 
 /** Free, keyless: Solana's own, then PublicNode's (Allnodes), taken in turn when one says 429. */
 const PUBLIC_RPCS = ["https://api.mainnet-beta.solana.com", "https://solana-rpc.publicnode.com"];
-/** SOLANA_RPC_URL: one RPC, or several separated by commas (tried in turn). */
+/**
+ * SOLANA_RPC_URL: one RPC, or several separated by commas (tried in turn); an account on its own keys, its
+ * Helius (keys.ts). Never the public ones for such an account: they're paced per server IP, shared with the site.
+ */
 const endpoints = () => {
-  const own = (process.env.SOLANA_RPC_URL ?? "")
-    .split(",")
-    .map((u) => u.trim())
-    .filter(Boolean);
-  return own.length ? own : PUBLIC_RPCS;
+  const own = solanaRpcUrls();
+  if (own.length) return own;
+  if (ownKeys()) throw new TraceError("nokey", "Add your own Helius API key (free) to trace Solana.");
+  return PUBLIC_RPCS;
 };
-const custom = () => !!process.env.SOLANA_RPC_URL?.trim();
-/** Its own RPC is set (SOLANA_RPC_URL): reads can go further. */
+const custom = () => solanaRpcUrls().length > 0;
+/** Its own RPC is set (SOLANA_RPC_URL, or the account's Helius): reads can go further. */
 export const ownRpc = custom;
 
 /** Transactions read per wallet, and at once. */
@@ -35,7 +38,7 @@ export const concurrency = () => (custom() ? 8 : 3);
  * Calls per second per endpoint: under the public endpoint's 40 per method per 10 seconds, and Helius's free
  * 10 per second. SOLANA_RPC_RPS raises it for a paid plan.
  */
-const rps = () => Number(process.env.SOLANA_RPC_RPS) || (custom() ? 9 : 3.5);
+const rps = () => (ownKeys() ? 9 : Number(process.env.SOLANA_RPC_RPS) || (custom() ? 9 : 3.5));
 
 /** Waits between retries (tests make them short). */
 export const RPC_TIMING = { backoffMs: 700 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { Gauge } from "lucide-react";
+import { Gauge, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { delay } from "@/lib/motion";
@@ -9,6 +9,7 @@ import type { TraceResponse } from "@/lib/trace/types";
 import { PageHeader } from "../PageHeader";
 import { TrailField } from "./TraceCinema";
 import { TraceInput } from "./TraceInput";
+import { KeysNote } from "./TraceKeys";
 import { TracePath } from "./TracePath";
 import { useTrail } from "./useTrail";
 
@@ -37,16 +38,18 @@ export function TraceIntro() {
           it was cashed out at. Solana, Ethereum, Base, Arbitrum, Optimism, Polygon and Robinhood Chain. Paste a
           token&apos;s CA for its report: who&apos;s buying, who&apos;s selling, and the warning signs (BSC too).
         </PageHeader>
-        <div className="cine-in max-w-2xl" style={delay(160)}>
+        <div className="cine-in max-w-2xl space-y-3" style={delay(160)}>
           <TraceInput size="lg" autoFocus />
+          <KeysNote />
         </div>
-        <Link
-          href="/trace/usage"
-          className="cine-in inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-fg"
-          style={delay(200)}
-        >
-          <Gauge className="size-3.5" /> API usage: how much of each free limit is used
-        </Link>
+        <div className="cine-in flex flex-wrap gap-x-5 gap-y-2 text-[13px]" style={delay(200)}>
+          <Link href="/trace/usage" className="inline-flex items-center gap-1.5 text-muted hover:text-fg">
+            <Gauge className="size-3.5" /> API usage: how much of each free limit is used
+          </Link>
+          <Link href="/trace/keys" className="inline-flex items-center gap-1.5 text-muted hover:text-fg">
+            <KeyRound className="size-3.5" /> Your API keys
+          </Link>
+        </div>
         <ol className="cine-in grid gap-3 sm:grid-cols-3" style={delay(240)}>
           {STEPS.map(([k, v]) => (
             <li key={k} className="border-t border-border bg-bg/60 pt-3 backdrop-blur-[1px]">
