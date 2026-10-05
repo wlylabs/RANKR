@@ -56,17 +56,14 @@ export function tickerLine(tickers: string[], tokens: number): string {
   return more > 0 ? `${shown} +${more}` : shown;
 }
 
-/**
- * "Paper-traded $PEPE on Rankr: 2.40x." The post always says it's paper: a paper trade passed off as a
- * real one is the card's one way to mislead.
- */
+/** "Traded $PEPE on Rankr: 2.40x.", as the card says it: holding while some is still held. */
 export function paperShareText(card: PaperCard): string {
   const moved = card.multiple > 1.005 || card.multiple < 0.995;
   if (card.kind === "wallet") {
-    const did = card.tickers.length ? `Paper-trading ${tickerLine(card.tickers, card.tokens)} on Rankr` : "Paper-trading on Rankr";
+    const did = card.tickers.length ? `Trading ${tickerLine(card.tickers, card.tokens)} on Rankr` : "Trading on Rankr";
     return moved ? `${did}: ${formatChange(card.multiple)}.` : `${did}.`;
   }
-  const did = `${card.open ? "Paper-trading" : "Paper-traded"} $${card.symbol} on Rankr`;
+  const did = `${card.open ? "Holding" : "Traded"} $${card.symbol} on Rankr`;
   return moved ? `${did}: ${formatMultiple(card.multiple)}${card.open ? " so far" : ""}.` : `${did}.`;
 }
 

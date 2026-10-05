@@ -45,11 +45,11 @@ const trade: PaperCard = { kind: "trade", symbol: "PEPE", chainId: "solana", ope
 const wallet: PaperCard = { kind: "wallet", tickers: ["PEPE", "WIF", "DOGE"], tokens: 5, trades: 7, multiple: 1.24, amounts: null };
 
 describe("paperShareText", () => {
-  it("always says it's paper, with the move", () => {
-    expect(paperShareText(trade)).toBe("Paper-traded $PEPE on Rankr: 2.40x.");
-    expect(paperShareText({ ...trade, open: true, multiple: 0.548 })).toBe("Paper-trading $PEPE on Rankr: -45.2% so far.");
-    expect(paperShareText(wallet)).toBe("Paper-trading $PEPE $WIF $DOGE +2 on Rankr: +24.0%.");
-    expect(paperShareText({ ...wallet, tickers: [], tokens: 0, multiple: 1.001 })).toBe("Paper-trading on Rankr.");
+  it("says it as the card does, with the move", () => {
+    expect(paperShareText(trade)).toBe("Traded $PEPE on Rankr: 2.40x.");
+    expect(paperShareText({ ...trade, open: true, multiple: 0.548 })).toBe("Holding $PEPE on Rankr: -45.2% so far.");
+    expect(paperShareText(wallet)).toBe("Trading $PEPE $WIF $DOGE +2 on Rankr: +24.0%.");
+    expect(paperShareText({ ...wallet, tickers: [], tokens: 0, multiple: 1.001 })).toBe("Trading on Rankr.");
   });
 });
 
