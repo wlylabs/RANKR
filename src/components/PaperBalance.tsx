@@ -11,10 +11,10 @@ const USD_STARTS = [100, 1_000, 10_000];
 const IDR_STARTS = [1_000_000, 10_000_000, 100_000_000];
 
 /**
- * The paper wallet's cash, with a way to add to it. Before there is one: picking the balance to start with,
- * any amount.
+ * The paper wallet's cash (`label`ed), with a way to add to it. Before there is one: picking the balance to
+ * start with, any amount.
  */
-export function PaperBalance({ className }: { className?: string }) {
+export function PaperBalance({ label = "Balance", className }: { label?: string; className?: string }) {
   const wallet = usePaperWallet();
   const money = useMoney();
   const [open, setOpen] = useState(false);
@@ -35,7 +35,7 @@ export function PaperBalance({ className }: { className?: string }) {
     <div className={clsx("text-xs", className)}>
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-1.5 text-muted">
-          <Wallet className="size-3.5" /> Balance{" "}
+          <Wallet className="size-3.5" /> {label}{" "}
           <span className="tabular font-mono text-fg">{money.format(wallet.cashUsd)}</span>
         </span>
         <button
