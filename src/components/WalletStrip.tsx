@@ -50,6 +50,9 @@ export function WalletStrip({ current, onSell, className }: { current: string | 
             href="/swap"
             card={{
               kind: "wallet",
+              // What's held first, most worth first, then what was traded.
+              tickers: [...new Set([...holdings.map((h) => h.symbol), ...trades.map((t) => t.symbol)])],
+              tokens: new Set(trades.map((t) => t.tokenId)).size,
               trades: trades.length,
               multiple,
               amounts: { inUsd: wallet.depositedUsd, backUsd: total, currency: money.shown, usdIdr: money.rate?.usdIdr ?? null },

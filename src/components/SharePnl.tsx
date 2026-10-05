@@ -60,7 +60,7 @@ function PnlDialog({ card, href, title }: { card: PaperCard; href: string; title
   return (
     <ShareSheet
       title={title}
-      subtitle="Marked PAPER: simulated with live DEX prices, no real money."
+      subtitle="The card shows your PnL as it is right now."
       image={`/api/paper/card?${paperCardQuery(shown)}`}
       fileName={paperCardFile(card)}
       text={paperShareText(card)}
