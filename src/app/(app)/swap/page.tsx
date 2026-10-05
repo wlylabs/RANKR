@@ -4,7 +4,7 @@ import { Swap } from "@/components/Swap";
 
 export const metadata: Metadata = {
   title: "Swap",
-  description: "Paste a token, pick how much, swap: on paper, with no real money, priced from the token's live pool.",
+  description: "Paste a token, pick how much, swap, priced from the token's live pool.",
 };
 
 export default function SwapPage() {

@@ -9,7 +9,7 @@ import useSWR from "swr";
 import { parseAmount, spendPresets, useMoney } from "@/lib/currency";
 import { formatAmount, formatMultiple, formatPrice, formatUsd, tokenHref } from "@/lib/format";
 import { fetcher } from "@/lib/hooks";
-import { MAX_TRADES, PAPER_NOTE, holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
+import { MAX_TRADES, holdingsOf, swapBuy, swapSell, usePaperTrades, usePaperWallet, type SwapError } from "@/lib/paper";
 import { CONFIRM_IMPACT, WARN_IMPACT, atMultiple, poolOf, quoteBuy, quoteSell } from "@/lib/sim";
 import { lookupPaste } from "@/lib/track";
 import type { MarketSnapshot, TokenResponse } from "@/lib/types";
@@ -38,12 +38,12 @@ const pct = (x: number) => `${(x * 100).toFixed(x >= 0.1 ? 0 : 1)}%`;
 const impactLabel = (x: number) => (x >= 1 ? `${formatMultiple(1 + x)} the market price` : pct(x));
 
 const ERRORS: Record<SwapError, string> = {
-  balance: "Not enough paper balance for that.",
+  balance: "Not enough balance for that.",
   holdings: "You don't hold that much of it.",
   price: "This token has no live price right now.",
   stale: "No fresh price right now: try again in a moment.",
   drained: "This pool is drained: there's nothing to trade against.",
-  full: `You have ${MAX_TRADES} open paper trades: sell or clear some first.`,
+  full: `You have ${MAX_TRADES} open trades: sell or clear some first.`,
 };
 
 /** A typed token amount: "1,250,000" or "1250000.5". */
@@ -146,11 +146,11 @@ export function Swap() {
         const got = side === "buy" ? `${formatAmount(now)} $${m.symbol}` : money.format(now);
         throw new Error(`The price moved past your ${pct(slippage)} slippage: you'd get ${got} now. Nothing was swapped: check the new quote and swap again.`);
       }
-      const note = `Within your ${pct(slippage)} slippage. On paper: no real money moved.`;
+      const note = `Within your ${pct(slippage)} slippage.`;
       if (side === "buy") {
         const out = swapBuy(m, spendUsd!, money.rate?.usdIdr ?? null);
         if (typeof out === "string") throw new Error(ERRORS[out]);
-        setAnnounce(`Swapped ${money.format(out.spentUsd)} for about ${formatAmount(out.tokens)} $${m.symbol}, on paper.`);
+        setAnnounce(`Swapped ${money.format(out.spentUsd)} for about ${formatAmount(out.tokens)} $${m.symbol}.`);
         setDone({
           title: `Swapped ${money.format(out.spentUsd)} for ≈ ${formatAmount(out.tokens)} $${m.symbol}`,
           rows: [
@@ -166,7 +166,7 @@ export function Swap() {
       } else {
         const out = swapSell(tokenId(m.chainId, m.address), sellTokens!, m);
         if (typeof out === "string") throw new Error(ERRORS[out]);
-        setAnnounce(`Swapped ${formatAmount(out.tokens)} $${m.symbol} for about ${money.format(out.proceedsUsd)}, on paper.`);
+        setAnnounce(`Swapped ${formatAmount(out.tokens)} $${m.symbol} for about ${money.format(out.proceedsUsd)}.`);
         setDone({
           title: `Swapped ${formatAmount(out.tokens)} $${m.symbol} for ≈ ${money.format(out.proceedsUsd)}`,
           rows: [
@@ -190,14 +190,14 @@ export function Swap() {
   const label = !market
     ? "Paste a token"
     : side === "buy" && !wallet
-      ? "Pick a paper balance first"
+      ? "Add a balance first"
       : !typed
         ? "Enter an amount"
         : tooSmall
           ? "Too small to cover network costs"
           : short
             ? side === "buy"
-              ? "Not enough paper balance"
+              ? "Insufficient balance"
               : `Not enough $${market.symbol}`
             : confirming
               ? `Swap anyway, at ${impactLabel(impact)} impact`
@@ -211,7 +211,6 @@ export function Swap() {
       <div className="relative isolate flex items-center justify-between gap-3">
         <PoolField />
         <h1 className="text-xl font-semibold tracking-tight">Swap</h1>
-        <span className="rounded border border-border px-1.5 font-mono text-[10px] tracking-wide text-subtle uppercase">paper</span>
       </div>
 
       <TokenPicker
@@ -234,7 +233,7 @@ export function Swap() {
         <Receipt title={done.title} rows={done.rows} note={done.note}>
           <div className="cine-in mt-4 flex justify-center gap-2" style={{ "--d": "900ms" } as CSSProperties}>
             <Link href="/me?tab=paper" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg">
-              Your paper trades
+              Your trades
             </Link>
             <button type="button" onClick={() => setDone(null)} className="inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85">
               Swap again
@@ -480,7 +479,6 @@ export function Swap() {
 
           {wallet && <PaperBalance className="mt-4" />}
           <RateNote className="mt-3" />
-          <p className="mt-2 text-[11px] leading-relaxed text-subtle">{PAPER_NOTE}</p>
         </>
       )}
     </div>

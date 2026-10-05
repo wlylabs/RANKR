@@ -211,7 +211,7 @@ function CheckSvg() {
 
 /**
  * What a filled swap ends on: a receipt. The check draws itself, its lines come in one after another and a
- * FILLED · PAPER stamp comes down on it.
+ * FILLED stamp comes down on it.
  */
 export function Receipt({
   title,
@@ -234,7 +234,7 @@ export function Receipt({
         aria-hidden
         className="stamp absolute top-4 right-4 rounded border-2 border-up/70 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.18em] text-up/90"
       >
-        FILLED · PAPER
+        FILLED
       </span>
       <dl className="mt-4 space-y-1.5 border-t border-dashed border-border pt-3 font-mono text-xs">
         {rows.map(([label, value], i) => (

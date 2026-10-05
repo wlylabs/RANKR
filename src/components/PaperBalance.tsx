@@ -23,9 +23,9 @@ export function PaperBalance({ className }: { className?: string }) {
     return (
       <div className={clsx("card p-4", className)}>
         <p className="flex items-center gap-2 text-sm font-medium">
-          <Wallet className="size-4 text-muted" /> Start with a paper balance
+          <Wallet className="size-4 text-muted" /> Start with a balance
         </p>
-        <p className="mt-1 text-xs text-muted">Any amount. It&apos;s play money: buys take from it, sales pay into it.</p>
+        <p className="mt-1 text-xs text-muted">Any amount: buys take from it, sales pay into it.</p>
         <FundsForm cta="Start" onDone={() => {}} className="mt-3" />
       </div>
     );
@@ -35,7 +35,7 @@ export function PaperBalance({ className }: { className?: string }) {
     <div className={clsx("text-xs", className)}>
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-1.5 text-muted">
-          <Wallet className="size-3.5" /> Paper balance{" "}
+          <Wallet className="size-3.5" /> Balance{" "}
           <span className="tabular font-mono text-fg">{money.format(wallet.cashUsd)}</span>
         </span>
         <button
