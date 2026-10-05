@@ -196,7 +196,7 @@ const USES: Record<Upstream, string> = {
   dexscreener: "Prices, pools, search: the whole app",
   "dexscreener-slow": "A pasted address without its chain",
   publicnode: "A token's owner(), BSC tokens",
-  fx: "USD to IDR, for paper trades in rupiah",
+  fx: "USD to IDR, for amounts in rupiah",
 };
 
 export type UsageRow = {

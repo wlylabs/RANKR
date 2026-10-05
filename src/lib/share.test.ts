@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { callHref } from "./format";
-import { callCardFile, callShareText, paperCardFile, paperCardQuery, paperShareText, parsePaperCard, type PaperCard } from "./share";
+import { callCardFile, callShareText, paperCardFile, paperCardQuery, paperShareText, parsePaperCard, tickerLine, type PaperCard } from "./share";
 
 const call = { username: "nonce_7f3a", symbol: "PEPE", entryMarketCap: 80_200, multiple: 12.4, mine: true };
 
@@ -42,21 +42,21 @@ describe("callHref", () => {
 });
 
 const trade: PaperCard = { kind: "trade", symbol: "PEPE", chainId: "solana", open: false, multiple: 2.4, amounts: null };
-const wallet: PaperCard = { kind: "wallet", trades: 7, multiple: 1.24, amounts: null };
+const wallet: PaperCard = { kind: "wallet", tickers: ["PEPE", "WIF", "DOGE"], tokens: 5, trades: 7, multiple: 1.24, amounts: null };
 
 describe("paperShareText", () => {
-  it("always says it's paper, with the move", () => {
-    expect(paperShareText(trade)).toBe("Paper-traded $PEPE on Rankr: 2.40x. Simulated, no real money.");
-    expect(paperShareText({ ...trade, open: true, multiple: 0.548 })).toBe("Paper-trading $PEPE on Rankr: -45.2% so far. Simulated, no real money.");
-    expect(paperShareText(wallet)).toBe("My Rankr paper portfolio: +24.0% since the start. Simulated, no real money.");
-    expect(paperShareText({ ...wallet, multiple: 1.001 })).toBe("My Rankr paper portfolio. Simulated, no real money.");
+  it("says it as the card does, with the move", () => {
+    expect(paperShareText(trade)).toBe("Traded $PEPE on Rankr: 2.40x.");
+    expect(paperShareText({ ...trade, open: true, multiple: 0.548 })).toBe("Holding $PEPE on Rankr: -45.2% so far.");
+    expect(paperShareText(wallet)).toBe("Trading $PEPE $WIF $DOGE +2 on Rankr: +24.0%.");
+    expect(paperShareText({ ...wallet, tickers: [], tokens: 0, multiple: 1.001 })).toBe("Trading on Rankr.");
   });
 });
 
 describe("paperCardFile", () => {
   it("names the saved card after the ticker, or the portfolio", () => {
-    expect(paperCardFile({ ...trade, symbol: "WIF/2.0" })).toBe("rankr-paper-WIF20.png");
-    expect(paperCardFile(wallet)).toBe("rankr-paper-portfolio.png");
+    expect(paperCardFile({ ...trade, symbol: "WIF/2.0" })).toBe("rankr-pnl-WIF20.png");
+    expect(paperCardFile(wallet)).toBe("rankr-pnl-portfolio.png");
   });
 });
 
@@ -88,10 +88,18 @@ describe("paper card query", () => {
       "k=t&s=PEPE&c=So%20lana&x=2",
       "k=t&s=PEPE&c=solana&x=2&a=100", // half the amounts
       "k=t&s=PEPE&c=solana&x=2&a=100&b=200&r=0",
-      "k=w&x=2&n=1.5",
+      "k=w&x=2&n=1.5&m=1",
+      "k=w&x=2&n=3&m=1&t=PEPE,WIF", // fewer tokens than it names
       "k=z&x=2",
     ];
     for (const q of bad) expect(parsePaperCard(new URLSearchParams(q)), q).toBeNull();
+  });
+
+  it("names a portfolio by its first few tickers, counting the rest", () => {
+    expect(tickerLine(["PEPE", "WIF"], 2)).toBe("$PEPE $WIF");
+    expect(tickerLine(["PEPE", "WIF", "DOGE", "BONK"], 6)).toBe("$PEPE $WIF $DOGE +3");
+    const card = parsePaperCard(new URLSearchParams("k=w&x=2&n=9&m=6&t=PEPE,W<i>F,,DOGE,BONK"));
+    expect(card?.kind === "wallet" && card.tickers).toEqual(["PEPE", "WiF", "DOGE"]);
   });
 
   it("keeps a ticker short and plain", () => {

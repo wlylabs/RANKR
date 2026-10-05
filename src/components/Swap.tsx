@@ -84,6 +84,8 @@ export function Swap() {
   const [announce, setAnnounce] = useState("");
   const [sellAll, setSellAll] = useState(false);
   const amountId = useId();
+  // Where Buy on the wallet takes you: the token, then how much.
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   // An amount typed in one currency means nothing in the other: switching clears it.
   const [typedIn, setTypedIn] = useState(money.shown);
@@ -232,6 +234,17 @@ export function Swap() {
       <WalletStrip
         className="mt-4"
         current={market ? tokenId(market.chainId, market.address) : null}
+        onBuy={() => {
+          reset();
+          setDone(null);
+          if (side !== "buy") {
+            setSide("buy");
+            setTurns((t) => t + 1);
+          }
+          pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          // A token to paste when there's none yet, else the amount to pay.
+          (pickerRef.current?.querySelector("input") ?? document.getElementById(amountId))?.focus({ preventScroll: true });
+        }}
         onSell={(h) => {
           reset();
           setDone(null);
@@ -244,26 +257,28 @@ export function Swap() {
         }}
       />
 
-      <TokenPicker
-        market={market}
-        loading={isLoading}
-        error={key && error ? "Couldn't load this token. Try again." : null}
-        onPick={(m) => {
-          reset();
-          setDone(null);
-          router.replace(`${pathname}?chain=${encodeURIComponent(m.chainId)}&ca=${encodeURIComponent(m.address)}`, { scroll: false });
-        }}
-        onClear={() => {
-          reset();
-          setDone(null);
-          router.replace(pathname, { scroll: false });
-        }}
-      />
+      <div ref={pickerRef} className="scroll-mt-20">
+        <TokenPicker
+          market={market}
+          loading={isLoading}
+          error={key && error ? "Couldn't load this token. Try again." : null}
+          onPick={(m) => {
+            reset();
+            setDone(null);
+            router.replace(`${pathname}?chain=${encodeURIComponent(m.chainId)}&ca=${encodeURIComponent(m.address)}`, { scroll: false });
+          }}
+          onClear={() => {
+            reset();
+            setDone(null);
+            router.replace(pathname, { scroll: false });
+          }}
+        />
+      </div>
 
       {done ? (
         <Receipt title={done.title} rows={done.rows} note={done.note}>
           <div className="cine-in mt-4 flex justify-center gap-2" style={{ "--d": "900ms" } as CSSProperties}>
-            <Link href="/me?tab=paper" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg">
+            <Link href="/me?tab=portfolio" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted hover:bg-surface-2 hover:text-fg">
               Your trades
             </Link>
             {done.pnl && market && <SharePnl variant="action" card={done.pnl} href={tokenHref(market)} />}

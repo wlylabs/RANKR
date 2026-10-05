@@ -17,7 +17,6 @@ import {
   usePaperTrades,
   usePaperWallet,
   writeOffPaperTrade,
-  PAPER_NOTE,
   type PaperTrade,
 } from "@/lib/paper";
 import { isFresh } from "@/lib/sim";
@@ -57,8 +56,8 @@ export function PaperTrades() {
         <PaperBalance />
         <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
           <FlaskConical className="mx-auto size-5 text-subtle" />
-          <p className="mt-3 font-medium">No paper trades yet</p>
-          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Paste a token, pick how much, swap: any amount, no real money.</p>
+          <p className="mt-3 font-medium">No trades yet</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Paste a token, pick how much, swap.</p>
           <Link
             href="/swap"
             className="mt-5 inline-flex h-9 items-center rounded-md bg-fg px-4 text-sm font-medium text-bg hover:opacity-85"
@@ -77,7 +76,7 @@ export function PaperTrades() {
   return (
     <div className="mt-4">
       <p className="text-sm text-muted">
-        On this device only. Selling is priced on the pool as it is now, after the DEX fee and price impact.{" "}
+        Sold at the pool&apos;s price now, after the DEX fee and price impact.{" "}
         <Link href="/swap" className="text-fg underline-offset-4 hover:underline">
           Swap
         </Link>
@@ -128,11 +127,10 @@ export function PaperTrades() {
       <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-xl space-y-1">
           <RateNote />
-          <p className="text-[11px] leading-relaxed text-subtle">{PAPER_NOTE}</p>
         </div>
         {confirmClear ? (
           <span className="flex items-center gap-2 text-xs">
-            <span className="text-muted">Clear every paper trade?</span>
+            <span className="text-muted">Clear every trade?</span>
             <button
               type="button"
               onClick={() => {
@@ -222,7 +220,7 @@ function TradeRow({ trade: t, market: m, loading }: { trade: PaperTrade; market:
           <button
             type="button"
             onClick={() => removePaperTrade(t.id)}
-            aria-label={`Remove the $${t.symbol} paper trade`}
+            aria-label={`Remove the $${t.symbol} trade`}
             title="Remove"
             className="-mr-1 shrink-0 rounded p-1 text-subtle hover:text-fg"
           >
