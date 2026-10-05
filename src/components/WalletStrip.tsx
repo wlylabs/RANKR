@@ -8,7 +8,7 @@ import { chainMeta } from "@/lib/chains";
 import { useMoney } from "@/lib/currency";
 import { formatAmount, formatChange } from "@/lib/format";
 import { marketOf, useWatchlistMarkets } from "@/lib/hooks";
-import { holdingsList, remainingOf, summaryOf, usePaperTrades, usePaperWallet, type Holding } from "@/lib/paper";
+import { holdingsList, remainingOf, usePaperTrades, usePaperWallet, type Holding } from "@/lib/paper";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { OfficialBadge } from "./OfficialBadge";
@@ -41,7 +41,7 @@ function ChangePill({ multiple }: { multiple: number }) {
 
 /**
  * The top of Swap, as a wallet's home screen opens (Phantom, Rainbow, Backpack): who it is, what it's worth now
- * (cash, plus selling what's held at the live price) and how far that is from what was put in, the actions, then
+ * (cash, plus what's held at the market price) and how far that is from what was put in, the actions, then
  * the cash and the tokens held by ticker and name, with what each is worth and has done (one tap to sell one:
  * `onSell`). Funds are added from the settings menu. Nothing before there's a wallet: Swap asks for a balance.
  */
@@ -67,11 +67,11 @@ export function WalletStrip({
 
   if (!wallet) return null;
 
-  const s = summaryOf(trades, market);
   const holdings = holdingsList(trades, market);
-  const total = wallet.cashUsd + s.openValueUsd;
+  // At the market price, as a wallet shows a balance; what a sale would really bring in is quoted on Sell.
+  const total = wallet.cashUsd + holdings.reduce((n, h) => n + (h.marketUsd ?? 0), 0);
   // Waiting on live data for what's held: the total would read as if it were worth nothing.
-  const pending = isLoading && s.unpriced > 0;
+  const pending = isLoading && holdings.some((h) => h.marketUsd === null);
   const multiple = wallet.depositedUsd > 0 ? total / wallet.depositedUsd : null;
   // Sell: the token on screen when it's held, else the one worth most.
   const toSell = holdings.find((h) => h.tokenId === current) ?? holdings[0];
@@ -101,7 +101,7 @@ export function WalletStrip({
         </div>
 
         <div className="mt-5 text-center">
-          <div className="tabular text-[2.75rem] leading-none font-semibold tracking-tight" title="Cash, plus selling everything held now">
+          <div className="tabular text-[2.75rem] leading-none font-semibold tracking-tight" title="Cash, plus what you hold at the market price">
             {pending ? <span className="text-shimmer">{money.format(wallet.cashUsd)}</span> : <RollingNumber text={money.format(total)} />}
           </div>
           <div className="mt-2.5 flex h-6 items-center justify-center gap-2 font-mono text-sm">
@@ -171,7 +171,7 @@ export function WalletStrip({
             <span className="tabular font-mono text-sm">{money.format(wallet.cashUsd)}</span>
           </li>
           {shown.map((h) => {
-            const m = h.valueUsd === null || !(h.costUsd > 0) ? null : h.valueUsd / h.costUsd;
+            const m = h.marketUsd === null || !(h.costUsd > 0) ? null : h.marketUsd / h.costUsd;
             const active = h.tokenId === current;
             return (
               <li key={h.tokenId}>
@@ -192,7 +192,7 @@ export function WalletStrip({
                     </span>
                   </span>
                   <span className="shrink-0 text-right font-mono">
-                    <span className="tabular block text-sm">{h.valueUsd !== null ? money.format(h.valueUsd) : isLoading ? "…" : "—"}</span>
+                    <span className="tabular block text-sm">{h.marketUsd !== null ? money.format(h.marketUsd) : isLoading ? "…" : "—"}</span>
                     <span className={clsx("tabular block text-[11px]", tone(m))}>{m === null ? " " : formatChange(m)}</span>
                   </span>
                 </button>

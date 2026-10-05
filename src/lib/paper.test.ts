@@ -219,6 +219,9 @@ describe("the paper wallet", () => {
     expect(alpha.costUsd).toBeCloseTo(150, 9);
     expect(alpha.valueUsd).toBeCloseTo(summaryOf([a, b], () => now, T0 + 1).openValueUsd, 9);
     expect(list[0].valueUsd).toBeNull();
+    expect(alpha.marketUsd).toBeCloseTo(alpha.tokens * now.priceUsd, 9); // at the price, no impact
+    expect(alpha.marketUsd!).toBeGreaterThan(alpha.valueUsd!);
+    expect(list[0].marketUsd).toBeNull();
   });
 
   it("takes trades together for a PnL card", () => {
